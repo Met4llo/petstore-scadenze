@@ -1,0 +1,613 @@
+// ===== PetStore Scadenze App =====
+const DB_NAME = 'PetStoreScadenze';
+const DB_VERSION = 1;
+const STORE_PRODUCTS = 'products';
+const STORE_META = 'meta';
+
+let db = null;
+let products = [];          // in-memory cache
+let supplierConditions = {};
+let currentProduct = null;
+let html5QrCode = null;
+let isScanning = false;
+
+// ---------- IndexedDB helpers ----------
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(STORE_PRODUCTS)) {
+        const store = database.createObjectStore(STORE_PRODUCTS, { keyPath: 'ean' });
+        store.createIndex('name', 'name', { unique: false });
+        store.createIndex('supplier', 'supplier', { unique: false });
+        store.createIndex('expiry', 'expiry', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORE_META)) {
+        database.createObjectStore(STORE_META, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function idbGetAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(storeName, item) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.put(item);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbClear(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbBulkPut(storeName, items) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    items.forEach(item => store.put(item));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ---------- Password ----------
+async function getPassword() {
+  const meta = await idbGetAll(STORE_META);
+  const entry = meta.find(m => m.key === 'password');
+  return entry ? entry.value : 'scadenze2026';
+}
+
+async function setPassword(pwd) {
+  await idbPut(STORE_META, { key: 'password', value: pwd });
+}
+
+// ---------- Days calculation ----------
+function daysRemaining(expiryStr) {
+  if (!expiryStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expiryStr);
+  exp.setHours(0, 0, 0, 0);
+  return Math.round((exp - today) / (1000 * 60 * 60 * 24));
+}
+
+function getStatusClass(days) {
+  if (days === null) return '';
+  if (days <= 0) return 'expired';
+  if (days <= 7) return 'urgent';
+  if (days <= 30) return 'attention';
+  if (days <= 120) return 'monitor';
+  return 'ok';
+}
+
+function getBadge(days, signaled) {
+  if (signaled) return '<span class="badge signaled">Segnalato</span>';
+  if (days === null) return '';
+  if (days <= 0) return `<span class="badge expired">${days} gg</span>`;
+  if (days <= 7) return `<span class="badge urgent">${days} gg</span>`;
+  if (days <= 30) return `<span class="badge attention">${days} gg</span>`;
+  if (days <= 120) return `<span class="badge monitor">${days} gg</span>`;
+  return `<span class="badge ok">${days} gg</span>`;
+}
+
+// ---------- Load data ----------
+async function loadInitialData() {
+  const existing = await idbGetAll(STORE_PRODUCTS);
+  if (existing && existing.length > 0) {
+    products = existing;
+    console.log('Loaded from IndexedDB:', products.length);
+    return;
+  }
+
+  // First run: load from products.json
+  try {
+    showToast('Caricamento database prodotti...');
+    const res = await fetch('products.json');
+    const data = await res.json();
+    products = data;
+    // Bulk insert in chunks
+    const chunkSize = 500;
+    for (let i = 0; i < products.length; i += chunkSize) {
+      await idbBulkPut(STORE_PRODUCTS, products.slice(i, i + chunkSize));
+    }
+    console.log('Imported', products.length, 'products');
+    showToast(`Caricati ${products.length} prodotti`);
+  } catch (err) {
+    console.error(err);
+    showToast('Errore caricamento prodotti');
+  }
+}
+
+async function loadSupplierConditions() {
+  try {
+    const res = await fetch('supplier-conditions.json');
+    supplierConditions = await res.json();
+  } catch (e) {
+    console.warn('Could not load supplier conditions');
+  }
+}
+
+// ---------- Find best matching condition ----------
+function findCondition(supplierName) {
+  if (!supplierName) return null;
+  const name = supplierName.toUpperCase();
+  // Exact or partial match
+  for (const [key, val] of Object.entries(supplierConditions)) {
+    if (name.includes(key.toUpperCase()) || key.toUpperCase().includes(name.split(' ')[0])) {
+      return val;
+    }
+  }
+  // Common mappings
+  const map = {
+    '4 HEALTHY': '4 HEALTHY PETS (EDGARD COOPER)',
+    'EDGARD': '4 HEALTHY PETS (EDGARD COOPER)',
+    'CAMON': 'CAMON&CROCI PET GROUP SPA',
+    'CROCI': 'CAMON&CROCI PET GROUP SPA',
+    'AFFINITY': 'AFFINITY (TRAINER)',
+    'TRAINER': 'AFFINITY (TRAINER)',
+    'TRIXIE': 'TRIXIE ITALIA SPA',
+    'MONGE': 'MONGE',
+    'HILL': "HILL'S PET NUTRITION ITALIA S.R.L",
+    'ROYAL CANIN': 'HILL\'S PET NUTRITION ITALIA S.R.L', // fallback
+    'WONDERFOOD': 'WONDERFOOD',
+    'OASY': 'WONDERFOOD',
+    'ACANA': 'WONDERFOOD',
+    'ORIJEN': 'WONDERFOOD',
+    'VITAKRAFT': 'VITAKRAFT',
+    'ALMO': 'ALMO NATURE S.P.A.',
+    'SANYPET': 'SANYPET SRL',
+    'OLISTIKA': 'OLISTIKA',
+    'NEXTMUNE': 'NEXTMUNE',
+    'UNIPRO': 'UNIPRO',
+    'VISAN': 'VISAN',
+    'REBO': 'REBO SRL (HAPPYDOG)',
+    'HAPPYDOG': 'REBO SRL (HAPPYDOG)',
+    'PLATTO': 'PLATTO SRL (DOGGYEBAG)',
+    'DOGGYEBAG': 'PLATTO SRL (DOGGYEBAG)',
+    'TRE PONTI': 'TRE PONTI',
+    'RINALDO': 'RINALDO FRANCO',
+    'FARMINA': 'RUSSO MANGIMI FARMINA',
+    'RUSSO': 'RUSSO MANGIMI FARMINA',
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (name.includes(k)) {
+      return supplierConditions[v] || null;
+    }
+  }
+  return null;
+}
+
+// ---------- UI Helpers ----------
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), duration);
+}
+
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === pageId);
+  });
+  // Stop scanner when leaving
+  if (pageId !== 'scanner' && isScanning) stopScanner();
+}
+
+function renderProductCard(p) {
+  const days = daysRemaining(p.expiry);
+  const cls = getStatusClass(days);
+  return `
+    <div class="product-card ${cls}" data-ean="${p.ean}">
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-meta">
+        <span>${p.ean}</span>
+        ${getBadge(days, p.signaled)}
+        ${p.supplier ? `<span>${escapeHtml(p.supplier.split(' ')[0])}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------- Dashboard ----------
+function updateDashboard() {
+  const withDate = products.filter(p => p.expiry);
+  const expired = withDate.filter(p => daysRemaining(p.expiry) <= 0);
+  const urgent = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
+  const attention = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
+  const monitor = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 30 && d <= 120; });
+  const unsignaled = withDate.filter(p => {
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 120 && !p.signaled;
+  });
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card expired" data-filter="expired">
+      <div class="count">${expired.length}</div>
+      <div class="label">Scaduti (≤0 gg)</div>
+    </div>
+    <div class="stat-card urgent" data-filter="urgent">
+      <div class="count">${urgent.length}</div>
+      <div class="label">Urgenti (≤7 gg)</div>
+    </div>
+    <div class="stat-card attention" data-filter="attention">
+      <div class="count">${attention.length}</div>
+      <div class="label">Attenzione (≤30 gg)</div>
+    </div>
+    <div class="stat-card monitor" data-filter="monitor">
+      <div class="count">${monitor.length}</div>
+      <div class="label">Da monitorare (≤120)</div>
+    </div>
+    <div class="stat-card unsignaled" data-filter="unsignaled" style="grid-column: span 2;">
+      <div class="count">${unsignaled.length}</div>
+      <div class="label">Non ancora segnalati (≤120 gg)</div>
+    </div>
+  `;
+
+  // Recent (last 8 with expiry, sorted by lastModified if present)
+  const recent = withDate
+    .filter(p => p.lastModified)
+    .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))
+    .slice(0, 8);
+  document.getElementById('recent-list').innerHTML = recent.length
+    ? recent.map(renderProductCard).join('')
+    : '<p style="color:#64748b;font-size:0.9rem;">Nessuna modifica recente</p>';
+
+  // Attach click handlers
+  document.querySelectorAll('.stat-card').forEach(card => {
+    card.onclick = () => {
+      const filter = card.dataset.filter;
+      document.getElementById('list-filter').value = filter;
+      showPage('list');
+      renderFilteredList(filter);
+    };
+  });
+  document.querySelectorAll('#recent-list .product-card').forEach(card => {
+    card.onclick = () => openProduct(card.dataset.ean);
+  });
+}
+
+// ---------- List / Filter ----------
+function renderFilteredList(filter) {
+  let list = products.filter(p => p.expiry);
+  if (filter === 'expired') list = list.filter(p => daysRemaining(p.expiry) <= 0);
+  else if (filter === 'urgent') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
+  else if (filter === 'attention') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
+  else if (filter === 'monitor') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 30 && d <= 120; });
+  else if (filter === 'unsignaled') list = list.filter(p => {
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 120 && !p.signaled;
+  });
+  else if (filter === 'with-date') { /* already filtered */ }
+  else if (filter === 'all') { /* keep */ }
+
+  // Sort by days ascending
+  list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
+
+  const titles = {
+    expired: 'Prodotti scaduti',
+    urgent: 'Urgenti (≤7 giorni)',
+    attention: 'Attenzione (≤30 giorni)',
+    monitor: 'Da monitorare (≤120 giorni)',
+    unsignaled: 'Non segnalati',
+    'with-date': 'Con data di scadenza',
+    all: 'Tutti con scadenza'
+  };
+  document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
+
+  const container = document.getElementById('filtered-list');
+  if (list.length === 0) {
+    container.innerHTML = '<p style="color:#64748b;text-align:center;padding:20px;">Nessun prodotto in questa categoria</p>';
+  } else {
+    container.innerHTML = list.slice(0, 300).map(renderProductCard).join('') +
+      (list.length > 300 ? `<p style="text-align:center;color:#64748b;">... e altri ${list.length - 300}</p>` : '');
+  }
+  container.querySelectorAll('.product-card').forEach(card => {
+    card.onclick = () => openProduct(card.dataset.ean);
+  });
+}
+
+// ---------- Search ----------
+function doSearch(query) {
+  query = query.trim().toLowerCase();
+  if (query.length < 2) {
+    document.getElementById('search-results').innerHTML = '';
+    return;
+  }
+  const results = products.filter(p =>
+    p.ean.includes(query) ||
+    p.name.toLowerCase().includes(query)
+  ).slice(0, 50);
+
+  const container = document.getElementById('search-results');
+  container.innerHTML = results.length
+    ? results.map(renderProductCard).join('')
+    : '<p style="color:#64748b;text-align:center;">Nessun risultato</p>';
+  container.querySelectorAll('.product-card').forEach(card => {
+    card.onclick = () => openProduct(card.dataset.ean);
+  });
+}
+
+// ---------- Product Detail ----------
+function openProduct(ean) {
+  currentProduct = products.find(p => p.ean === ean);
+  if (!currentProduct) {
+    showToast('Prodotto non trovato');
+    return;
+  }
+  const days = daysRemaining(currentProduct.expiry);
+  const condition = findCondition(currentProduct.supplier);
+
+  document.getElementById('product-detail').innerHTML = `
+    <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
+    <div class="detail-ean">EAN: ${currentProduct.ean}</div>
+
+    <div class="detail-row">
+      <label>Data di scadenza</label>
+      <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
+    </div>
+
+    <div class="detail-row">
+      <div class="days-display ${getStatusClass(days)}" id="detail-days">
+        ${days === null ? 'Nessuna data' : (days <= 0 ? `Scaduto da ${Math.abs(days)} giorni` : `${days} giorni rimanenti`)}
+      </div>
+    </div>
+
+    <div class="detail-row">
+      <label>Stato</label>
+      <select id="detail-signaled">
+        <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
+        <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
+      </select>
+    </div>
+
+    <div class="supplier-box">
+      <strong>Fornitore</strong>
+      ${escapeHtml(currentProduct.supplier) || 'Non specificato'}
+      ${condition ? `<div class="conditions-text"><strong>Condizioni reso:</strong><br>${escapeHtml(condition)}</div>` : '<div class="conditions-text">Condizioni non trovate nel database fornitori</div>'}
+    </div>
+
+    <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:20px;">Salva modifiche</button>
+  `;
+
+  document.getElementById('detail-expiry').addEventListener('change', (e) => {
+    const d = daysRemaining(e.target.value);
+    const el = document.getElementById('detail-days');
+    el.className = 'days-display ' + getStatusClass(d);
+    el.textContent = d === null ? 'Nessuna data' : (d <= 0 ? `Scaduto da ${Math.abs(d)} giorni` : `${d} giorni rimanenti`);
+  });
+
+  document.getElementById('btn-save-product').onclick = saveProduct;
+  showPage('detail');
+}
+
+async function saveProduct() {
+  if (!currentProduct) return;
+  const expiry = document.getElementById('detail-expiry').value || null;
+  const signaled = document.getElementById('detail-signaled').value === 'true';
+
+  currentProduct.expiry = expiry;
+  currentProduct.signaled = signaled;
+  if (signaled && !currentProduct.signaledDate) {
+    currentProduct.signaledDate = new Date().toISOString().slice(0, 10);
+  }
+  if (!signaled) currentProduct.signaledDate = null;
+  currentProduct.lastModified = Date.now();
+
+  // Update in memory
+  const idx = products.findIndex(p => p.ean === currentProduct.ean);
+  if (idx >= 0) products[idx] = currentProduct;
+
+  // Persist
+  await idbPut(STORE_PRODUCTS, currentProduct);
+  showToast('Salvato!');
+  updateDashboard();
+}
+
+// ---------- Scanner ----------
+async function startScanner() {
+  if (isScanning) return;
+  const reader = document.getElementById('reader');
+  reader.innerHTML = '';
+  html5QrCode = new Html5Qrcode('reader');
+  try {
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 280, height: 150 } },
+      onScanSuccess,
+      () => {}
+    );
+    isScanning = true;
+    document.getElementById('btn-stop-scanner').classList.remove('hidden');
+  } catch (err) {
+    console.error(err);
+    showToast('Impossibile avviare la fotocamera. Controlla i permessi.');
+  }
+}
+
+async function stopScanner() {
+  if (html5QrCode && isScanning) {
+    try { await html5QrCode.stop(); } catch (e) {}
+    isScanning = false;
+    document.getElementById('btn-stop-scanner').classList.add('hidden');
+  }
+}
+
+function onScanSuccess(decodedText) {
+  // Clean EAN (sometimes has extra chars)
+  const ean = decodedText.replace(/\D/g, '');
+  stopScanner();
+  const product = products.find(p => p.ean === ean || p.ean === decodedText);
+  if (product) {
+    openProduct(product.ean);
+  } else {
+    document.getElementById('scan-result').classList.remove('hidden');
+    document.getElementById('scan-result').innerHTML = `
+      <p><strong>Codice scansionato:</strong> ${escapeHtml(decodedText)}</p>
+      <p style="color:var(--danger);margin-top:8px;">Prodotto non trovato nel database.</p>
+      <button class="btn btn-secondary" style="margin-top:12px;" onclick="document.getElementById('scan-result').classList.add('hidden');startScanner();">Riprova</button>
+    `;
+  }
+}
+
+// ---------- Export / Import ----------
+function exportData() {
+  const data = products.filter(p => p.expiry || p.signaled || p.lastModified);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `scadenze-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup esportato');
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      let count = 0;
+      for (const item of imported) {
+        const existing = products.find(p => p.ean === item.ean);
+        if (existing) {
+          existing.expiry = item.expiry || existing.expiry;
+          existing.signaled = item.signaled || existing.signaled;
+          existing.signaledDate = item.signaledDate || existing.signaledDate;
+          existing.lastModified = item.lastModified || Date.now();
+          await idbPut(STORE_PRODUCTS, existing);
+          count++;
+        }
+      }
+      showToast(`Importati ${count} aggiornamenti`);
+      updateDashboard();
+    } catch (err) {
+      showToast('File non valido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ---------- Init ----------
+async function init() {
+  db = await openDB();
+  await loadSupplierConditions();
+  await loadInitialData();
+
+  document.getElementById('products-count').textContent = products.length;
+
+  // Login
+  const loginBtn = document.getElementById('login-btn');
+  const pwdInput = document.getElementById('login-password');
+  loginBtn.onclick = async () => {
+    const stored = await getPassword();
+    if (pwdInput.value === stored) {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      updateDashboard();
+    } else {
+      document.getElementById('login-error').classList.remove('hidden');
+    }
+  };
+  pwdInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loginBtn.click();
+  });
+
+  // Navigation
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => {
+      const page = btn.dataset.page;
+      showPage(page);
+      if (page === 'list') renderFilteredList(document.getElementById('list-filter').value);
+      if (page === 'scanner') startScanner();
+      if (page === 'dashboard') updateDashboard();
+    };
+  });
+
+  document.getElementById('btn-go-scanner').onclick = () => {
+    showPage('scanner');
+    startScanner();
+  };
+  document.getElementById('btn-stop-scanner').onclick = stopScanner;
+  document.getElementById('btn-back').onclick = () => {
+    showPage('dashboard');
+    updateDashboard();
+  };
+  document.getElementById('btn-settings').onclick = () => showPage('settings');
+
+  // Search
+  let searchTimeout;
+  document.getElementById('search-input').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => doSearch(e.target.value), 250);
+  });
+
+  // List filter
+  document.getElementById('list-filter').addEventListener('change', (e) => {
+    renderFilteredList(e.target.value);
+  });
+
+  // Settings
+  document.getElementById('btn-change-password').onclick = async () => {
+    const n = document.getElementById('new-password').value;
+    const c = document.getElementById('confirm-password').value;
+    const msg = document.getElementById('password-msg');
+    if (n.length < 4) {
+      msg.textContent = 'Password troppo corta (min 4 caratteri)';
+      msg.className = 'msg error';
+      return;
+    }
+    if (n !== c) {
+      msg.textContent = 'Le password non coincidono';
+      msg.className = 'msg error';
+      return;
+    }
+    await setPassword(n);
+    msg.textContent = 'Password aggiornata!';
+    msg.className = 'msg success';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
+  };
+
+  document.getElementById('btn-export').onclick = exportData;
+  document.getElementById('btn-import').onclick = () => document.getElementById('import-file').click();
+  document.getElementById('import-file').addEventListener('change', (e) => {
+    if (e.target.files[0]) importData(e.target.files[0]);
+  });
+
+  // Service worker for offline
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(console.warn);
+  }
+}
+
+init().catch(console.error);

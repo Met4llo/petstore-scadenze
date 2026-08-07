@@ -1,0 +1,22 @@
+{
+  "name": "PetStore Scadenze",
+  "short_name": "Scadenze",
+  "description": "Gestione scadenze prodotti PetStore Conad",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E85A2A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo-petstore.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo-petstore.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
