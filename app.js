@@ -194,7 +194,8 @@ async function loadSupplierConditions() {
 // ---------- Save to Supabase ----------
 async function saveToCloud(product) {
   if (!supabase) {
-    showToast('Cloud non disponibile');
+    console.error('supabase client is null');
+    showToast('Cloud non disponibile - libreria non caricata');
     return false;
   }
   try {
@@ -206,18 +207,21 @@ async function saveToCloud(product) {
       last_modified: new Date().toISOString(),
       updated_by: 'app'
     };
-    const { error } = await supabase
+    console.log('Saving to Supabase:', payload);
+    const { data, error } = await supabase
       .from('scadenze')
-      .upsert(payload, { onConflict: 'ean' });
+      .upsert(payload, { onConflict: 'ean' })
+      .select();
     if (error) {
       console.error('Supabase save error:', error);
-      showToast('Errore salvataggio cloud: ' + error.message);
+      showToast('Errore cloud: ' + (error.message || JSON.stringify(error)));
       return false;
     }
+    console.log('Save success:', data);
     return true;
   } catch (err) {
-    console.error(err);
-    showToast('Errore di rete nel salvataggio');
+    console.error('Save exception:', err);
+    showToast('Errore di rete: ' + err.message);
     return false;
   }
 }
@@ -587,17 +591,31 @@ async function manualSync() {
 
 // ---------- Init ----------
 async function init() {
-  // Load Supabase library
-  await new Promise((resolve) => {
-    if (window.supabase) return resolve();
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    s.onload = resolve;
-    s.onerror = resolve;
-    document.head.appendChild(s);
-  });
+  // Load Supabase library more robustly
+  try {
+    if (!window.supabase) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js';
+        s.onload = () => {
+          console.log('Supabase library loaded');
+          resolve();
+        };
+        s.onerror = () => {
+          console.error('Failed to load Supabase library');
+          reject(new Error('Libreria Supabase non caricata'));
+        };
+        document.head.appendChild(s);
+      });
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('Supabase client created successfully');
+  } catch (err) {
+    console.error('Supabase init error:', err);
+    showToast('Errore collegamento cloud: ' + err.message);
+    supabase = null;
+  }
 
-  supabase = initSupabase();
   db = await openDB();
   await loadSupplierConditions();
   await loadCatalog();
