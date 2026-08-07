@@ -1,17 +1,30 @@
-// ===== PetStore Scadenze App =====
+// ===== PetStore Scadenze App + Supabase =====
+const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
+
 const DB_NAME = 'PetStoreScadenze';
 const DB_VERSION = 1;
 const STORE_PRODUCTS = 'products';
 const STORE_META = 'meta';
 
 let db = null;
-let products = [];          // in-memory cache
+let products = [];          // full catalog + merged scadenze
 let supplierConditions = {};
 let currentProduct = null;
 let html5QrCode = null;
 let isScanning = false;
+let supabase = null;
 
-// ---------- IndexedDB helpers ----------
+// ---------- Supabase init ----------
+function initSupabase() {
+  if (typeof window.supabase === 'undefined') {
+    console.warn('Supabase library not loaded yet');
+    return null;
+  }
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+// ---------- IndexedDB (for offline catalog cache) ----------
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -20,8 +33,6 @@ function openDB() {
       if (!database.objectStoreNames.contains(STORE_PRODUCTS)) {
         const store = database.createObjectStore(STORE_PRODUCTS, { keyPath: 'ean' });
         store.createIndex('name', 'name', { unique: false });
-        store.createIndex('supplier', 'supplier', { unique: false });
-        store.createIndex('expiry', 'expiry', { unique: false });
       }
       if (!database.objectStoreNames.contains(STORE_META)) {
         database.createObjectStore(STORE_META, { keyPath: 'key' });
@@ -35,8 +46,7 @@ function openDB() {
 function idbGetAll(storeName) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readonly');
-    const store = tx.objectStore(storeName);
-    const req = store.getAll();
+    const req = tx.objectStore(storeName).getAll();
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
@@ -45,18 +55,7 @@ function idbGetAll(storeName) {
 function idbPut(storeName, item) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-    const req = store.put(item);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function idbClear(storeName) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-    const req = store.clear();
+    const req = tx.objectStore(storeName).put(item);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
@@ -112,31 +111,74 @@ function getBadge(days, signaled) {
   return `<span class="badge ok">${days} gg</span>`;
 }
 
-// ---------- Load data ----------
-async function loadInitialData() {
+// ---------- Load catalog (static) ----------
+async function loadCatalog() {
   const existing = await idbGetAll(STORE_PRODUCTS);
-  if (existing && existing.length > 0) {
+  if (existing && existing.length > 1000) {
     products = existing;
-    console.log('Loaded from IndexedDB:', products.length);
+    console.log('Catalog from IndexedDB:', products.length);
     return;
   }
-
-  // First run: load from products.json
   try {
-    showToast('Caricamento database prodotti...');
+    showToast('Caricamento catalogo prodotti...');
     const res = await fetch('products.json');
     const data = await res.json();
-    products = data;
-    // Bulk insert in chunks
+    products = data.map(p => ({
+      ean: p.ean,
+      name: p.name,
+      supplier: p.supplier || '',
+      expiry: null,
+      signaled: false,
+      signaledDate: null,
+      lastModified: null
+    }));
     const chunkSize = 500;
     for (let i = 0; i < products.length; i += chunkSize) {
       await idbBulkPut(STORE_PRODUCTS, products.slice(i, i + chunkSize));
     }
-    console.log('Imported', products.length, 'products');
-    showToast(`Caricati ${products.length} prodotti`);
+    console.log('Catalog imported:', products.length);
   } catch (err) {
     console.error(err);
-    showToast('Errore caricamento prodotti');
+    showToast('Errore caricamento catalogo');
+  }
+}
+
+// ---------- Load scadenze from Supabase ----------
+async function loadScadenzeFromCloud() {
+  if (!supabase) {
+    console.warn('Supabase not ready');
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('scadenze')
+      .select('*');
+    if (error) {
+      console.error('Supabase load error:', error);
+      showToast('Errore caricamento cloud: ' + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.log('Nessuna scadenza sul cloud ancora');
+      return;
+    }
+    // Merge into products
+    const map = {};
+    products.forEach(p => map[p.ean] = p);
+    data.forEach(row => {
+      if (map[row.ean]) {
+        map[row.ean].expiry = row.expiry || null;
+        map[row.ean].signaled = !!row.signaled;
+        map[row.ean].signaledDate = row.signaled_date || null;
+        map[row.ean].lastModified = row.last_modified ? new Date(row.last_modified).getTime() : null;
+      }
+    });
+    products = Object.values(map);
+    console.log('Merged', data.length, 'scadenze from Supabase');
+    showToast(`Sincronizzate ${data.length} scadenze`);
+  } catch (err) {
+    console.error(err);
+    showToast('Errore di rete verso Supabase');
   }
 }
 
@@ -149,17 +191,46 @@ async function loadSupplierConditions() {
   }
 }
 
-// ---------- Find best matching condition ----------
+// ---------- Save to Supabase ----------
+async function saveToCloud(product) {
+  if (!supabase) {
+    showToast('Cloud non disponibile');
+    return false;
+  }
+  try {
+    const payload = {
+      ean: product.ean,
+      expiry: product.expiry || null,
+      signaled: !!product.signaled,
+      signaled_date: product.signaledDate || null,
+      last_modified: new Date().toISOString(),
+      updated_by: 'app'
+    };
+    const { error } = await supabase
+      .from('scadenze')
+      .upsert(payload, { onConflict: 'ean' });
+    if (error) {
+      console.error('Supabase save error:', error);
+      showToast('Errore salvataggio cloud: ' + error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(err);
+    showToast('Errore di rete nel salvataggio');
+    return false;
+  }
+}
+
+// ---------- Find condition ----------
 function findCondition(supplierName) {
   if (!supplierName) return null;
   const name = supplierName.toUpperCase();
-  // Exact or partial match
   for (const [key, val] of Object.entries(supplierConditions)) {
     if (name.includes(key.toUpperCase()) || key.toUpperCase().includes(name.split(' ')[0])) {
       return val;
     }
   }
-  // Common mappings
   const map = {
     '4 HEALTHY': '4 HEALTHY PETS (EDGARD COOPER)',
     'EDGARD': '4 HEALTHY PETS (EDGARD COOPER)',
@@ -170,7 +241,6 @@ function findCondition(supplierName) {
     'TRIXIE': 'TRIXIE ITALIA SPA',
     'MONGE': 'MONGE',
     'HILL': "HILL'S PET NUTRITION ITALIA S.R.L",
-    'ROYAL CANIN': 'HILL\'S PET NUTRITION ITALIA S.R.L', // fallback
     'WONDERFOOD': 'WONDERFOOD',
     'OASY': 'WONDERFOOD',
     'ACANA': 'WONDERFOOD',
@@ -185,22 +255,19 @@ function findCondition(supplierName) {
     'REBO': 'REBO SRL (HAPPYDOG)',
     'HAPPYDOG': 'REBO SRL (HAPPYDOG)',
     'PLATTO': 'PLATTO SRL (DOGGYEBAG)',
-    'DOGGYEBAG': 'PLATTO SRL (DOGGYEBAG)',
     'TRE PONTI': 'TRE PONTI',
     'RINALDO': 'RINALDO FRANCO',
     'FARMINA': 'RUSSO MANGIMI FARMINA',
-    'RUSSO': 'RUSSO MANGIMI FARMINA',
+    'RUSSO': 'RUSSO MANGIMI FARMINA'
   };
   for (const [k, v] of Object.entries(map)) {
-    if (name.includes(k)) {
-      return supplierConditions[v] || null;
-    }
+    if (name.includes(k)) return supplierConditions[v] || null;
   }
   return null;
 }
 
 // ---------- UI Helpers ----------
-function showToast(msg, duration = 2500) {
+function showToast(msg, duration = 2800) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.remove('hidden');
@@ -213,7 +280,6 @@ function showPage(pageId) {
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.page === pageId);
   });
-  // Stop scanner when leaving
   if (pageId !== 'scanner' && isScanning) stopScanner();
 }
 
@@ -234,7 +300,7 @@ function renderProductCard(p) {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ---------- Dashboard ----------
@@ -272,7 +338,6 @@ function updateDashboard() {
     </div>
   `;
 
-  // Recent (last 8 with expiry, sorted by lastModified if present)
   const recent = withDate
     .filter(p => p.lastModified)
     .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))
@@ -281,13 +346,11 @@ function updateDashboard() {
     ? recent.map(renderProductCard).join('')
     : '<p style="color:#64748b;font-size:0.9rem;">Nessuna modifica recente</p>';
 
-  // Attach click handlers
   document.querySelectorAll('.stat-card').forEach(card => {
     card.onclick = () => {
-      const filter = card.dataset.filter;
-      document.getElementById('list-filter').value = filter;
+      document.getElementById('list-filter').value = card.dataset.filter;
       showPage('list');
-      renderFilteredList(filter);
+      renderFilteredList(card.dataset.filter);
     };
   });
   document.querySelectorAll('#recent-list .product-card').forEach(card => {
@@ -306,10 +369,7 @@ function renderFilteredList(filter) {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120 && !p.signaled;
   });
-  else if (filter === 'with-date') { /* already filtered */ }
-  else if (filter === 'all') { /* keep */ }
 
-  // Sort by days ascending
   list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
 
   const titles = {
@@ -318,7 +378,6 @@ function renderFilteredList(filter) {
     attention: 'Attenzione (≤30 giorni)',
     monitor: 'Da monitorare (≤120 giorni)',
     unsignaled: 'Non segnalati',
-    'with-date': 'Con data di scadenza',
     all: 'Tutti con scadenza'
   };
   document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
@@ -343,8 +402,7 @@ function doSearch(query) {
     return;
   }
   const results = products.filter(p =>
-    p.ean.includes(query) ||
-    p.name.toLowerCase().includes(query)
+    p.ean.includes(query) || p.name.toLowerCase().includes(query)
   ).slice(0, 50);
 
   const container = document.getElementById('search-results');
@@ -422,13 +480,16 @@ async function saveProduct() {
   if (!signaled) currentProduct.signaledDate = null;
   currentProduct.lastModified = Date.now();
 
-  // Update in memory
   const idx = products.findIndex(p => p.ean === currentProduct.ean);
   if (idx >= 0) products[idx] = currentProduct;
 
-  // Persist
-  await idbPut(STORE_PRODUCTS, currentProduct);
-  showToast('Salvato!');
+  // Save to cloud (shared)
+  const ok = await saveToCloud(currentProduct);
+  if (ok) {
+    showToast('Salvato e sincronizzato!');
+  } else {
+    showToast('Salvato in locale (cloud non raggiungibile)');
+  }
   updateDashboard();
 }
 
@@ -462,7 +523,6 @@ async function stopScanner() {
 }
 
 function onScanSuccess(decodedText) {
-  // Clean EAN (sometimes has extra chars)
   const ean = decodedText.replace(/\D/g, '');
   stopScanner();
   const product = products.find(p => p.ean === ean || p.ean === decodedText);
@@ -478,7 +538,7 @@ function onScanSuccess(decodedText) {
   }
 }
 
-// ---------- Export / Import ----------
+// ---------- Export / Import (backup) ----------
 function exportData() {
   const data = products.filter(p => p.expiry || p.signaled || p.lastModified);
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -504,11 +564,11 @@ function importData(file) {
           existing.signaled = item.signaled || existing.signaled;
           existing.signaledDate = item.signaledDate || existing.signaledDate;
           existing.lastModified = item.lastModified || Date.now();
-          await idbPut(STORE_PRODUCTS, existing);
+          await saveToCloud(existing);
           count++;
         }
       }
-      showToast(`Importati ${count} aggiornamenti`);
+      showToast(`Importati e sincronizzati ${count} aggiornamenti`);
       updateDashboard();
     } catch (err) {
       showToast('File non valido');
@@ -517,11 +577,31 @@ function importData(file) {
   reader.readAsText(file);
 }
 
+// ---------- Sync button ----------
+async function manualSync() {
+  showToast('Sincronizzazione in corso...');
+  await loadScadenzeFromCloud();
+  updateDashboard();
+  showToast('Sincronizzazione completata');
+}
+
 // ---------- Init ----------
 async function init() {
+  // Load Supabase library
+  await new Promise((resolve) => {
+    if (window.supabase) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s.onload = resolve;
+    s.onerror = resolve;
+    document.head.appendChild(s);
+  });
+
+  supabase = initSupabase();
   db = await openDB();
   await loadSupplierConditions();
-  await loadInitialData();
+  await loadCatalog();
+  await loadScadenzeFromCloud();
 
   document.getElementById('products-count').textContent = products.length;
 
@@ -563,6 +643,7 @@ async function init() {
     updateDashboard();
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
+  document.getElementById('btn-sync').onclick = manualSync;
 
   // Search
   let searchTimeout;
@@ -604,7 +685,6 @@ async function init() {
     if (e.target.files[0]) importData(e.target.files[0]);
   });
 
-  // Service worker for offline
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(console.warn);
   }
