@@ -209,6 +209,7 @@ body {
 .stat-card.attention { border-color: var(--attention); }
 .stat-card.monitor { border-color: var(--monitor); }
 .stat-card.unsignaled { border-color: #3b82f6; }
+.stat-card.signaled { border-color: #6366f1; }
 
 .stat-card .count {
   font-size: 1.8rem;

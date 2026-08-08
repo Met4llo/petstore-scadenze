@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.4 - segnalati + data obbligatoria + operatori
+// VERSION 1.5 - segnalati + data obbligatoria + operatori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -326,6 +326,8 @@ function updateDashboard() {
     return d !== null && d <= 120 && !p.signaled;
   });
 
+  const signaledCount = products.filter(p => p.signaled).length;
+
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card expired" data-filter="expired">
       <div class="count">${expired.length}</div>
@@ -343,9 +345,13 @@ function updateDashboard() {
       <div class="count">${monitor.length}</div>
       <div class="label">Da monitorare (≤120)</div>
     </div>
-    <div class="stat-card unsignaled" data-filter="unsignaled" style="grid-column: span 2;">
+    <div class="stat-card unsignaled" data-filter="unsignaled">
       <div class="count">${unsignaled.length}</div>
-      <div class="label">Non ancora segnalati (≤120 gg)</div>
+      <div class="label">Non segnalati (≤120)</div>
+    </div>
+    <div class="stat-card signaled" data-filter="signaled">
+      <div class="count">${signaledCount}</div>
+      <div class="label">Già segnalati</div>
     </div>
   `;
 
