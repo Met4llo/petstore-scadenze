@@ -378,6 +378,7 @@ function renderFilteredList(filter) {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120 && !p.signaled;
   });
+  else if (filter === 'signaled') list = products.filter(p => p.signaled);
 
   list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
 
@@ -387,6 +388,7 @@ function renderFilteredList(filter) {
     attention: 'Attenzione (≤30 giorni)',
     monitor: 'Da monitorare (≤120 giorni)',
     unsignaled: 'Non segnalati',
+    signaled: 'Solo segnalati',
     all: 'Tutti con scadenza'
   };
   document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
@@ -456,6 +458,12 @@ function openProduct(ean) {
       </select>
     </div>
 
+    <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
+      <label>Data di segnalazione *</label>
+      <input type="date" id="detail-signaled-date" value="${currentProduct.signaledDate || ''}" required>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Obbligatoria se il prodotto è segnalato</p>
+    </div>
+
     <div class="detail-row">
       <div class="modified-by" id="detail-modified-by">
         ${currentProduct.updatedBy ? 'Ultima modifica di: <strong>' + escapeHtml(currentProduct.updatedBy) + '</strong>' : 'Nessuna modifica registrata'}
@@ -478,6 +486,19 @@ function openProduct(ean) {
     el.textContent = d === null ? 'Nessuna data' : (d <= 0 ? `Scaduto da ${Math.abs(d)} giorni` : `${d} giorni rimanenti`);
   });
 
+  document.getElementById('detail-signaled').addEventListener('change', (e) => {
+    const row = document.getElementById('signaled-date-row');
+    if (e.target.value === 'true') {
+      row.style.display = '';
+      const dateInput = document.getElementById('detail-signaled-date');
+      if (!dateInput.value) {
+        dateInput.value = new Date().toISOString().slice(0, 10);
+      }
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
   document.getElementById('btn-save-product').onclick = saveProduct;
   showPage('detail');
 }
@@ -486,13 +507,18 @@ async function saveProduct() {
   if (!currentProduct) return;
   const expiry = document.getElementById('detail-expiry').value || null;
   const signaled = document.getElementById('detail-signaled').value === 'true';
+  const signaledDateInput = document.getElementById('detail-signaled-date');
+  const signaledDate = signaledDateInput ? (signaledDateInput.value || null) : null;
+
+  if (signaled && !signaledDate) {
+    showToast('Inserisci la Data di segnalazione (obbligatoria)');
+    if (signaledDateInput) signaledDateInput.focus();
+    return;
+  }
 
   currentProduct.expiry = expiry;
   currentProduct.signaled = signaled;
-  if (signaled && !currentProduct.signaledDate) {
-    currentProduct.signaledDate = new Date().toISOString().slice(0, 10);
-  }
-  if (!signaled) currentProduct.signaledDate = null;
+  currentProduct.signaledDate = signaled ? signaledDate : null;
   currentProduct.lastModified = Date.now();
   currentProduct.updatedBy = currentOperator || 'Sconosciuto';
 
