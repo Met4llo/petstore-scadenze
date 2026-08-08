@@ -9,7 +9,7 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css?v=1.3">
+  <link rel="stylesheet" href="styles.css?v=1.4">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -104,6 +104,7 @@
       <section id="page-search" class="page">
         <h2 class="page-title">Cerca prodotto</h2>
         <input type="search" id="search-input" placeholder="EAN o nome prodotto..." class="search-input">
+        <button id="btn-go-add" class="btn btn-secondary btn-large" style="margin-bottom:14px;">＋ Aggiungi prodotto manualmente</button>
         <div id="search-results" class="product-list"></div>
       </section>
 
@@ -123,6 +124,35 @@
           </select>
         </div>
         <div id="filtered-list" class="product-list"></div>
+      </section>
+
+      
+      <!-- ADD PRODUCT -->
+      <section id="page-add" class="page">
+        <button id="btn-back-add" class="btn-back">← Indietro</button>
+        <h2 class="page-title">Aggiungi prodotto</h2>
+        <div class="detail-card">
+          <div class="detail-row">
+            <label>Codice a barre (EAN) *</label>
+            <input type="text" id="add-ean" placeholder="Inserisci EAN" inputmode="numeric">
+          </div>
+          <div class="detail-row">
+            <label>Nome prodotto *</label>
+            <input type="text" id="add-name" placeholder="Nome completo del prodotto">
+          </div>
+          <div class="detail-row">
+            <label>Fornitore *</label>
+            <select id="add-supplier">
+              <option value="">— Seleziona fornitore —</option>
+            </select>
+          </div>
+          <div class="detail-row">
+            <label>Data di scadenza (opzionale)</label>
+            <input type="date" id="add-expiry">
+          </div>
+          <button id="btn-save-new-product" class="btn btn-primary btn-large" style="margin-top:12px;">Salva prodotto</button>
+          <p id="add-product-msg" class="msg hidden"></p>
+        </div>
       </section>
 
       <!-- PRODUCT DETAIL -->
@@ -155,7 +185,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.3 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.4 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -165,6 +195,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.3"></script>
+  <script src="app.js?v=1.4"></script>
 </body>
 </html>

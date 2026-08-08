@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.3 - segnalati + data obbligatoria + operatori
+// VERSION 1.4 - segnalati + data obbligatoria + operatori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -16,6 +16,7 @@ let html5QrCode = null;
 let isScanning = false;
 let supabase = null;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
+const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
 
 // ---------- Supabase init ----------
@@ -634,6 +635,7 @@ function importData(file) {
 async function manualSync() {
   showToast('Sincronizzazione in corso...');
   await loadScadenzeFromCloud();
+  await loadCustomProducts();
   updateDashboard();
   showToast('Sincronizzazione completata');
 }
@@ -658,6 +660,147 @@ function selectOperator(name) {
   localStorage.setItem('petstore_operator', name);
   enterApp();
 }
+
+
+function populateSupplierSelect() {
+  const sel = document.getElementById('add-supplier');
+  if (!sel || sel.options.length > 1) return;
+  SUPPLIERS_LIST.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  });
+}
+
+async function saveNewProduct() {
+  const ean = (document.getElementById('add-ean').value || '').trim().replace(/\D/g, '');
+  const name = (document.getElementById('add-name').value || '').trim();
+  const supplier = document.getElementById('add-supplier').value || '';
+  const expiry = document.getElementById('add-expiry').value || null;
+  const msg = document.getElementById('add-product-msg');
+
+  if (!ean || ean.length < 5) {
+    msg.textContent = 'Inserisci un EAN valido';
+    msg.className = 'msg error';
+    msg.classList.remove('hidden');
+    return;
+  }
+  if (!name) {
+    msg.textContent = 'Inserisci il nome del prodotto';
+    msg.className = 'msg error';
+    msg.classList.remove('hidden');
+    return;
+  }
+  if (!supplier) {
+    msg.textContent = 'Seleziona un fornitore';
+    msg.className = 'msg error';
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  // Check if already exists
+  const existing = products.find(p => p.ean === ean);
+  if (existing) {
+    msg.textContent = 'Questo EAN esiste già: ' + existing.name;
+    msg.className = 'msg error';
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  const newProduct = {
+    ean: ean,
+    name: name,
+    supplier: supplier,
+    expiry: expiry,
+    signaled: false,
+    signaledDate: null,
+    lastModified: Date.now(),
+    updatedBy: currentOperator || 'Sconosciuto',
+    isCustom: true
+  };
+
+  // Save to Supabase prodotti_custom
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('prodotti_custom').upsert({
+        ean: ean,
+        name: name,
+        supplier: supplier,
+        created_by: currentOperator || 'Sconosciuto',
+        created_at: new Date().toISOString()
+      }, { onConflict: 'ean' });
+      if (error) {
+        console.error(error);
+        // If table doesn't exist, still save locally
+        if (error.message && error.message.includes('does not exist')) {
+          showToast('Tabella prodotti_custom non trovata - salvato solo in locale');
+        } else {
+          msg.textContent = 'Errore cloud: ' + error.message;
+          msg.className = 'msg error';
+          msg.classList.remove('hidden');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // If has expiry, also save to scadenze
+  if (expiry && supabase) {
+    await saveToCloud(newProduct);
+  }
+
+  products.push(newProduct);
+  try { await idbPut(STORE_PRODUCTS, newProduct); } catch(e) {}
+
+  msg.textContent = 'Prodotto aggiunto!';
+  msg.className = 'msg success';
+  msg.classList.remove('hidden');
+  showToast('Prodotto aggiunto');
+
+  // Clear form
+  document.getElementById('add-ean').value = '';
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-supplier').value = '';
+  document.getElementById('add-expiry').value = '';
+
+  setTimeout(() => {
+    openProduct(ean);
+  }, 600);
+}
+
+async function loadCustomProducts() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('prodotti_custom').select('*');
+    if (error || !data) return;
+    let added = 0;
+    data.forEach(row => {
+      if (!products.find(p => p.ean === row.ean)) {
+        products.push({
+          ean: row.ean,
+          name: row.name,
+          supplier: row.supplier || '',
+          expiry: null,
+          signaled: false,
+          signaledDate: null,
+          lastModified: null,
+          updatedBy: row.created_by || null,
+          isCustom: true
+        });
+        added++;
+      }
+    });
+    if (added > 0) {
+      console.log('Loaded', added, 'custom products from cloud');
+    }
+  } catch (e) {
+    console.warn('Could not load custom products', e);
+  }
+}
+
 
 // ---------- Init ----------
 async function init() {
@@ -691,6 +834,7 @@ async function init() {
   await loadSupplierConditions();
   await loadCatalog();
   await loadScadenzeFromCloud();
+  await loadCustomProducts();
 
   document.getElementById('products-count').textContent = products.length;
 
@@ -736,6 +880,17 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  populateSupplierSelect();
+  const btnGoAdd = document.getElementById('btn-go-add');
+  if (btnGoAdd) btnGoAdd.onclick = () => { populateSupplierSelect(); showPage('add'); };
+  const btnGoAddDash = document.getElementById('btn-go-add-dash');
+  if (btnGoAddDash) btnGoAddDash.onclick = () => { populateSupplierSelect(); showPage('add'); };
+  const btnBackAdd = document.getElementById('btn-back-add');
+  if (btnBackAdd) btnBackAdd.onclick = () => { showPage('search'); };
+  const btnSaveNew = document.getElementById('btn-save-new-product');
+  if (btnSaveNew) btnSaveNew.onclick = saveNewProduct;
+
 
   // Operator selection
   document.querySelectorAll('.operator-btn').forEach(btn => {
