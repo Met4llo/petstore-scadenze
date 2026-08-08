@@ -14,6 +14,8 @@ let currentProduct = null;
 let html5QrCode = null;
 let isScanning = false;
 let supabase = null;
+const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
+let currentOperator = localStorage.getItem('petstore_operator') || null;
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -171,6 +173,7 @@ async function loadScadenzeFromCloud() {
         map[row.ean].signaled = !!row.signaled;
         map[row.ean].signaledDate = row.signaled_date || null;
         map[row.ean].lastModified = row.last_modified ? new Date(row.last_modified).getTime() : null;
+        map[row.ean].updatedBy = row.updated_by || null;
       }
     });
     products = Object.values(map);
@@ -205,7 +208,7 @@ async function saveToCloud(product) {
       signaled: !!product.signaled,
       signaled_date: product.signaledDate || null,
       last_modified: new Date().toISOString(),
-      updated_by: 'app'
+      updated_by: currentOperator || 'Sconosciuto'
     };
     console.log('Saving to Supabase:', payload);
     const { data, error } = await supabase
@@ -290,6 +293,7 @@ function showPage(pageId) {
 function renderProductCard(p) {
   const days = daysRemaining(p.expiry);
   const cls = getStatusClass(days);
+  const by = p.updatedBy ? `<span class="modified-by">👤 ${escapeHtml(p.updatedBy)}</span>` : '';
   return `
     <div class="product-card ${cls}" data-ean="${p.ean}">
       <div class="product-name">${escapeHtml(p.name)}</div>
@@ -297,6 +301,7 @@ function renderProductCard(p) {
         <span>${p.ean}</span>
         ${getBadge(days, p.signaled)}
         ${p.supplier ? `<span>${escapeHtml(p.supplier.split(' ')[0])}</span>` : ''}
+        ${by}
       </div>
     </div>
   `;
@@ -451,6 +456,12 @@ function openProduct(ean) {
       </select>
     </div>
 
+    <div class="detail-row">
+      <div class="modified-by" id="detail-modified-by">
+        ${currentProduct.updatedBy ? 'Ultima modifica di: <strong>' + escapeHtml(currentProduct.updatedBy) + '</strong>' : 'Nessuna modifica registrata'}
+      </div>
+    </div>
+
     <div class="supplier-box">
       <strong>Fornitore</strong>
       ${escapeHtml(currentProduct.supplier) || 'Non specificato'}
@@ -483,17 +494,28 @@ async function saveProduct() {
   }
   if (!signaled) currentProduct.signaledDate = null;
   currentProduct.lastModified = Date.now();
+  currentProduct.updatedBy = currentOperator || 'Sconosciuto';
 
   const idx = products.findIndex(p => p.ean === currentProduct.ean);
   if (idx >= 0) products[idx] = currentProduct;
 
-  // Save to cloud (shared)
+  // Diagnostic
+  console.log('=== SAVE DIAGNOSTIC ===');
+  console.log('supabase client:', supabase);
+  console.log('window.supabase:', typeof window.supabase);
+
+  if (!supabase) {
+    showToast('ERRORE: Client Supabase non inizializzato. Ricarica la pagina.');
+    updateDashboard();
+    return;
+  }
+
+  showToast('Salvataggio su cloud in corso...');
   const ok = await saveToCloud(currentProduct);
   if (ok) {
     showToast('Salvato e sincronizzato!');
-  } else {
-    showToast('Salvato in locale (cloud non raggiungibile)');
   }
+  // se non ok, saveToCloud ha già mostrato il messaggio di errore specifico
   updateDashboard();
 }
 
@@ -589,30 +611,52 @@ async function manualSync() {
   showToast('Sincronizzazione completata');
 }
 
+
+function enterApp() {
+  document.getElementById('operator-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  updateOperatorUI();
+  updateDashboard();
+}
+
+function updateOperatorUI() {
+  const el = document.getElementById('current-operator');
+  if (el) el.textContent = currentOperator || '';
+  const settingsName = document.getElementById('settings-operator-name');
+  if (settingsName) settingsName.textContent = currentOperator || 'Nessuno';
+}
+
+function selectOperator(name) {
+  currentOperator = name;
+  localStorage.setItem('petstore_operator', name);
+  enterApp();
+}
+
 // ---------- Init ----------
 async function init() {
-  // Load Supabase library more robustly
+  // Create Supabase client (library already loaded from index.html)
   try {
-    if (!window.supabase) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js';
-        s.onload = () => {
-          console.log('Supabase library loaded');
-          resolve();
-        };
-        s.onerror = () => {
-          console.error('Failed to load Supabase library');
-          reject(new Error('Libreria Supabase non caricata'));
-        };
-        document.head.appendChild(s);
-      });
+    const sb = window.supabase;
+    console.log('window.supabase type:', typeof sb, sb);
+    if (sb && typeof sb.createClient === 'function') {
+      supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else if (sb && sb.default && typeof sb.default.createClient === 'function') {
+      supabase = sb.default.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+      throw new Error('Libreria Supabase non trovata. Controlla la connessione internet.');
     }
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('Supabase client created successfully');
+    console.log('Supabase client OK');
+    // Quick connection test
+    const { error: testErr } = await supabase.from('scadenze').select('ean').limit(1);
+    if (testErr) {
+      console.error('Connection test failed:', testErr);
+      showToast('Avviso: ' + testErr.message);
+    } else {
+      console.log('Connection test OK');
+    }
   } catch (err) {
     console.error('Supabase init error:', err);
-    showToast('Errore collegamento cloud: ' + err.message);
+    showToast('Errore cloud: ' + err.message);
     supabase = null;
   }
 
@@ -630,8 +674,11 @@ async function init() {
     const stored = await getPassword();
     if (pwdInput.value === stored) {
       document.getElementById('login-screen').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      updateDashboard();
+      if (currentOperator && OPERATORS.includes(currentOperator)) {
+        enterApp();
+      } else {
+        document.getElementById('operator-screen').classList.remove('hidden');
+      }
     } else {
       document.getElementById('login-error').classList.remove('hidden');
     }
@@ -662,6 +709,20 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  // Operator selection
+  document.querySelectorAll('.operator-btn').forEach(btn => {
+    btn.onclick = () => selectOperator(btn.dataset.op);
+  });
+  const btnChangeOp = document.getElementById('btn-change-operator');
+  if (btnChangeOp) {
+    btnChangeOp.onclick = () => {
+      document.getElementById('app').classList.add('hidden');
+      document.getElementById('operator-screen').classList.remove('hidden');
+    };
+  }
+  updateOperatorUI();
+
 
   // Search
   let searchTimeout;

@@ -518,3 +518,33 @@ body {
   margin-bottom: 12px;
   color: var(--muted);
 }
+
+/* Operator selection */
+.operator-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.operator-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.15rem;
+}
+.current-op {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: #fff5f0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modified-by {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 6px;
+}

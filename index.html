@@ -26,12 +26,29 @@
     </div>
   </div>
 
+  
+  <!-- OPERATOR SELECTION -->
+  <div id="operator-screen" class="screen hidden">
+    <div class="login-box">
+      <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
+      <h1>Chi sta usando l'app?</h1>
+      <p class="subtitle">Seleziona il tuo nome</p>
+      <div class="operator-grid" id="operator-grid">
+        <button class="btn btn-primary operator-btn" data-op="Santoemma">Santoemma</button>
+        <button class="btn btn-primary operator-btn" data-op="Fuschi">Fuschi</button>
+        <button class="btn btn-primary operator-btn" data-op="Pizzimenti">Pizzimenti</button>
+        <button class="btn btn-primary operator-btn" data-op="Sorrentino">Sorrentino</button>
+      </div>
+    </div>
+  </div>
+
   <!-- APP -->
   <div id="app" class="hidden">
     <!-- HEADER -->
     <header class="header">
       <img src="logo-petstore.png" alt="PetStore" class="logo-header">
       <div class="header-actions">
+        <span id="current-operator" class="current-op"></span>
         <button id="btn-sync" class="icon-btn" title="Sincronizza">🔄</button>
         <button id="btn-settings" class="icon-btn" title="Impostazioni">⚙️</button>
       </div>
@@ -118,6 +135,11 @@
       <!-- SETTINGS -->
       <section id="page-settings" class="page">
         <h2 class="page-title">Impostazioni</h2>
+        <div class="settings-group">
+          <label>Operatore corrente</label>
+          <p id="settings-operator-name" style="font-weight:600;margin-bottom:10px;"></p>
+          <button id="btn-change-operator" class="btn btn-secondary">Cambia operatore</button>
+        </div>
         <div class="settings-group">
           <label>Cambia password</label>
           <input type="password" id="new-password" placeholder="Nuova password">
