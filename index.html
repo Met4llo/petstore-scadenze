@@ -9,7 +9,7 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.3">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -118,6 +118,7 @@
             <option value="attention">Attenzione (≤30)</option>
             <option value="monitor">Da monitorare (≤120)</option>
             <option value="unsignaled">Non segnalati</option>
+            <option value="signaled">Solo segnalati</option>
             <option value="with-date">Con data inserita</option>
           </select>
         </div>
@@ -154,7 +155,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info">Versione 1.0 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.3 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -164,6 +165,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=1.3"></script>
 </body>
 </html>
