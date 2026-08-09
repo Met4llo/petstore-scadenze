@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.15 - password per operatore + bacheca + task
+// VERSION 1.16 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -371,28 +371,34 @@ function updateDashboard() {
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card expired" data-filter="expired">
+      <div class="stat-emoji">⛔</div>
       <div class="count">${expired.length}</div>
       <div class="label">Scaduti (≤0 gg)</div>
     </div>
     <div class="stat-card urgent" data-filter="urgent">
+      <div class="stat-emoji">🔥</div>
       <div class="count">${urgent.length}</div>
       <div class="label">Urgenti (≤7 gg)</div>
     </div>
     <div class="stat-card attention" data-filter="attention">
+      <div class="stat-emoji">⚠️</div>
       <div class="count">${attention.length}</div>
       <div class="label">Attenzione (≤30 gg)</div>
     </div>
     <div class="stat-card monitor" data-filter="monitor">
+      <div class="stat-emoji">👀</div>
       <div class="count">${monitor.length}</div>
       <div class="label">Da monitorare (≤120)</div>
     </div>
     <div class="stat-card unsignaled" data-filter="unsignaled">
+      <div class="stat-emoji">📢</div>
       <div class="count">${unsignaled.length}</div>
       <div class="label">Non segnalati (≤120)</div>
     </div>
     <div class="stat-card signaled" data-filter="signaled" style="grid-column: span 2; background:#eef2ff;">
+      <div class="stat-emoji">✅</div>
       <div class="count">${signaledCount}</div>
-      <div class="label">✓ Già segnalati — tocca per vedere la lista</div>
+      <div class="label">Già segnalati — tocca per vedere la lista</div>
     </div>
   `;
 

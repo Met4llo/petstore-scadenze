@@ -355,6 +355,11 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+.stat-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+  margin-bottom: 4px;
+}
 .stat-card .count {
   font-size: 1.85rem;
   font-weight: 800;
