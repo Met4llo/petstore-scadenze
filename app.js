@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.13 - password per operatore + bacheca + task
+// VERSION 1.14 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -722,17 +722,52 @@ function importData(file) {
 }
 
 // ---------- Sync button ----------
-async function manualSync() {
-  showToast('Sincronizzazione in corso...');
-  await loadScadenzeFromCloud();
-  await loadCustomProducts();
-  await loadBacheca();
-  await loadTasks();
-  await loadTurni();
-  updateDashboard();
-  showToast('Sincronizzazione completata');
+const AUTO_SYNC_MS = 5 * 60 * 1000; // 5 minuti
+let autoSyncTimer = null;
+let autoSyncRunning = false;
+
+async function runSync(silent) {
+  if (autoSyncRunning) return;
+  if (!supabase || !currentOperator) return;
+  autoSyncRunning = true;
+  try {
+    if (!silent) showToast('Sincronizzazione in corso...');
+    await loadScadenzeFromCloud();
+    await loadCustomProducts();
+    await loadBacheca();
+    await loadTasks();
+    await loadTurni();
+    updateDashboard();
+    updateMyTasksAlert();
+    if (!silent) showToast('Sincronizzazione completata');
+  } catch (e) {
+    console.error('Sync error:', e);
+    if (!silent) showToast('Errore sincronizzazione');
+  } finally {
+    autoSyncRunning = false;
+  }
 }
 
+async function manualSync() {
+  await runSync(false);
+}
+
+function startAutoSync() {
+  stopAutoSync();
+  autoSyncTimer = setInterval(() => {
+    if (document.hidden) return; // risparmia batteria se app in background
+    if (!currentOperator) return;
+    runSync(true); // silenziosa, senza toast
+  }, AUTO_SYNC_MS);
+  console.log('Auto-sync avviato ogni 5 minuti');
+}
+
+function stopAutoSync() {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+}
 
 function enterApp() {
   document.getElementById('login-screen').classList.add('hidden');
@@ -743,6 +778,7 @@ function enterApp() {
   loadBacheca();
   loadTasks().then(() => notifyTasksOnLogin());
   loadTurni();
+  startAutoSync();
 }
 
 function updateOperatorUI() {
@@ -766,6 +802,7 @@ function selectOperator(name) {
 }
 
 function logoutToOperators() {
+  stopAutoSync();
   currentOperator = null;
   pendingOperator = null;
   localStorage.removeItem('petstore_operator');
@@ -1706,6 +1743,11 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && currentOperator) {
+      runSync(true);
+    }
+  });
 
   const btnNewSettimana = document.getElementById('btn-new-settimana');
   if (btnNewSettimana) btnNewSettimana.onclick = openNewSettimanaForm;
