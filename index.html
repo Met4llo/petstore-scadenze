@@ -9,7 +9,7 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css?v=1.9">
+  <link rel="stylesheet" href="styles.css?v=1.9.1">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -112,10 +112,6 @@
         <div class="quick-actions">
           <button id="btn-go-scanner" class="btn btn-primary btn-large">📷 Scansiona prodotto</button>
           <button id="btn-go-add-dash" class="btn btn-secondary btn-large" style="margin-top:10px;">＋ Aggiungi prodotto</button>
-        </div>
-        <div class="recent-section">
-          <h3>Ultimi modificati</h3>
-          <div id="recent-list" class="product-list"></div>
         </div>
       </section>
 
@@ -265,7 +261,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.9 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.9.1 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -275,6 +271,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.9"></script>
+  <script src="app.js?v=1.9.1"></script>
 </body>
 </html>

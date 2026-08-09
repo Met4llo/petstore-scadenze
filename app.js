@@ -394,23 +394,12 @@ function updateDashboard() {
     </div>
   `;
 
-  const recent = withDate
-    .filter(p => p.lastModified)
-    .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))
-    .slice(0, 8);
-  document.getElementById('recent-list').innerHTML = recent.length
-    ? recent.map(renderProductCard).join('')
-    : '<p style="color:#64748b;font-size:0.9rem;">Nessuna modifica recente</p>';
-
   document.querySelectorAll('.stat-card').forEach(card => {
     card.onclick = () => {
       document.getElementById('list-filter').value = card.dataset.filter;
       showPage('list');
       renderFilteredList(card.dataset.filter);
     };
-  });
-  document.querySelectorAll('#recent-list .product-card').forEach(card => {
-    card.onclick = () => openProduct(card.dataset.ean);
   });
 }
 
