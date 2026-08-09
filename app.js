@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.12 - password per operatore + bacheca + task
+// VERSION 1.13 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1368,21 +1368,122 @@ function updateTurniDash() {
   }
 }
 
+// Zoom/pan state for turno viewer
+let viewerScale = 1;
+let viewerX = 0;
+let viewerY = 0;
+let viewerPointers = new Map();
+let viewerLastDist = 0;
+let viewerPanning = false;
+
+function applyViewerTransform() {
+  const img = document.getElementById('turno-viewer-img');
+  if (!img) return;
+  img.style.transform = `translate(${viewerX}px, ${viewerY}px) scale(${viewerScale})`;
+}
+
+function resetViewerZoom() {
+  viewerScale = 1;
+  viewerX = 0;
+  viewerY = 0;
+  applyViewerTransform();
+}
+
+function zoomViewer(delta) {
+  const prev = viewerScale;
+  viewerScale = Math.min(5, Math.max(1, viewerScale + delta));
+  if (viewerScale === 1) {
+    viewerX = 0;
+    viewerY = 0;
+  }
+  applyViewerTransform();
+}
+
 function openTurnoViewer(t) {
   if (!t || !t.image_url) {
     showToast('Nessuna foto per questa settimana');
     return;
   }
-  document.getElementById('turno-viewer-img').src = t.image_url;
+  const img = document.getElementById('turno-viewer-img');
+  img.src = t.image_url;
   document.getElementById('turno-viewer-caption').textContent = formatRange(t.settimana_inizio, t.settimana_fine) +
     (t.uploaded_by ? ' · ' + t.uploaded_by : '');
+  resetViewerZoom();
   document.getElementById('turno-viewer').classList.remove('hidden');
+  // Prevent body scroll while viewing
+  document.body.style.overflow = 'hidden';
 }
 
 function closeTurnoViewer() {
   document.getElementById('turno-viewer').classList.add('hidden');
   document.getElementById('turno-viewer-img').src = '';
+  resetViewerZoom();
+  document.body.style.overflow = '';
 }
+
+function initViewerGestures() {
+  const stage = document.getElementById('turno-viewer-stage');
+  const img = document.getElementById('turno-viewer-img');
+  if (!stage || !img || stage.dataset.gestures === '1') return;
+  stage.dataset.gestures = '1';
+
+  stage.addEventListener('pointerdown', (e) => {
+    stage.setPointerCapture(e.pointerId);
+    viewerPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (viewerPointers.size === 2) {
+      const pts = [...viewerPointers.values()];
+      viewerLastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    } else if (viewerPointers.size === 1 && viewerScale > 1) {
+      viewerPanning = true;
+    }
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    if (!viewerPointers.has(e.pointerId)) return;
+    const prev = viewerPointers.get(e.pointerId);
+    viewerPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (viewerPointers.size === 2) {
+      const pts = [...viewerPointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (viewerLastDist > 0) {
+        const ratio = dist / viewerLastDist;
+        viewerScale = Math.min(5, Math.max(1, viewerScale * ratio));
+        if (viewerScale === 1) { viewerX = 0; viewerY = 0; }
+        applyViewerTransform();
+      }
+      viewerLastDist = dist;
+    } else if (viewerPanning && viewerPointers.size === 1 && viewerScale > 1) {
+      viewerX += e.clientX - prev.x;
+      viewerY += e.clientY - prev.y;
+      applyViewerTransform();
+    }
+  });
+
+  const endPtr = (e) => {
+    viewerPointers.delete(e.pointerId);
+    if (viewerPointers.size < 2) viewerLastDist = 0;
+    if (viewerPointers.size === 0) viewerPanning = false;
+  };
+  stage.addEventListener('pointerup', endPtr);
+  stage.addEventListener('pointercancel', endPtr);
+
+  // Double-tap to toggle zoom
+  let lastTap = 0;
+  stage.addEventListener('click', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      if (viewerScale > 1.2) {
+        resetViewerZoom();
+      } else {
+        viewerScale = 2.5;
+        applyViewerTransform();
+      }
+    }
+    lastTap = now;
+  });
+}
+
 
 function openNewSettimanaForm() {
   const mon = mondayOf(new Date());
@@ -1614,6 +1715,13 @@ async function init() {
   if (btnCancelTurno) btnCancelTurno.onclick = closeTurnoForm;
   const btnCloseViewer = document.getElementById('btn-close-viewer');
   if (btnCloseViewer) btnCloseViewer.onclick = closeTurnoViewer;
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  if (btnZoomIn) btnZoomIn.onclick = () => zoomViewer(0.5);
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  if (btnZoomOut) btnZoomOut.onclick = () => zoomViewer(-0.5);
+  const btnZoomReset = document.getElementById('btn-zoom-reset');
+  if (btnZoomReset) btnZoomReset.onclick = () => resetViewerZoom();
+  initViewerGestures();
   const turnoInizio = document.getElementById('turno-inizio');
   if (turnoInizio) turnoInizio.addEventListener('change', onInizioChange);
   const turnoFoto = document.getElementById('turno-foto');

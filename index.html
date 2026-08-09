@@ -9,7 +9,7 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css?v=1.12">
+  <link rel="stylesheet" href="styles.css?v=1.13">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -212,9 +212,19 @@
 
         <!-- VISUALIZZA FOTO FULLSCREEN -->
         <div id="turno-viewer" class="turno-viewer hidden">
-          <button id="btn-close-viewer" class="turno-viewer-close">✕ Chiudi</button>
-          <img id="turno-viewer-img" src="" alt="Foglio turni">
-          <p id="turno-viewer-caption" class="turno-viewer-caption"></p>
+          <div class="turno-viewer-toolbar">
+            <button id="btn-close-viewer" class="turno-viewer-close">✕ Chiudi</button>
+            <span id="turno-viewer-caption" class="turno-viewer-caption"></span>
+            <div class="turno-zoom-btns">
+              <button type="button" id="btn-zoom-out" class="turno-zoom-btn">−</button>
+              <button type="button" id="btn-zoom-reset" class="turno-zoom-btn">1:1</button>
+              <button type="button" id="btn-zoom-in" class="turno-zoom-btn">+</button>
+            </div>
+          </div>
+          <div id="turno-viewer-stage" class="turno-viewer-stage">
+            <img id="turno-viewer-img" src="" alt="Foglio turni">
+          </div>
+          <p class="turno-viewer-hint">Pizzica per zoom · trascina per spostare · usa + / −</p>
         </div>
       </section>
 
@@ -317,7 +327,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.12 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.13 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -327,6 +337,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.12"></script>
+  <script src="app.js?v=1.13"></script>
 </body>
 </html>

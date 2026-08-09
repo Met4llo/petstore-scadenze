@@ -1165,38 +1165,92 @@ body {
 .turno-viewer {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.92);
+  background: #0a0a0a;
   z-index: 300;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  padding-top: 56px;
+  padding: 0;
+  touch-action: none;
 }
 .turno-viewer.hidden { display: none !important; }
-.turno-viewer img {
-  max-width: 100%;
-  max-height: calc(100vh - 100px);
-  object-fit: contain;
-  border-radius: 8px;
+.turno-viewer-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  background: rgba(0,0,0,0.85);
+  z-index: 2;
 }
 .turno-viewer-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.18);
   color: #fff;
   border: none;
   border-radius: 12px;
-  padding: 10px 16px;
-  font-size: 0.95rem;
+  padding: 10px 14px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 .turno-viewer-caption {
-  color: rgba(255,255,255,0.8);
-  margin-top: 12px;
-  font-size: 0.9rem;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.8rem;
   text-align: center;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.turno-zoom-btns {
+  display: flex;
+  gap: 6px;
+}
+.turno-zoom-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.turno-zoom-btn:active {
+  background: rgba(232, 90, 42, 0.8);
+}
+.turno-viewer-stage {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.turno-viewer-stage img {
+  max-width: none;
+  width: auto;
+  height: auto;
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+  border-radius: 0;
+}
+.turno-viewer-hint {
+  flex-shrink: 0;
+  text-align: center;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.75rem;
+  padding: 8px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
