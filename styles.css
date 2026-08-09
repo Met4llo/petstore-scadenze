@@ -1004,3 +1004,199 @@ body {
 .scanner-section {
   margin-bottom: 4px;
 }
+
+/* ===== TURNI ===== */
+.turni-hint {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+.turni-oggi {
+  background: linear-gradient(135deg, var(--primary-soft), #ffe8dc);
+  border: 1px solid var(--primary-mid);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--primary-dark);
+}
+.turni-dash {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #6ee7b7;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #065f46;
+  cursor: pointer;
+}
+.turni-dash:active { transform: scale(0.98); }
+.turni-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.turno-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(0,0,0,0.03);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.15s;
+}
+.turno-card:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-md);
+}
+.turno-card.oggi {
+  border-left: 5px solid var(--primary);
+  background: linear-gradient(135deg, #fff 60%, var(--primary-soft));
+}
+.turno-card.weekend {
+  background: #f8fafc;
+}
+.turno-day {
+  font-weight: 750;
+  font-size: 0.98rem;
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+.turno-people {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-top: 6px;
+}
+.turno-people.empty {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+.turno-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.turno-fascia-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.turni-form-date {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.section-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 18px 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.turni-corrente {
+  background: linear-gradient(135deg, var(--primary-soft), #ffe8dc);
+  border: 1px solid var(--primary-mid);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 8px;
+}
+.turni-corrente-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.turni-corrente-range {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+.turno-thumb {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  max-height: 280px;
+  object-fit: contain;
+  background: #fff;
+}
+.turno-thumb-sm {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin: 8px 0;
+  cursor: pointer;
+  background: #f1f5f9;
+}
+.turno-note {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.turno-foto-preview {
+  margin-top: 10px;
+}
+.turno-foto-preview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f1f5f9;
+}
+.turno-viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: 56px;
+}
+.turno-viewer.hidden { display: none !important; }
+.turno-viewer img {
+  max-width: 100%;
+  max-height: calc(100vh - 100px);
+  object-fit: contain;
+  border-radius: 8px;
+}
+.turno-viewer-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.turno-viewer-caption {
+  color: rgba(255,255,255,0.8);
+  margin-top: 12px;
+  font-size: 0.9rem;
+  text-align: center;
+}

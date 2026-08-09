@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.10 - password per operatore + bacheca + task
+// VERSION 1.12 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -22,6 +22,8 @@ let bachecaMessages = [];
 let tasksList = [];
 let taskFilter = 'miei';
 let editingTaskId = null;
+let turniList = [];
+let editingTurnoDate = null;
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -726,6 +728,7 @@ async function manualSync() {
   await loadCustomProducts();
   await loadBacheca();
   await loadTasks();
+  await loadTurni();
   updateDashboard();
   showToast('Sincronizzazione completata');
 }
@@ -739,6 +742,7 @@ function enterApp() {
   updateDashboard();
   loadBacheca();
   loadTasks().then(() => notifyTasksOnLogin());
+  loadTurni();
 }
 
 function updateOperatorUI() {
@@ -1207,6 +1211,301 @@ async function deleteTask(id) {
 }
 
 
+
+// ========== TURNI (foto settimanale + storico) ==========
+const GIORNI_CORTI = ['dom','lun','mar','mer','gio','ven','sab'];
+const MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+
+function toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + day;
+}
+
+function parseDate(str) {
+  return new Date(str + 'T12:00:00');
+}
+
+function mondayOf(d) {
+  const x = new Date(d);
+  x.setHours(12,0,0,0);
+  const day = x.getDay(); // 0=dom
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  return x;
+}
+
+function sundayOf(monday) {
+  const x = new Date(monday);
+  x.setDate(x.getDate() + 6);
+  return x;
+}
+
+function formatRange(inizio, fine) {
+  const a = parseDate(inizio);
+  const b = parseDate(fine);
+  const sameMonth = a.getMonth() === b.getMonth();
+  if (sameMonth) {
+    return a.getDate() + ' – ' + b.getDate() + ' ' + MESI[a.getMonth()] + ' ' + a.getFullYear();
+  }
+  return a.getDate() + ' ' + MESI[a.getMonth()].slice(0,3) + ' – ' + b.getDate() + ' ' + MESI[b.getMonth()].slice(0,3) + ' ' + b.getFullYear();
+}
+
+function isCurrentWeek(inizio, fine) {
+  const today = toDateStr(new Date());
+  return today >= inizio && today <= fine;
+}
+
+async function loadTurni() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('turni_settimane')
+      .select('*')
+      .order('settimana_inizio', { ascending: false });
+    if (error) {
+      console.error('turni load:', error);
+      const el = document.getElementById('turni-list');
+      if (el) el.innerHTML = '<p class="muted-center">Errore caricamento. Verifica la tabella turni_settimane su Supabase.</p>';
+      return;
+    }
+    turniList = data || [];
+    renderTurni();
+    updateTurniDash();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderTurni() {
+  const el = document.getElementById('turni-list');
+  const corrente = document.getElementById('turni-corrente');
+  if (!el) return;
+
+  if (!turniList.length) {
+    el.innerHTML = '<p class="muted-center">Nessuna settimana in archivio.<br>Carica la foto del foglio turni.</p>';
+    if (corrente) corrente.classList.add('hidden');
+    return;
+  }
+
+  // Current week at top if exists
+  const current = turniList.find(t => isCurrentWeek(t.settimana_inizio, t.settimana_fine));
+  if (corrente) {
+    if (current) {
+      corrente.classList.remove('hidden');
+      corrente.innerHTML = `
+        <div class="turni-corrente-label">Settimana in corso</div>
+        <div class="turni-corrente-range">${formatRange(current.settimana_inizio, current.settimana_fine)}</div>
+        ${current.image_url ? `<img class="turno-thumb" src="${current.image_url}" alt="Turni settimana" data-id="${current.id}">` : '<p class="muted-center">Nessuna foto</p>'}
+        ${current.note ? `<div class="turno-note">${escapeHtml(current.note)}</div>` : ''}
+        <div class="turno-meta">Caricato da ${escapeHtml(current.uploaded_by || '')}</div>
+      `;
+      const img = corrente.querySelector('.turno-thumb');
+      if (img) img.onclick = () => openTurnoViewer(current);
+    } else {
+      corrente.classList.add('hidden');
+    }
+  }
+
+  el.innerHTML = turniList.map(t => {
+    const isCur = isCurrentWeek(t.settimana_inizio, t.settimana_fine);
+    return `<div class="turno-card ${isCur ? 'oggi' : ''}" data-id="${t.id}">
+      <div class="turno-day">${formatRange(t.settimana_inizio, t.settimana_fine)}${isCur ? ' · in corso' : ''}</div>
+      ${t.image_url ? `<img class="turno-thumb-sm" src="${t.image_url}" alt="Turni">` : ''}
+      ${t.note ? `<div class="turno-note">${escapeHtml(t.note)}</div>` : ''}
+      <div class="turno-meta">
+        <span>${escapeHtml(t.uploaded_by || '')}</span>
+        <span>${t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : ''}</span>
+      </div>
+      <div class="task-actions" style="margin-top:10px;">
+        <button class="btn btn-primary btn-view-turno" data-id="${t.id}">Vedi foto</button>
+        <button class="btn btn-secondary btn-del-settimana" data-id="${t.id}">Elimina</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.btn-view-turno').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const t = turniList.find(x => x.id === btn.dataset.id);
+      if (t) openTurnoViewer(t);
+    };
+  });
+  el.querySelectorAll('.btn-del-settimana').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      deleteSettimana(btn.dataset.id);
+    };
+  });
+  el.querySelectorAll('.turno-thumb-sm').forEach(img => {
+    img.onclick = (e) => {
+      e.stopPropagation();
+      const card = img.closest('.turno-card');
+      const t = turniList.find(x => x.id === card.dataset.id);
+      if (t) openTurnoViewer(t);
+    };
+  });
+}
+
+function updateTurniDash() {
+  const el = document.getElementById('turni-dash');
+  if (!el) return;
+  const current = turniList.find(t => isCurrentWeek(t.settimana_inizio, t.settimana_fine));
+  if (current) {
+    el.classList.remove('hidden');
+    el.innerHTML = '🗓️ Turni settimana: <strong>' + formatRange(current.settimana_inizio, current.settimana_fine) + '</strong> — tocca per vedere';
+    el.onclick = () => {
+      showPage('turni');
+      if (current.image_url) openTurnoViewer(current);
+    };
+  } else if (turniList.length) {
+    el.classList.remove('hidden');
+    el.innerHTML = '🗓️ Archivio turni disponibile — tocca per aprire';
+    el.onclick = () => showPage('turni');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+function openTurnoViewer(t) {
+  if (!t || !t.image_url) {
+    showToast('Nessuna foto per questa settimana');
+    return;
+  }
+  document.getElementById('turno-viewer-img').src = t.image_url;
+  document.getElementById('turno-viewer-caption').textContent = formatRange(t.settimana_inizio, t.settimana_fine) +
+    (t.uploaded_by ? ' · ' + t.uploaded_by : '');
+  document.getElementById('turno-viewer').classList.remove('hidden');
+}
+
+function closeTurnoViewer() {
+  document.getElementById('turno-viewer').classList.add('hidden');
+  document.getElementById('turno-viewer-img').src = '';
+}
+
+function openNewSettimanaForm() {
+  const mon = mondayOf(new Date());
+  const sun = sundayOf(mon);
+  document.getElementById('turno-inizio').value = toDateStr(mon);
+  document.getElementById('turno-fine').value = toDateStr(sun);
+  document.getElementById('turno-note').value = '';
+  document.getElementById('turno-foto').value = '';
+  document.getElementById('turno-foto-preview').classList.add('hidden');
+  document.getElementById('turno-foto-preview').innerHTML = '';
+  document.getElementById('turno-upload-msg').classList.add('hidden');
+  document.getElementById('turno-form-overlay').classList.remove('hidden');
+}
+
+function closeTurnoForm() {
+  document.getElementById('turno-form-overlay').classList.add('hidden');
+}
+
+// Auto-fill fine when inizio changes ( +6 days)
+function onInizioChange() {
+  const v = document.getElementById('turno-inizio').value;
+  if (!v) return;
+  const mon = parseDate(v);
+  // snap to monday of that week? keep user choice but set fine = +6
+  const sun = new Date(mon);
+  sun.setDate(sun.getDate() + 6);
+  document.getElementById('turno-fine').value = toDateStr(sun);
+}
+
+async function saveTurno() {
+  const inizio = document.getElementById('turno-inizio').value;
+  let fine = document.getElementById('turno-fine').value;
+  const note = (document.getElementById('turno-note').value || '').trim() || null;
+  const fileInput = document.getElementById('turno-foto');
+  const msg = document.getElementById('turno-upload-msg');
+
+  if (!inizio) {
+    showToast('Seleziona l\'inizio settimana');
+    return;
+  }
+  if (!fine) {
+    const sun = parseDate(inizio);
+    sun.setDate(sun.getDate() + 6);
+    fine = toDateStr(sun);
+  }
+  if (!fileInput.files || !fileInput.files[0]) {
+    showToast('Seleziona la foto del foglio turni');
+    return;
+  }
+  if (!supabase) {
+    showToast('Cloud non disponibile');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  msg.classList.remove('hidden');
+  msg.className = 'msg';
+  msg.textContent = 'Caricamento foto in corso...';
+
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `settimane/${inizio}_${Date.now()}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from('turni')
+      .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+
+    if (upErr) {
+      console.error(upErr);
+      msg.className = 'msg error';
+      msg.textContent = 'Errore upload: ' + upErr.message + ' (verifica bucket "turni" su Supabase Storage)';
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from('turni').getPublicUrl(path);
+    const image_url = urlData.publicUrl;
+
+    const { error } = await supabase.from('turni_settimane').insert({
+      settimana_inizio: inizio,
+      settimana_fine: fine,
+      image_url,
+      image_path: path,
+      note,
+      uploaded_by: currentOperator || 'Sconosciuto'
+    });
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = 'Errore salvataggio: ' + error.message;
+      return;
+    }
+
+    msg.className = 'msg success';
+    msg.textContent = 'Settimana salvata in archivio!';
+    showToast('Foglio turni archiviato');
+    closeTurnoForm();
+    await loadTurni();
+  } catch (err) {
+    console.error(err);
+    msg.className = 'msg error';
+    msg.textContent = 'Errore: ' + err.message;
+  }
+}
+
+async function deleteSettimana(id) {
+  if (!confirm('Eliminare questa settimana dall\'archivio?')) return;
+  if (!supabase) return;
+  const t = turniList.find(x => x.id === id);
+  // delete from storage if path known
+  if (t && t.image_path) {
+    try {
+      await supabase.storage.from('turni').remove([t.image_path]);
+    } catch (e) {}
+  }
+  const { error } = await supabase.from('turni_settimane').delete().eq('id', id);
+  if (error) {
+    showToast('Errore: ' + error.message);
+    return;
+  }
+  showToast('Eliminata dall\'archivio');
+  await loadTurni();
+}
+
 // ---------- Init ----------
 async function init() {
   // Create Supabase client (library already loaded from index.html)
@@ -1283,8 +1582,9 @@ async function init() {
       showPage(page);
       if (page === 'list') renderFilteredList(document.getElementById('list-filter').value);
       if (page === 'scanner') { /* non avviare in automatico: usa il pulsante */ }
-      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); }
+      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
       if (page === 'tasks') { loadTasks(); }
+      if (page === 'turni') { loadTurni(); }
     };
   });
 
@@ -1305,6 +1605,32 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  const btnNewSettimana = document.getElementById('btn-new-settimana');
+  if (btnNewSettimana) btnNewSettimana.onclick = openNewSettimanaForm;
+  const btnSaveTurno = document.getElementById('btn-save-turno');
+  if (btnSaveTurno) btnSaveTurno.onclick = saveTurno;
+  const btnCancelTurno = document.getElementById('btn-cancel-turno');
+  if (btnCancelTurno) btnCancelTurno.onclick = closeTurnoForm;
+  const btnCloseViewer = document.getElementById('btn-close-viewer');
+  if (btnCloseViewer) btnCloseViewer.onclick = closeTurnoViewer;
+  const turnoInizio = document.getElementById('turno-inizio');
+  if (turnoInizio) turnoInizio.addEventListener('change', onInizioChange);
+  const turnoFoto = document.getElementById('turno-foto');
+  if (turnoFoto) {
+    turnoFoto.addEventListener('change', () => {
+      const prev = document.getElementById('turno-foto-preview');
+      if (turnoFoto.files && turnoFoto.files[0]) {
+        const url = URL.createObjectURL(turnoFoto.files[0]);
+        prev.innerHTML = '<img src="' + url + '" alt="Anteprima">';
+        prev.classList.remove('hidden');
+      } else {
+        prev.classList.add('hidden');
+        prev.innerHTML = '';
+      }
+    });
+  }
+
 
   // Bacheca
   const btnNewBacheca = document.getElementById('btn-new-bacheca');
