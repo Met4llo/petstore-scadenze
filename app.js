@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.21 - password per operatore + bacheca + task
+// VERSION 1.22 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -29,6 +29,8 @@ let missioneProgress = [];
 let missioneCompletate = [];
 const MISSIONE_COUNT = 10;
 const MISSIONE_HOUR = 9;
+let detailReturnPage = 'dashboard';
+let nonInNegozio = new Set(); // EANs not in store
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -450,7 +452,7 @@ function renderFilteredList(filter) {
       (list.length > 300 ? `<p style="text-align:center;color:#64748b;">... e altri ${list.length - 300}</p>` : '');
   }
   container.querySelectorAll('.product-card').forEach(card => {
-    card.onclick = () => openProduct(card.dataset.ean);
+    card.onclick = () => openProduct(card.dataset.ean, 'list');
   });
 }
 
@@ -470,12 +472,14 @@ function doSearch(query) {
     ? results.map(renderProductCard).join('')
     : '<p style="color:#64748b;text-align:center;">Nessun risultato</p>';
   container.querySelectorAll('.product-card').forEach(card => {
-    card.onclick = () => openProduct(card.dataset.ean);
+    card.onclick = () => openProduct(card.dataset.ean, 'scanner');
   });
 }
 
 // ---------- Product Detail ----------
-function openProduct(ean) {
+function openProduct(ean, returnPage) {
+  if (returnPage) detailReturnPage = returnPage;
+  else if (!detailReturnPage) detailReturnPage = 'dashboard';
   currentProduct = products.find(p => p.ean === ean);
   if (!currentProduct) {
     showToast('Prodotto non trovato');
@@ -525,7 +529,10 @@ function openProduct(ean) {
       ${condition ? `<div class="conditions-text"><strong>Condizioni reso:</strong><br>${escapeHtml(condition)}</div>` : '<div class="conditions-text">Condizioni non trovate nel database fornitori</div>'}
     </div>
 
-    <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:20px;">Salva modifiche</button>
+    <button id="btn-toggle-non-negozio" class="btn btn-secondary btn-large" style="margin-top:20px;">
+      ${nonInNegozio.has(currentProduct.ean) ? '🛒  Segna come in negozio' : '📦  Segna come non in negozio'}
+    </button>
+    <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:10px;">Salva modifiche</button>
     <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">🗑️ Elimina prodotto</button>
   `;
 
@@ -551,6 +558,8 @@ function openProduct(ean) {
 
   document.getElementById('btn-save-product').onclick = saveProduct;
   document.getElementById('btn-delete-product').onclick = deleteProduct;
+  const btnNonNeg = document.getElementById('btn-toggle-non-negozio');
+  if (btnNonNeg) btnNonNeg.onclick = () => toggleNonInNegozio(currentProduct.ean);
   showPage('detail');
 }
 
@@ -749,6 +758,7 @@ async function runSync(silent) {
     await loadTasks();
     await loadTurni();
     await refreshMissione();
+    await loadNonInNegozio();
     updateDashboard();
     updateMyTasksAlert();
     if (!silent) showToast('Sincronizzazione completata');
@@ -791,6 +801,7 @@ function enterApp() {
   loadTasks().then(() => notifyTasksOnLogin());
   loadTurni();
   refreshMissione();
+  loadNonInNegozio();
   startAutoSync();
 }
 
@@ -1688,16 +1699,17 @@ function isAfterMissionHour() {
 }
 
 function pickRandomProducts(n) {
-  // Include: senza scadenza + con scadenza entro 180 giorni
-  const senzaScadenza = products.filter(p => p.ean && !p.expiry);
+  // Include: senza scadenza + con scadenza entro 180 giorni (esclude non in negozio)
+  const inStore = (p) => p.ean && !nonInNegozio.has(p.ean);
+  const senzaScadenza = products.filter(p => inStore(p) && !p.expiry);
   const conScadenza = products.filter(p => {
+    if (!inStore(p)) return false;
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 180;
   });
-  // Mix: metà e metà se possibile, poi riempi
   let pool = [...senzaScadenza, ...conScadenza];
   if (pool.length < n) {
-    pool = products.filter(p => p.ean);
+    pool = products.filter(p => inStore(p));
   }
   // shuffle
   const arr = [...pool];
@@ -1883,7 +1895,7 @@ function renderMissione() {
   listEl.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.btn-check-mission')) return;
-      openProduct(card.dataset.ean);
+      openProduct(card.dataset.ean, 'missione');
     });
   });
   listEl.querySelectorAll('.btn-check-mission').forEach(btn => {
@@ -1927,6 +1939,80 @@ async function refreshMissione() {
   await ensureMissioneOggi();
   renderMissione();
   updateMissioneDash();
+}
+
+
+
+// ========== NON IN NEGOZIO ==========
+async function loadNonInNegozio() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('prodotti_non_in_negozio').select('ean');
+    if (error) {
+      console.error('non in negozio:', error);
+      return;
+    }
+    nonInNegozio = new Set((data || []).map(r => r.ean));
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function toggleNonInNegozio(ean) {
+  if (!supabase || !ean) return;
+  const isOut = nonInNegozio.has(ean);
+  if (isOut) {
+    const { error } = await supabase.from('prodotti_non_in_negozio').delete().eq('ean', ean);
+    if (error) {
+      showToast('Errore: ' + error.message);
+      return;
+    }
+    nonInNegozio.delete(ean);
+    showToast('Prodotto segnato come in negozio');
+  } else {
+    const { error } = await supabase.from('prodotti_non_in_negozio').upsert({
+      ean,
+      updated_by: currentOperator || 'Sconosciuto',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'ean' });
+    if (error) {
+      showToast('Errore: ' + error.message);
+      return;
+    }
+    nonInNegozio.add(ean);
+    showToast('Prodotto segnato come non in negozio');
+  }
+  // refresh detail button if still on same product
+  if (currentProduct && currentProduct.ean === ean) {
+    openProduct(ean, detailReturnPage);
+  }
+  renderNonInNegozio();
+}
+
+function renderNonInNegozio() {
+  const el = document.getElementById('non-negozio-list');
+  if (!el) return;
+  const list = products.filter(p => nonInNegozio.has(p.ean));
+  if (!list.length) {
+    el.innerHTML = '<p class="muted-center">Nessun prodotto segnato come non in negozio.<br>Apri un prodotto e usa il pulsante «Segna come non in negozio».</p>';
+    return;
+  }
+  list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
+  el.innerHTML = list.map(p => {
+    const days = daysRemaining(p.expiry);
+    const cls = getStatusClass(days);
+    return `<div class="product-card ${cls}" data-ean="${p.ean}">
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-meta">
+        <span>${p.ean}</span>
+        ${getBadge(days, p.signaled)}
+        ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.product-card').forEach(card => {
+    card.onclick = () => openProduct(card.dataset.ean, 'non-negozio');
+  });
 }
 
 
@@ -2026,8 +2112,17 @@ async function init() {
     };
   }
   document.getElementById('btn-back').onclick = () => {
-    showPage('dashboard');
-    updateDashboard();
+    const dest = detailReturnPage || 'dashboard';
+    detailReturnPage = 'dashboard';
+    showPage(dest);
+    if (dest === 'dashboard') updateDashboard();
+    if (dest === 'missione') { refreshMissione(); }
+    if (dest === 'list') {
+      const lf = document.getElementById('list-filter');
+      renderFilteredList(lf ? lf.value : 'all');
+    }
+    if (dest === 'non-negozio') renderNonInNegozio();
+    if (dest === 'scanner') { /* ok */ }
   };
   const _btnSettings = document.getElementById('btn-settings');
   if (_btnSettings) _btnSettings.onclick = () => showPage('settings');
@@ -2066,6 +2161,7 @@ async function init() {
       if (page === 'tasks') loadTasks();
       if (page === 'turni') loadTurni();
       if (page === 'missione') refreshMissione();
+      if (page === 'non-negozio') { loadNonInNegozio().then(() => renderNonInNegozio()); }
       // highlight bottom nav if page has a tab
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);

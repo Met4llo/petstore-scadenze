@@ -12,7 +12,7 @@
   <script>
     (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="styles.css?v=1.21">
+  <link rel="stylesheet" href="styles.css?v=1.22">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -61,6 +61,7 @@
           <button type="button" class="logo-dropdown-item" data-page="turni">🗓️  Turni</button>
           <button type="button" class="logo-dropdown-item" data-page="scanner">📷  Scanner / Cerca</button>
           <button type="button" class="logo-dropdown-item" data-page="list">📋  Lista scadenze</button>
+          <button type="button" class="logo-dropdown-item" data-page="non-negozio">📦  Non in negozio</button>
           <div class="logo-dropdown-divider"></div>
           <button type="button" class="logo-dropdown-item" data-page="settings">⚙️  Impostazioni</button>
         </div>
@@ -322,6 +323,16 @@
         </div>
       </section>
 
+      
+      <!-- NON IN NEGOZIO -->
+      <section id="page-non-negozio" class="page">
+        <h2 class="page-title">📦 Non in negozio</h2>
+        <p class="turni-hint">Prodotti in assortimento generale ma non presenti a scaffale. Puoi segnarli dal dettaglio prodotto.</p>
+        <div id="non-negozio-list" class="product-list">
+          <p class="muted-center">Caricamento...</p>
+        </div>
+      </section>
+
       <!-- PRODUCT DETAIL -->
       <section id="page-detail" class="page">
         <button id="btn-back" class="btn-back">← Indietro</button>
@@ -361,7 +372,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.21 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.22 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -371,6 +382,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.21"></script>
+  <script src="app.js?v=1.22"></script>
 </body>
 </html>
