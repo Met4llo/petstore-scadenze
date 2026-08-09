@@ -9,29 +9,16 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css?v=1.7">
+  <link rel="stylesheet" href="styles.css?v=1.8">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-  <!-- LOGIN -->
+  <!-- LOGIN: scegli operatore -->
   <div id="login-screen" class="screen">
     <div class="login-box">
       <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
-      <h1>Gestione Scadenze</h1>
-      <p class="subtitle">Inserisci la password per accedere</p>
-      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-      <button id="login-btn" class="btn btn-primary">Entra</button>
-      <p id="login-error" class="error hidden">Password non corretta</p>
-    </div>
-  </div>
-
-  
-  <!-- OPERATOR SELECTION -->
-  <div id="operator-screen" class="screen hidden">
-    <div class="login-box">
-      <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
-      <h1>Chi sta usando l'app?</h1>
+      <h1>Accesso operatori</h1>
       <p class="subtitle">Seleziona il tuo nome</p>
       <div class="operator-grid" id="operator-grid">
         <button class="btn btn-primary operator-btn" data-op="Santoemma">Santoemma</button>
@@ -39,6 +26,19 @@
         <button class="btn btn-primary operator-btn" data-op="Pizzimenti">Pizzimenti</button>
         <button class="btn btn-primary operator-btn" data-op="Sorrentino">Sorrentino</button>
       </div>
+    </div>
+  </div>
+
+  <!-- PASSWORD per operatore scelto -->
+  <div id="password-screen" class="screen hidden">
+    <div class="login-box">
+      <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
+      <h1 id="pwd-operator-name">Password</h1>
+      <p class="subtitle">Inserisci la tua password personale</p>
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+      <button id="login-btn" class="btn btn-primary" style="width:100%">Entra</button>
+      <button id="btn-back-to-operators" class="btn btn-secondary" style="width:100%;margin-top:8px;">← Cambia operatore</button>
+      <p id="login-error" class="error hidden">Password non corretta</p>
     </div>
   </div>
 
@@ -248,13 +248,14 @@
         <div class="settings-group">
           <label>Operatore corrente</label>
           <p id="settings-operator-name" style="font-weight:600;margin-bottom:10px;"></p>
-          <button id="btn-change-operator" class="btn btn-secondary">Cambia operatore</button>
+          <button id="btn-change-operator" class="btn btn-secondary">Esci / Cambia operatore</button>
         </div>
         <div class="settings-group">
-          <label>Cambia password</label>
+          <label>Cambia la tua password</label>
+          <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Solo per l'operatore attualmente connesso</p>
           <input type="password" id="new-password" placeholder="Nuova password">
           <input type="password" id="confirm-password" placeholder="Conferma password">
-          <button id="btn-change-password" class="btn btn-primary">Salva password</button>
+          <button id="btn-change-password" class="btn btn-primary">Salva la mia password</button>
           <p id="password-msg" class="msg hidden"></p>
         </div>
         <div class="settings-group">
@@ -264,7 +265,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.7 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.8 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -274,6 +275,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.7"></script>
+  <script src="app.js?v=1.8"></script>
 </body>
 </html>

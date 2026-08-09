@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.7 - bacheca + task di reparto + elimina + operatori
+// VERSION 1.8 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -89,14 +89,40 @@ function idbBulkPut(storeName, items) {
 }
 
 // ---------- Password ----------
-async function getPassword() {
+// Default passwords (operator can change their own)
+const DEFAULT_PASSWORDS = {
+  Santoemma: 'santoemma',
+  Fuschi: 'fuschi',
+  Pizzimenti: 'pizzimenti',
+  Sorrentino: 'sorrentino'
+};
+
+async function getOperatorPassword(opName) {
   const meta = await idbGetAll(STORE_META);
-  const entry = meta.find(m => m.key === 'password');
-  return entry ? entry.value : 'scadenze2026';
+  const entry = meta.find(m => m.key === 'pwd_' + opName);
+  if (entry && entry.value) return entry.value;
+  // Try Supabase
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('operatori_pwd').select('password').eq('nome', opName).maybeSingle();
+      if (data && data.password) {
+        await idbPut(STORE_META, { key: 'pwd_' + opName, value: data.password });
+        return data.password;
+      }
+    } catch (e) {}
+  }
+  return DEFAULT_PASSWORDS[opName] || '1234';
 }
 
-async function setPassword(pwd) {
-  await idbPut(STORE_META, { key: 'password', value: pwd });
+async function setOperatorPassword(opName, pwd) {
+  await idbPut(STORE_META, { key: 'pwd_' + opName, value: pwd });
+  if (supabase) {
+    try {
+      await supabase.from('operatori_pwd').upsert({ nome: opName, password: pwd }, { onConflict: 'nome' });
+    } catch (e) {
+      console.warn('Could not sync password to cloud', e);
+    }
+  }
 }
 
 // ---------- Days calculation ----------
@@ -713,7 +739,8 @@ async function manualSync() {
 
 
 function enterApp() {
-  document.getElementById('operator-screen').classList.add('hidden');
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('password-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   updateOperatorUI();
   updateDashboard();
@@ -728,10 +755,27 @@ function updateOperatorUI() {
   if (settingsName) settingsName.textContent = currentOperator || 'Nessuno';
 }
 
+let pendingOperator = null;
+
 function selectOperator(name) {
-  currentOperator = name;
-  localStorage.setItem('petstore_operator', name);
-  enterApp();
+  // Show password screen for this operator (do not enter yet)
+  pendingOperator = name;
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('password-screen').classList.remove('hidden');
+  document.getElementById('pwd-operator-name').textContent = name;
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+  setTimeout(() => document.getElementById('login-password').focus(), 100);
+}
+
+function logoutToOperators() {
+  currentOperator = null;
+  pendingOperator = null;
+  localStorage.removeItem('petstore_operator');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('password-screen').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-password').value = '';
 }
 
 
@@ -1210,21 +1254,34 @@ async function init() {
   const loginBtn = document.getElementById('login-btn');
   const pwdInput = document.getElementById('login-password');
   loginBtn.onclick = async () => {
-    const stored = await getPassword();
+    const op = pendingOperator;
+    if (!op) {
+      showToast('Seleziona prima un operatore');
+      return;
+    }
+    const stored = await getOperatorPassword(op);
     if (pwdInput.value === stored) {
-      document.getElementById('login-screen').classList.add('hidden');
-      if (currentOperator && OPERATORS.includes(currentOperator)) {
-        enterApp();
-      } else {
-        document.getElementById('operator-screen').classList.remove('hidden');
-      }
+      currentOperator = op;
+      localStorage.setItem('petstore_operator', op);
+      document.getElementById('login-error').classList.add('hidden');
+      enterApp();
     } else {
       document.getElementById('login-error').classList.remove('hidden');
+      document.getElementById('login-error').textContent = 'Password non corretta per ' + op;
     }
   };
   pwdInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') loginBtn.click();
   });
+  const btnBackOps = document.getElementById('btn-back-to-operators');
+  if (btnBackOps) {
+    btnBackOps.onclick = () => {
+      pendingOperator = null;
+      document.getElementById('password-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('login-error').classList.add('hidden');
+    };
+  }
 
   // Navigation
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1297,8 +1354,9 @@ async function init() {
   const btnChangeOp = document.getElementById('btn-change-operator');
   if (btnChangeOp) {
     btnChangeOp.onclick = () => {
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('operator-screen').classList.remove('hidden');
+      if (confirm('Uscire e cambiare operatore? Dovrai inserire di nuovo la password.')) {
+        logoutToOperators();
+      }
     };
   }
   updateOperatorUI();
@@ -1321,19 +1379,27 @@ async function init() {
     const n = document.getElementById('new-password').value;
     const c = document.getElementById('confirm-password').value;
     const msg = document.getElementById('password-msg');
+    if (!currentOperator) {
+      msg.textContent = 'Nessun operatore connesso';
+      msg.className = 'msg error';
+      return;
+    }
     if (n.length < 4) {
       msg.textContent = 'Password troppo corta (min 4 caratteri)';
       msg.className = 'msg error';
+      msg.classList.remove('hidden');
       return;
     }
     if (n !== c) {
       msg.textContent = 'Le password non coincidono';
       msg.className = 'msg error';
+      msg.classList.remove('hidden');
       return;
     }
-    await setPassword(n);
-    msg.textContent = 'Password aggiornata!';
+    await setOperatorPassword(currentOperator, n);
+    msg.textContent = 'Password di ' + currentOperator + ' aggiornata!';
     msg.className = 'msg success';
+    msg.classList.remove('hidden');
     document.getElementById('new-password').value = '';
     document.getElementById('confirm-password').value = '';
   };
