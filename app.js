@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.16 - password per operatore + bacheca + task
+// VERSION 1.17 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1650,8 +1650,29 @@ async function deleteSettimana(id) {
   await loadTurni();
 }
 
+
+// ========== THEME ==========
+function getTheme() {
+  return localStorage.getItem('petstore_theme') || 'light';
+}
+
+function applyTheme(theme) {
+  const t = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('petstore_theme', t);
+  const btnL = document.getElementById('btn-theme-light');
+  const btnD = document.getElementById('btn-theme-dark');
+  if (btnL) btnL.classList.toggle('active', t === 'light');
+  if (btnD) btnD.classList.toggle('active', t === 'dark');
+}
+
+function initTheme() {
+  applyTheme(getTheme());
+}
+
 // ---------- Init ----------
 async function init() {
+  initTheme();
   // Create Supabase client (library already loaded from index.html)
   try {
     const sb = window.supabase;
@@ -1749,6 +1770,12 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  const btnThemeLight = document.getElementById('btn-theme-light');
+  if (btnThemeLight) btnThemeLight.onclick = () => { applyTheme('light'); showToast('Modalità chiara'); };
+  const btnThemeDark = document.getElementById('btn-theme-dark');
+  if (btnThemeDark) btnThemeDark.onclick = () => { applyTheme('dark'); showToast('Modalità scura'); };
+
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentOperator) {
       runSync(true);
