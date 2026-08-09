@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.19 - password per operatore + bacheca + task
+// VERSION 1.21 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -24,6 +24,11 @@ let taskFilter = 'miei';
 let editingTaskId = null;
 let turniList = [];
 let editingTurnoDate = null;
+let missioneOggi = null;
+let missioneProgress = [];
+let missioneCompletate = [];
+const MISSIONE_COUNT = 10;
+const MISSIONE_HOUR = 9;
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -743,6 +748,7 @@ async function runSync(silent) {
     await loadBacheca();
     await loadTasks();
     await loadTurni();
+    await refreshMissione();
     updateDashboard();
     updateMyTasksAlert();
     if (!silent) showToast('Sincronizzazione completata');
@@ -784,6 +790,7 @@ function enterApp() {
   loadBacheca();
   loadTasks().then(() => notifyTasksOnLogin());
   loadTurni();
+  refreshMissione();
   startAutoSync();
 }
 
@@ -1670,6 +1677,259 @@ function initTheme() {
   applyTheme(getTheme());
 }
 
+
+// ========== MISSIONE GIORNALIERA ==========
+function todayStr() {
+  return toDateStr(new Date());
+}
+
+function isAfterMissionHour() {
+  return new Date().getHours() >= MISSIONE_HOUR;
+}
+
+function pickRandomProducts(n) {
+  // Include: senza scadenza + con scadenza entro 180 giorni
+  const senzaScadenza = products.filter(p => p.ean && !p.expiry);
+  const conScadenza = products.filter(p => {
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 180;
+  });
+  // Mix: metà e metà se possibile, poi riempi
+  let pool = [...senzaScadenza, ...conScadenza];
+  if (pool.length < n) {
+    pool = products.filter(p => p.ean);
+  }
+  // shuffle
+  const arr = [...pool];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, Math.min(n, arr.length)).map(p => p.ean);
+}
+
+async function ensureMissioneOggi() {
+  if (!supabase || !products.length) return null;
+  if (!isAfterMissionHour()) {
+    // Prima delle 9: nessuna missione ancora
+    missioneOggi = null;
+    return null;
+  }
+  const data = todayStr();
+  try {
+    let { data: row, error } = await supabase
+      .from('missioni')
+      .select('*')
+      .eq('data', data)
+      .maybeSingle();
+    if (error) {
+      console.error('missione load:', error);
+      return null;
+    }
+    if (!row) {
+      // Crea missione del giorno
+      const eans = pickRandomProducts(MISSIONE_COUNT);
+      if (!eans.length) return null;
+      const { data: created, error: insErr } = await supabase
+        .from('missioni')
+        .insert({ data, prodotti: eans, created_by: currentOperator || 'sistema' })
+        .select()
+        .maybeSingle();
+      if (insErr) {
+        // Race: un altro operatore l'ha già creata
+        const retry = await supabase.from('missioni').select('*').eq('data', data).maybeSingle();
+        row = retry.data;
+      } else {
+        row = created;
+      }
+    }
+    missioneOggi = row;
+    await loadMissioneProgress();
+    return row;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+}
+
+async function loadMissioneProgress() {
+  if (!supabase || !missioneOggi) return;
+  const data = missioneOggi.data;
+  const [prog, comp] = await Promise.all([
+    supabase.from('missioni_progress').select('*').eq('data', data),
+    supabase.from('missioni_completate').select('*').eq('data', data)
+  ]);
+  missioneProgress = prog.data || [];
+  missioneCompletate = comp.data || [];
+}
+
+function myCheckedEans() {
+  if (!currentOperator) return new Set();
+  return new Set(
+    missioneProgress
+      .filter(p => p.operator === currentOperator)
+      .map(p => p.ean)
+  );
+}
+
+function isProductCheckedByMe(ean) {
+  return myCheckedEans().has(ean);
+}
+
+function myMissionDone() {
+  if (!missioneOggi || !currentOperator) return false;
+  return missioneCompletate.some(c => c.operator === currentOperator);
+}
+
+function myMissionProgress() {
+  if (!missioneOggi || !missioneOggi.prodotti) return { done: 0, total: 0 };
+  const total = missioneOggi.prodotti.length;
+  const done = missioneOggi.prodotti.filter(ean => isProductCheckedByMe(ean)).length;
+  return { done, total };
+}
+
+async function markProductChecked(ean) {
+  if (!supabase || !missioneOggi || !currentOperator) return;
+  const { error } = await supabase.from('missioni_progress').upsert({
+    data: missioneOggi.data,
+    ean,
+    operator: currentOperator,
+    checked_at: new Date().toISOString()
+  }, { onConflict: 'data,ean,operator' });
+  if (error) {
+    showToast('Errore: ' + error.message);
+    return;
+  }
+  await loadMissioneProgress();
+  // Auto-complete mission if all checked
+  const { done, total } = myMissionProgress();
+  if (done >= total && total > 0 && !myMissionDone()) {
+    await supabase.from('missioni_completate').upsert({
+      data: missioneOggi.data,
+      operator: currentOperator,
+      completed_at: new Date().toISOString()
+    }, { onConflict: 'data,operator' });
+    await loadMissioneProgress();
+    showToast('🎯 Missione completata! Ottimo lavoro');
+  } else {
+    showToast('Prodotto controllato ✓');
+  }
+  renderMissione();
+  updateMissioneDash();
+}
+
+function renderMissione() {
+  const statusEl = document.getElementById('missione-status');
+  const listEl = document.getElementById('missione-list');
+  const opsEl = document.getElementById('missione-operators');
+  if (!statusEl || !listEl) return;
+
+  if (!isAfterMissionHour()) {
+    statusEl.innerHTML = `<div class="mission-title">⏰ Missione non ancora attiva</div>
+      <p class="mission-progress">La missione del giorno si genera alle ore ${MISSIONE_HOUR}:00.</p>`;
+    listEl.innerHTML = '';
+    if (opsEl) opsEl.innerHTML = '';
+    return;
+  }
+
+  if (!missioneOggi || !missioneOggi.prodotti || !missioneOggi.prodotti.length) {
+    statusEl.innerHTML = `<div class="mission-title">Nessuna missione</div>
+      <p class="mission-progress">Non è stato possibile generare prodotti da controllare.</p>`;
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const { done, total } = myMissionProgress();
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const completed = myMissionDone();
+
+  statusEl.innerHTML = `
+    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 Controlla le scadenze di questi prodotti'}</div>
+    <p class="mission-progress">Il tuo progresso: <strong>${done}/${total}</strong> controllati</p>
+    <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">Apri ogni prodotto, verifica la scadenza e segna come controllato.</p>
+  `;
+
+  // Operators status
+  if (opsEl) {
+    opsEl.innerHTML = OPERATORS.map(op => {
+      const doneOp = missioneCompletate.some(c => c.operator === op);
+      return `<span class="missione-op-chip ${doneOp ? 'done' : ''}">${doneOp ? '✓ ' : ''}${op}</span>`;
+    }).join('');
+  }
+
+  listEl.innerHTML = missioneOggi.prodotti.map(ean => {
+    const p = products.find(x => x.ean === ean);
+    if (!p) {
+      return `<div class="product-card"><div class="product-name">EAN ${ean}</div><div class="product-meta">Prodotto non in catalogo</div></div>`;
+    }
+    const checked = isProductCheckedByMe(ean);
+    const days = daysRemaining(p.expiry);
+    const cls = getStatusClass(days);
+    return `<div class="product-card ${cls} ${checked ? 'mission-checked' : ''}" data-ean="${ean}">
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-meta">
+        <span>${ean}</span>
+        ${getBadge(days, p.signaled)}
+        ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
+      </div>
+      ${checked
+        ? `<button class="btn btn-secondary mission-check-btn" disabled>✓ Controllato da te</button>`
+        : `<button class="btn btn-primary mission-check-btn btn-check-mission" data-ean="${ean}">✓ Segna controllato</button>`
+      }
+    </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.product-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-check-mission')) return;
+      openProduct(card.dataset.ean);
+    });
+  });
+  listEl.querySelectorAll('.btn-check-mission').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      markProductChecked(btn.dataset.ean);
+    };
+  });
+}
+
+function updateMissioneDash() {
+  const el = document.getElementById('missione-dash');
+  if (!el) return;
+
+  if (!isAfterMissionHour()) {
+    el.classList.remove('hidden', 'done');
+    el.innerHTML = `⏰ Missione giornaliera dalle ${MISSIONE_HOUR}:00`;
+    el.onclick = () => showPage('missione');
+    return;
+  }
+
+  if (!missioneOggi || !missioneOggi.prodotti) {
+    el.classList.add('hidden');
+    return;
+  }
+
+  const { done, total } = myMissionProgress();
+  const completed = myMissionDone();
+  el.classList.remove('hidden');
+  if (completed) {
+    el.classList.add('done');
+    el.innerHTML = `🏆 Missione di oggi completata (${total}/${total})`;
+  } else {
+    el.classList.remove('done');
+    el.innerHTML = `🎯 Missione di oggi: <strong>${done}/${total}</strong> prodotti controllati — tocca per aprire`;
+  }
+  el.onclick = () => { showPage('missione'); renderMissione(); };
+}
+
+async function refreshMissione() {
+  await ensureMissioneOggi();
+  renderMissione();
+  updateMissioneDash();
+}
+
+
 // ---------- Init ----------
 async function init() {
   initTheme();
@@ -1750,6 +2010,7 @@ async function init() {
       if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
       if (page === 'tasks') { loadTasks(); }
       if (page === 'turni') { loadTurni(); }
+      if (page === 'missione') { refreshMissione(); }
     };
   });
 
@@ -1804,6 +2065,7 @@ async function init() {
       if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
       if (page === 'tasks') loadTasks();
       if (page === 'turni') loadTurni();
+      if (page === 'missione') refreshMissione();
       // highlight bottom nav if page has a tab
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
