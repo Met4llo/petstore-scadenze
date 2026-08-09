@@ -12,7 +12,7 @@
   <script>
     (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="styles.css?v=1.18">
+  <link rel="stylesheet" href="styles.css?v=1.19">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -55,7 +55,7 @@
           <span class="logo-menu-caret">▾</span>
         </button>
         <div id="logo-dropdown" class="logo-dropdown hidden">
-          <button type="button" class="logo-dropdown-item" data-page="dashboard">📊  Home</button>
+          <button type="button" class="logo-dropdown-item" data-page="dashboard">🏠  Home</button>
           <button type="button" class="logo-dropdown-item" data-page="tasks">✅  Task</button>
           <button type="button" class="logo-dropdown-item" data-page="turni">🗓️  Turni</button>
           <button type="button" class="logo-dropdown-item" data-page="scanner">📷  Scanner / Cerca</button>
@@ -67,14 +67,13 @@
       <div class="header-actions">
         <span id="current-operator" class="current-op"></span>
         <button id="btn-sync" class="icon-btn" title="Sincronizza">🔄</button>
-        <button id="btn-settings" class="icon-btn" title="Impostazioni">⚙️</button>
       </div>
     </header>
 
     <!-- NAV (senza Lista) -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-page="dashboard">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon">🏠</span>
         <span>Home</span>
       </button>
       <button class="nav-btn" data-page="tasks">
@@ -95,8 +94,7 @@
     <main class="main">
       <!-- DASHBOARD -->
       <section id="page-dashboard" class="page active">
-        <h2 class="page-title">Dashboard</h2>
-
+        
         <!-- BACHECA -->
         <div class="bacheca-box">
           <div class="bacheca-header">
@@ -348,7 +346,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.18 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.19 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -358,6 +356,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.18"></script>
+  <script src="app.js?v=1.19"></script>
 </body>
 </html>
