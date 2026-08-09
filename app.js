@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.5 - segnalati + data obbligatoria + operatori
+// VERSION 1.6 - elimina prodotto + segnalati + operatori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -60,6 +60,15 @@ function idbPut(storeName, item) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readwrite');
     const req = tx.objectStore(storeName).put(item);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbDelete(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).delete(key);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
@@ -349,9 +358,9 @@ function updateDashboard() {
       <div class="count">${unsignaled.length}</div>
       <div class="label">Non segnalati (≤120)</div>
     </div>
-    <div class="stat-card signaled" data-filter="signaled">
+    <div class="stat-card signaled" data-filter="signaled" style="grid-column: span 2; background:#eef2ff;">
       <div class="count">${signaledCount}</div>
-      <div class="label">Già segnalati</div>
+      <div class="label">✓ Già segnalati — tocca per vedere la lista</div>
     </div>
   `;
 
@@ -485,6 +494,7 @@ function openProduct(ean) {
     </div>
 
     <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:20px;">Salva modifiche</button>
+    <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">🗑️ Elimina prodotto</button>
   `;
 
   document.getElementById('detail-expiry').addEventListener('change', (e) => {
@@ -508,6 +518,7 @@ function openProduct(ean) {
   });
 
   document.getElementById('btn-save-product').onclick = saveProduct;
+  document.getElementById('btn-delete-product').onclick = deleteProduct;
   showPage('detail');
 }
 
@@ -551,6 +562,54 @@ async function saveProduct() {
   }
   // se non ok, saveToCloud ha già mostrato il messaggio di errore specifico
   updateDashboard();
+}
+
+
+async function deleteProduct() {
+  if (!currentProduct) return;
+
+  const nome = currentProduct.name || currentProduct.ean;
+  const ok = confirm(
+    'Eliminare questo prodotto dal database?\n\n' +
+    nome + '\nEAN: ' + currentProduct.ean + '\n\n' +
+    'L\'operazione non si può annullare.'
+  );
+  if (!ok) return;
+
+  const ean = currentProduct.ean;
+  showToast('Eliminazione in corso...');
+
+  // Remove from Supabase scadenze
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('scadenze').delete().eq('ean', ean);
+      if (error) console.error('scadenze delete error:', error);
+    } catch (e) {
+      console.error(e);
+    }
+    // Remove from prodotti_custom if present
+    try {
+      const { error } = await supabase.from('prodotti_custom').delete().eq('ean', ean);
+      if (error) console.error('prodotti_custom delete error:', error);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Remove from local array
+  products = products.filter(p => p.ean !== ean);
+
+  // Remove from IndexedDB
+  try {
+    await idbDelete(STORE_PRODUCTS, ean);
+  } catch (e) {
+    console.error('IndexedDB delete error:', e);
+  }
+
+  currentProduct = null;
+  showToast('Prodotto eliminato');
+  updateDashboard();
+  showPage('dashboard');
 }
 
 // ---------- Scanner ----------

@@ -1,14 +1,17 @@
-const CACHE_NAME = 'petstore-scadenze-v1';
+const CACHE_NAME = 'petstore-scadenze-v16';
 const ASSETS = [
   './',
   './index.html',
+  './styles.css?v=1.6',
+  './app.js?v=1.6',
   './styles.css',
   './app.js',
   './manifest.json',
   './logo-petstore.png',
   './products.json',
   './supplier-conditions.json',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js'
 ];
 
 self.addEventListener('install', (event) => {

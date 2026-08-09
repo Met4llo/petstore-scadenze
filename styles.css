@@ -549,3 +549,11 @@ body {
   color: var(--muted);
   margin-top: 6px;
 }
+
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+.btn-danger:active {
+  background: #b91c1c;
+}
