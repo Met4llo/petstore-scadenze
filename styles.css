@@ -557,3 +557,241 @@ body {
 .btn-danger:active {
   background: #b91c1c;
 }
+
+/* ===== Bacheca ===== */
+.bacheca-box {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--primary);
+}
+.bacheca-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.bacheca-header h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+.btn-small {
+  background: #fff5f0;
+  color: var(--primary);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bacheca-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.bacheca-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  position: relative;
+}
+.bacheca-item.fixed {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+.bacheca-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bacheca-del {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.bacheca-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.bacheca-form textarea,
+.task-form-card textarea {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.bacheca-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.muted-center {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 12px;
+}
+
+/* Alert task personali */
+.my-tasks-alert {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #92400e;
+  cursor: pointer;
+}
+
+/* ===== Tasks ===== */
+.task-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+.task-filter-btn {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.task-filter-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.task-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+  border-left: 4px solid #94a3b8;
+}
+.task-card.alta {
+  border-left-color: var(--danger);
+}
+.task-card.fatto {
+  opacity: 0.65;
+  border-left-color: var(--success);
+}
+.task-card-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+.task-card-desc {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.task-card-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.task-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.task-badge.alta { background: #fee2e2; color: var(--danger); }
+.task-badge.normale { background: #f1f5f9; color: #64748b; }
+.task-badge.fatto { background: #dcfce7; color: var(--success); }
+.task-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.task-actions .btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 0.85rem;
+}
+
+/* Task form overlay */
+.task-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+.task-form-overlay.hidden { display: none !important; }
+.task-form-card {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.task-form-card h3 {
+  margin-bottom: 14px;
+  font-size: 1.1rem;
+}
+.operator-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.operator-checks .check-label {
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+/* Nav 5 items - slightly smaller */
+.bottom-nav .nav-btn {
+  font-size: 0.65rem;
+  padding: 8px 2px;
+}
+.bottom-nav .nav-icon {
+  font-size: 1.25rem;
+}

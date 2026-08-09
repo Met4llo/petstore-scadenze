@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.6 - elimina prodotto + segnalati + operatori
+// VERSION 1.7 - bacheca + task di reparto + elimina + operatori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -18,6 +18,10 @@ let supabase = null;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
+let bachecaMessages = [];
+let tasksList = [];
+let taskFilter = 'miei';
+let editingTaskId = null;
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -701,6 +705,8 @@ async function manualSync() {
   showToast('Sincronizzazione in corso...');
   await loadScadenzeFromCloud();
   await loadCustomProducts();
+  await loadBacheca();
+  await loadTasks();
   updateDashboard();
   showToast('Sincronizzazione completata');
 }
@@ -711,6 +717,8 @@ function enterApp() {
   document.getElementById('app').classList.remove('hidden');
   updateOperatorUI();
   updateDashboard();
+  loadBacheca();
+  loadTasks().then(() => notifyTasksOnLogin());
 }
 
 function updateOperatorUI() {
@@ -867,6 +875,301 @@ async function loadCustomProducts() {
 }
 
 
+
+// ========== BACHECA ==========
+async function loadBacheca() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('bacheca')
+      .select('*')
+      .order('fixed', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('bacheca load:', error);
+      return;
+    }
+    bachecaMessages = data || [];
+    renderBacheca();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderBacheca() {
+  const el = document.getElementById('bacheca-list');
+  if (!el) return;
+  if (!bachecaMessages.length) {
+    el.innerHTML = '<p class="muted-center">Nessun messaggio in bacheca</p>';
+    return;
+  }
+  el.innerHTML = bachecaMessages.map(m => {
+    const date = m.created_at ? new Date(m.created_at).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''}">
+      <div>${escapeHtml(m.testo)}</div>
+      <div class="bacheca-meta">
+        <span>${escapeHtml(m.created_by || '')} · ${date}${m.fixed ? ' · 📌' : ''}</span>
+        <button class="bacheca-del" data-id="${m.id}">Elimina</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.bacheca-del').forEach(btn => {
+    btn.onclick = () => deleteBacheca(btn.dataset.id);
+  });
+}
+
+async function saveBacheca() {
+  const testo = (document.getElementById('bacheca-text').value || '').trim();
+  if (!testo) {
+    showToast('Scrivi un messaggio');
+    return;
+  }
+  if (!supabase) {
+    showToast('Cloud non disponibile');
+    return;
+  }
+  const fixed = document.getElementById('bacheca-fixed').checked;
+  const { error } = await supabase.from('bacheca').insert({
+    testo,
+    created_by: currentOperator || 'Sconosciuto',
+    fixed
+  });
+  if (error) {
+    showToast('Errore: ' + error.message);
+    console.error(error);
+    return;
+  }
+  document.getElementById('bacheca-text').value = '';
+  document.getElementById('bacheca-fixed').checked = false;
+  document.getElementById('bacheca-form').classList.add('hidden');
+  showToast('Messaggio pubblicato');
+  await loadBacheca();
+}
+
+async function deleteBacheca(id) {
+  if (!confirm('Eliminare questo messaggio?')) return;
+  if (!supabase) return;
+  const { error } = await supabase.from('bacheca').delete().eq('id', id);
+  if (error) {
+    showToast('Errore eliminazione: ' + error.message);
+    return;
+  }
+  showToast('Messaggio eliminato');
+  await loadBacheca();
+}
+
+// ========== TASKS ==========
+async function loadTasks() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('priorita', { ascending: true })
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('tasks load:', error);
+      return;
+    }
+    tasksList = data || [];
+    renderTasks();
+    updateMyTasksAlert();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function getMyOpenTasks() {
+  if (!currentOperator) return [];
+  return tasksList.filter(t =>
+    t.stato !== 'fatto' &&
+    Array.isArray(t.responsabili) &&
+    t.responsabili.includes(currentOperator)
+  );
+}
+
+function updateMyTasksAlert() {
+  const el = document.getElementById('my-tasks-alert');
+  if (!el) return;
+  const mine = getMyOpenTasks();
+  if (mine.length === 0) {
+    el.classList.add('hidden');
+    return;
+  }
+  const alte = mine.filter(t => t.priorita === 'alta').length;
+  el.classList.remove('hidden');
+  el.innerHTML = `⚠️ Hai <strong>${mine.length}</strong> task da fare` +
+    (alte ? ` (di cui <strong>${alte}</strong> ad alta priorità)` : '') +
+    ` — tocca per aprirle`;
+  el.onclick = () => {
+    taskFilter = 'miei';
+    document.querySelectorAll('.task-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.filter === 'miei');
+    });
+    showPage('tasks');
+    renderTasks();
+  };
+}
+
+function notifyTasksOnLogin() {
+  const mine = getMyOpenTasks();
+  if (mine.length > 0) {
+    const alte = mine.filter(t => t.priorita === 'alta').length;
+    let msg = `Hai ${mine.length} task da completare`;
+    if (alte) msg += ` (${alte} ad alta priorità)`;
+    showToast(msg, 4000);
+  }
+}
+
+function renderTasks() {
+  const el = document.getElementById('tasks-list');
+  if (!el) return;
+
+  let list = [...tasksList];
+  if (taskFilter === 'miei') {
+    list = list.filter(t =>
+      t.stato !== 'fatto' &&
+      Array.isArray(t.responsabili) &&
+      t.responsabili.includes(currentOperator)
+    );
+  } else if (taskFilter === 'aperti') {
+    list = list.filter(t => t.stato !== 'fatto');
+  } else if (taskFilter === 'fatti') {
+    list = list.filter(t => t.stato === 'fatto');
+  }
+
+  // Sort: alta first, then by date
+  list.sort((a, b) => {
+    if (a.stato === 'fatto' && b.stato !== 'fatto') return 1;
+    if (b.stato === 'fatto' && a.stato !== 'fatto') return -1;
+    if (a.priorita === 'alta' && b.priorita !== 'alta') return -1;
+    if (b.priorita === 'alta' && a.priorita !== 'alta') return 1;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+
+  if (!list.length) {
+    el.innerHTML = '<p class="muted-center">Nessun task in questa vista</p>';
+    return;
+  }
+
+  el.innerHTML = list.map(t => {
+    const resp = (t.responsabili || []).join(', ');
+    const date = t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : '';
+    const isDone = t.stato === 'fatto';
+    const cls = (t.priorita === 'alta' ? 'alta ' : '') + (isDone ? 'fatto' : '');
+    return `<div class="task-card ${cls}" data-id="${t.id}">
+      <div class="task-card-title">${escapeHtml(t.titolo)}</div>
+      ${t.descrizione ? `<div class="task-card-desc">${escapeHtml(t.descrizione)}</div>` : ''}
+      <div class="task-card-meta">
+        <span class="task-badge ${t.priorita}">${t.priorita === 'alta' ? 'Alta priorità' : 'Normale'}</span>
+        ${isDone ? '<span class="task-badge fatto">Completato</span>' : ''}
+        <span>👤 ${escapeHtml(resp)}</span>
+        <span>${date}</span>
+        ${t.created_by ? `<span>da ${escapeHtml(t.created_by)}</span>` : ''}
+      </div>
+      ${!isDone ? `<div class="task-actions">
+        <button class="btn btn-primary btn-complete-task" data-id="${t.id}">✓ Completa</button>
+        <button class="btn btn-secondary btn-delete-task" data-id="${t.id}">Elimina</button>
+      </div>` : `<div class="task-actions">
+        <button class="btn btn-secondary btn-delete-task" data-id="${t.id}">Elimina</button>
+      </div>`}
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.btn-complete-task').forEach(btn => {
+    btn.onclick = () => completeTask(btn.dataset.id);
+  });
+  el.querySelectorAll('.btn-delete-task').forEach(btn => {
+    btn.onclick = () => deleteTask(btn.dataset.id);
+  });
+}
+
+function openTaskForm() {
+  editingTaskId = null;
+  document.getElementById('task-form-title').textContent = 'Nuovo task';
+  document.getElementById('task-titolo').value = '';
+  document.getElementById('task-descrizione').value = '';
+  document.getElementById('task-priorita').value = 'normale';
+  document.querySelectorAll('#task-responsabili input').forEach(cb => { cb.checked = false; });
+  // Pre-check current operator
+  document.querySelectorAll('#task-responsabili input').forEach(cb => {
+    if (cb.value === currentOperator) cb.checked = true;
+  });
+  document.getElementById('task-form-overlay').classList.remove('hidden');
+}
+
+function closeTaskForm() {
+  document.getElementById('task-form-overlay').classList.add('hidden');
+  editingTaskId = null;
+}
+
+async function saveTask() {
+  const titolo = (document.getElementById('task-titolo').value || '').trim();
+  const descrizione = (document.getElementById('task-descrizione').value || '').trim();
+  const priorita = document.getElementById('task-priorita').value;
+  const responsabili = [...document.querySelectorAll('#task-responsabili input:checked')].map(cb => cb.value);
+
+  if (!titolo) {
+    showToast('Inserisci il titolo');
+    return;
+  }
+  if (!responsabili.length) {
+    showToast('Seleziona almeno un responsabile');
+    return;
+  }
+  if (!supabase) {
+    showToast('Cloud non disponibile');
+    return;
+  }
+
+  const payload = {
+    titolo,
+    descrizione: descrizione || null,
+    priorita,
+    responsabili,
+    stato: 'da_fare',
+    created_by: currentOperator || 'Sconosciuto'
+  };
+
+  const { error } = await supabase.from('tasks').insert(payload);
+  if (error) {
+    showToast('Errore: ' + error.message);
+    console.error(error);
+    return;
+  }
+  showToast('Task creato');
+  closeTaskForm();
+  await loadTasks();
+}
+
+async function completeTask(id) {
+  if (!supabase) return;
+  const { error } = await supabase.from('tasks').update({
+    stato: 'fatto',
+    completed_at: new Date().toISOString(),
+    completed_by: currentOperator || 'Sconosciuto'
+  }).eq('id', id);
+  if (error) {
+    showToast('Errore: ' + error.message);
+    return;
+  }
+  showToast('Task completato!');
+  await loadTasks();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Eliminare questo task?')) return;
+  if (!supabase) return;
+  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  if (error) {
+    showToast('Errore: ' + error.message);
+    return;
+  }
+  showToast('Task eliminato');
+  await loadTasks();
+}
+
+
 // ---------- Init ----------
 async function init() {
   // Create Supabase client (library already loaded from index.html)
@@ -930,7 +1233,8 @@ async function init() {
       showPage(page);
       if (page === 'list') renderFilteredList(document.getElementById('list-filter').value);
       if (page === 'scanner') startScanner();
-      if (page === 'dashboard') updateDashboard();
+      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); }
+      if (page === 'tasks') { loadTasks(); }
     };
   });
 
@@ -945,6 +1249,35 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  // Bacheca
+  const btnNewBacheca = document.getElementById('btn-new-bacheca');
+  if (btnNewBacheca) btnNewBacheca.onclick = () => {
+    document.getElementById('bacheca-form').classList.toggle('hidden');
+  };
+  const btnSaveBacheca = document.getElementById('btn-save-bacheca');
+  if (btnSaveBacheca) btnSaveBacheca.onclick = saveBacheca;
+  const btnCancelBacheca = document.getElementById('btn-cancel-bacheca');
+  if (btnCancelBacheca) btnCancelBacheca.onclick = () => {
+    document.getElementById('bacheca-form').classList.add('hidden');
+  };
+
+  // Tasks
+  const btnNewTask = document.getElementById('btn-new-task');
+  if (btnNewTask) btnNewTask.onclick = openTaskForm;
+  const btnSaveTask = document.getElementById('btn-save-task');
+  if (btnSaveTask) btnSaveTask.onclick = saveTask;
+  const btnCancelTask = document.getElementById('btn-cancel-task');
+  if (btnCancelTask) btnCancelTask.onclick = closeTaskForm;
+  document.querySelectorAll('.task-filter-btn').forEach(btn => {
+    btn.onclick = () => {
+      taskFilter = btn.dataset.filter;
+      document.querySelectorAll('.task-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTasks();
+    };
+  });
+
 
   populateSupplierSelect();
   const btnGoAdd = document.getElementById('btn-go-add');
