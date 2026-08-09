@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.17 - password per operatore + bacheca + task
+// VERSION 1.18 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1770,6 +1770,49 @@ async function init() {
   };
   document.getElementById('btn-settings').onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  // Logo dropdown menu
+  const btnLogoMenu = document.getElementById('btn-logo-menu');
+  const logoDropdown = document.getElementById('logo-dropdown');
+  function closeLogoMenu() {
+    if (logoDropdown) logoDropdown.classList.add('hidden');
+    if (btnLogoMenu) btnLogoMenu.classList.remove('open');
+  }
+  function toggleLogoMenu(e) {
+    if (e) e.stopPropagation();
+    if (!logoDropdown) return;
+    const open = logoDropdown.classList.contains('hidden');
+    if (open) {
+      logoDropdown.classList.remove('hidden');
+      if (btnLogoMenu) btnLogoMenu.classList.add('open');
+    } else {
+      closeLogoMenu();
+    }
+  }
+  if (btnLogoMenu) btnLogoMenu.onclick = toggleLogoMenu;
+  document.querySelectorAll('.logo-dropdown-item').forEach(item => {
+    item.onclick = () => {
+      const page = item.dataset.page;
+      closeLogoMenu();
+      showPage(page);
+      if (page === 'list') {
+        const lf = document.getElementById('list-filter');
+        renderFilteredList(lf ? lf.value : 'all');
+      }
+      if (page === 'scanner') { /* camera on demand */ }
+      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
+      if (page === 'tasks') loadTasks();
+      if (page === 'turni') loadTurni();
+      // highlight bottom nav if page has a tab
+      document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.page === page);
+      });
+    };
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.logo-menu-wrap')) closeLogoMenu();
+  });
+
 
   const btnThemeLight = document.getElementById('btn-theme-light');
   if (btnThemeLight) btnThemeLight.onclick = () => { applyTheme('light'); showToast('Modalità chiara'); };

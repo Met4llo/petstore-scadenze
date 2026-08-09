@@ -12,7 +12,7 @@
   <script>
     (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="styles.css?v=1.17">
+  <link rel="stylesheet" href="styles.css?v=1.18">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -49,7 +49,21 @@
   <div id="app" class="hidden">
     <!-- HEADER -->
     <header class="header">
-      <img src="logo-petstore.png" alt="PetStore" class="logo-header">
+      <div class="logo-menu-wrap">
+        <button type="button" id="btn-logo-menu" class="logo-menu-btn" title="Menu">
+          <img src="logo-petstore.png" alt="PetStore" class="logo-header">
+          <span class="logo-menu-caret">▾</span>
+        </button>
+        <div id="logo-dropdown" class="logo-dropdown hidden">
+          <button type="button" class="logo-dropdown-item" data-page="dashboard">📊  Home</button>
+          <button type="button" class="logo-dropdown-item" data-page="tasks">✅  Task</button>
+          <button type="button" class="logo-dropdown-item" data-page="turni">🗓️  Turni</button>
+          <button type="button" class="logo-dropdown-item" data-page="scanner">📷  Scanner / Cerca</button>
+          <button type="button" class="logo-dropdown-item" data-page="list">📋  Lista scadenze</button>
+          <div class="logo-dropdown-divider"></div>
+          <button type="button" class="logo-dropdown-item" data-page="settings">⚙️  Impostazioni</button>
+        </div>
+      </div>
       <div class="header-actions">
         <span id="current-operator" class="current-op"></span>
         <button id="btn-sync" class="icon-btn" title="Sincronizza">🔄</button>
@@ -57,7 +71,7 @@
       </div>
     </header>
 
-    <!-- NAV -->
+    <!-- NAV (senza Lista) -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-page="dashboard">
         <span class="nav-icon">📊</span>
@@ -74,10 +88,6 @@
       <button class="nav-btn" data-page="scanner">
         <span class="nav-icon">📷</span>
         <span>Scanner</span>
-      </button>
-      <button class="nav-btn" data-page="list">
-        <span class="nav-icon">📋</span>
-        <span>Lista</span>
       </button>
     </nav>
 
@@ -338,7 +348,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.17 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.18 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -348,6 +358,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.17"></script>
+  <script src="app.js?v=1.18"></script>
 </body>
 </html>
