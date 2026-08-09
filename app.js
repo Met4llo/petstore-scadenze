@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.9 - password per operatore + bacheca + task
+// VERSION 1.10 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -646,6 +646,8 @@ async function startScanner() {
     );
     isScanning = true;
     document.getElementById('btn-stop-scanner').classList.remove('hidden');
+    const bs = document.getElementById('btn-start-scanner');
+    if (bs) bs.classList.add('hidden');
   } catch (err) {
     console.error(err);
     showToast('Impossibile avviare la fotocamera. Controlla i permessi.');
@@ -657,6 +659,8 @@ async function stopScanner() {
     try { await html5QrCode.stop(); } catch (e) {}
     isScanning = false;
     document.getElementById('btn-stop-scanner').classList.add('hidden');
+    const btnStart = document.getElementById('btn-start-scanner');
+    if (btnStart) btnStart.classList.remove('hidden');
   }
 }
 
@@ -1278,7 +1282,7 @@ async function init() {
       const page = btn.dataset.page;
       showPage(page);
       if (page === 'list') renderFilteredList(document.getElementById('list-filter').value);
-      if (page === 'scanner') startScanner();
+      if (page === 'scanner') { /* non avviare in automatico: usa il pulsante */ }
       if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); }
       if (page === 'tasks') { loadTasks(); }
     };
@@ -1286,9 +1290,15 @@ async function init() {
 
   document.getElementById('btn-go-scanner').onclick = () => {
     showPage('scanner');
-    startScanner();
   };
   document.getElementById('btn-stop-scanner').onclick = stopScanner;
+  const btnStartScanner = document.getElementById('btn-start-scanner');
+  if (btnStartScanner) {
+    btnStartScanner.onclick = async () => {
+      btnStartScanner.classList.add('hidden');
+      await startScanner();
+    };
+  }
   document.getElementById('btn-back').onclick = () => {
     showPage('dashboard');
     updateDashboard();
@@ -1331,7 +1341,7 @@ async function init() {
   const btnGoAddDash = document.getElementById('btn-go-add-dash');
   if (btnGoAddDash) btnGoAddDash.onclick = () => { populateSupplierSelect(); showPage('add'); };
   const btnBackAdd = document.getElementById('btn-back-add');
-  if (btnBackAdd) btnBackAdd.onclick = () => { showPage('search'); };
+  if (btnBackAdd) btnBackAdd.onclick = () => { showPage('scanner'); };
   const btnSaveNew = document.getElementById('btn-save-new-product');
   if (btnSaveNew) btnSaveNew.onclick = saveNewProduct;
 

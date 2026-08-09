@@ -9,7 +9,7 @@
   <title>PetStore Scadenze</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
-  <link rel="stylesheet" href="styles.css?v=1.9.1">
+  <link rel="stylesheet" href="styles.css?v=1.10">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -67,10 +67,6 @@
       <button class="nav-btn" data-page="scanner">
         <span class="nav-icon">📷</span>
         <span>Scanner</span>
-      </button>
-      <button class="nav-btn" data-page="search">
-        <span class="nav-icon">🔍</span>
-        <span>Cerca</span>
       </button>
       <button class="nav-btn" data-page="list">
         <span class="nav-icon">📋</span>
@@ -166,18 +162,22 @@
         </div>
       </section>
 
-      <!-- SCANNER -->
+      <!-- SCANNER + CERCA -->
       <section id="page-scanner" class="page">
-        <h2 class="page-title">Scanner Barcode</h2>
-        <div id="reader" class="scanner-box"></div>
-        <p class="scanner-hint">Inquadra il codice a barre del prodotto</p>
-        <button id="btn-stop-scanner" class="btn btn-secondary hidden">Ferma scanner</button>
-        <div id="scan-result" class="scan-result hidden"></div>
-      </section>
+        <h2 class="page-title">Scanner / Cerca</h2>
 
-      <!-- SEARCH -->
-      <section id="page-search" class="page">
-        <h2 class="page-title">Cerca prodotto</h2>
+        <div class="scanner-section">
+          <div id="reader" class="scanner-box"></div>
+          <p class="scanner-hint">Inquadra il codice a barre del prodotto</p>
+          <button id="btn-start-scanner" class="btn btn-primary btn-large">📷 Avvia fotocamera</button>
+          <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
+          <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="search-divider">
+          <span>oppure cerca manualmente</span>
+        </div>
+
         <input type="search" id="search-input" placeholder="EAN o nome prodotto..." class="search-input">
         <button id="btn-go-add" class="btn btn-secondary btn-large" style="margin-bottom:14px;">＋ Aggiungi prodotto manualmente</button>
         <div id="search-results" class="product-list"></div>
@@ -261,7 +261,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.9.1 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.10 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -271,6 +271,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.9.1"></script>
+  <script src="app.js?v=1.10"></script>
 </body>
 </html>

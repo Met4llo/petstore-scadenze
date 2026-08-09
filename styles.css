@@ -980,3 +980,27 @@ body {
   border-color: var(--primary);
   background: var(--primary-soft);
 }
+
+/* Scanner + search combined */
+.search-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.search-divider::before,
+.search-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.search-divider span {
+  white-space: nowrap;
+}
+.scanner-section {
+  margin-bottom: 4px;
+}
