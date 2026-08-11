@@ -1,9 +1,9 @@
-const CACHE_NAME = 'petstore-scadenze-v125';
+const CACHE_NAME = 'petstore-scadenze-v126';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=1.25',
-  './app.js?v=1.25',
+  './styles.css?v=1.26',
+  './app.js?v=1.26',
   './styles.css',
   './app.js',
   './manifest.json',

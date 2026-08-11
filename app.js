@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.25 - password per operatore + bacheca + task
+// VERSION 1.26 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1415,19 +1415,9 @@ function renderTurni() {
 }
 
 function updateTurniDash() {
+  // Banner turni rimosso dalla Home (si usano dal menu)
   const el = document.getElementById('turni-dash');
-  if (!el) return;
-  const current = turniList.find(t => isCurrentWeek(t.settimana_inizio, t.settimana_fine));
-  if (current) {
-    el.classList.remove('hidden');
-    el.innerHTML = '🗓️ Turni settimana: <strong>' + formatRange(current.settimana_inizio, current.settimana_fine) + '</strong> — tocca per vedere';
-    el.onclick = () => {
-      showPage('turni');
-      if (current.image_url) openTurnoViewer(current);
-    };
-  } else {
-    el.classList.add('hidden');
-  }
+  if (el) el.classList.add('hidden');
 }
 
 // Zoom/pan state for turno viewer
