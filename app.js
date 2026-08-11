@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.23 - password per operatore + bacheca + task
+// VERSION 1.24 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -31,6 +31,9 @@ const MISSIONE_COUNT = 10;
 const MISSIONE_HOUR = 9;
 let detailReturnPage = 'dashboard';
 let nonInNegozio = new Set(); // EANs not in store
+let consegneList = [];
+let consegneFilter = 'prossime';
+let editingConsegnaId = null;
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -759,6 +762,7 @@ async function runSync(silent) {
     await loadTurni();
     await refreshMissione();
     await loadNonInNegozio();
+    await loadConsegne();
     updateDashboard();
     updateMyTasksAlert();
     if (!silent) showToast('Sincronizzazione completata');
@@ -802,6 +806,7 @@ function enterApp() {
   loadTurni();
   refreshMissione();
   loadNonInNegozio();
+  loadConsegne();
   startAutoSync();
 }
 
@@ -2012,6 +2017,222 @@ function renderNonInNegozio() {
 }
 
 
+
+// ========== CONSEGNE ==========
+async function loadConsegne() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('consegne')
+      .select('*')
+      .order('data', { ascending: true });
+    if (error) {
+      console.error('consegne:', error);
+      return;
+    }
+    consegneList = data || [];
+    renderConsegne();
+    updateConsegneDash();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function populateConsegnaFornitore() {
+  const sel = document.getElementById('consegna-fornitore');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Seleziona fornitore —</option>';
+  (typeof SUPPLIERS_LIST !== 'undefined' ? SUPPLIERS_LIST : []).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function renderConsegne() {
+  const el = document.getElementById('consegne-list');
+  if (!el) return;
+  const oggi = todayStr();
+  let list = [...consegneList];
+
+  if (consegneFilter === 'oggi') {
+    list = list.filter(c => c.data === oggi);
+  } else if (consegneFilter === 'prossime') {
+    list = list.filter(c => c.data >= oggi && c.stato !== 'consegnato');
+  } else if (consegneFilter === 'storico') {
+    list = list.filter(c => c.data < oggi || c.stato === 'consegnato');
+    list.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  }
+
+  if (consegneFilter !== 'storico') {
+    list.sort((a, b) => {
+      if (a.data !== b.data) return (a.data || '').localeCompare(b.data || '');
+      return (a.ora || '').localeCompare(b.ora || '');
+    });
+  }
+
+  if (!list.length) {
+    el.innerHTML = '<p class="muted-center">Nessuna consegna in questa vista</p>';
+    return;
+  }
+
+  el.innerHTML = list.map(c => {
+    const isOggi = c.data === oggi;
+    const stato = c.stato === 'consegnato' ? 'consegnato' : 'prevista';
+    const d = c.data ? formatGiornoSafe(c.data) : '';
+    return `<div class="consegna-card ${isOggi ? 'oggi' : ''} ${stato}" data-id="${c.id}">
+      <div class="consegna-fornitore">${escapeHtml(c.fornitore || '')}</div>
+      <div class="consegna-meta">
+        <span class="consegna-badge ${stato}">${stato === 'consegnato' ? '✓ Consegnato' : 'Prevista'}</span>
+        <span>${d}</span>
+        ${c.ora ? '<span>🕒 ' + escapeHtml(c.ora.slice(0,5)) + '</span>' : ''}
+        ${c.created_by ? '<span>da ' + escapeHtml(c.created_by) + '</span>' : ''}
+      </div>
+      ${c.note ? '<div style="font-size:0.85rem;color:var(--muted);margin-top:6px;">' + escapeHtml(c.note) + '</div>' : ''}
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.consegna-card').forEach(card => {
+    card.onclick = () => openConsegnaForm(card.dataset.id);
+  });
+}
+
+function formatGiornoSafe(dateStr) {
+  try {
+    if (typeof formatGiorno === 'function') return formatGiorno(dateStr);
+  } catch (e) {}
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function updateConsegneDash() {
+  const el = document.getElementById('consegne-dash');
+  if (!el) return;
+  const oggi = todayStr();
+  const oggiList = consegneList.filter(c => c.data === oggi);
+  if (!oggiList.length) {
+    el.classList.add('hidden');
+    return;
+  }
+  const pending = oggiList.filter(c => c.stato !== 'consegnato');
+  const done = oggiList.filter(c => c.stato === 'consegnato');
+  el.classList.remove('hidden');
+  if (pending.length) {
+    const names = pending.map(c => c.fornitore).join(', ');
+    el.innerHTML = '📅 Oggi in arrivo: <strong>' + escapeHtml(names) + '</strong>' +
+      (done.length ? ' · ' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') : '');
+  } else {
+    el.innerHTML = '📅 Consegne di oggi: tutte segnate come consegnate ✓';
+  }
+  el.onclick = () => {
+    consegneFilter = 'oggi';
+    document.querySelectorAll('#consegne-filters .task-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.cfilter === 'oggi');
+    });
+    showPage('consegne');
+    renderConsegne();
+  };
+}
+
+function openConsegnaForm(id) {
+  editingConsegnaId = id || null;
+  populateConsegnaFornitore();
+  const title = document.getElementById('consegna-form-title');
+  const btnDel = document.getElementById('btn-delete-consegna');
+  if (id) {
+    const c = consegneList.find(x => x.id === id);
+    if (!c) return;
+    title.textContent = 'Modifica consegna';
+    document.getElementById('consegna-data').value = c.data || '';
+    document.getElementById('consegna-fornitore').value = c.fornitore || '';
+    document.getElementById('consegna-ora').value = (c.ora || '').slice(0, 5);
+    document.getElementById('consegna-note').value = c.note || '';
+    document.getElementById('consegna-stato').value = c.stato === 'consegnato' ? 'consegnato' : 'prevista';
+    if (btnDel) btnDel.classList.remove('hidden');
+  } else {
+    title.textContent = 'Nuova consegna';
+    document.getElementById('consegna-data').value = todayStr();
+    document.getElementById('consegna-fornitore').value = '';
+    document.getElementById('consegna-ora').value = '';
+    document.getElementById('consegna-note').value = '';
+    document.getElementById('consegna-stato').value = 'prevista';
+    if (btnDel) btnDel.classList.add('hidden');
+  }
+  document.getElementById('consegna-form-overlay').classList.remove('hidden');
+}
+
+function closeConsegnaForm() {
+  document.getElementById('consegna-form-overlay').classList.add('hidden');
+  editingConsegnaId = null;
+}
+
+async function saveConsegna() {
+  const data = document.getElementById('consegna-data').value;
+  const fornitore = document.getElementById('consegna-fornitore').value;
+  const ora = document.getElementById('consegna-ora').value || null;
+  const note = (document.getElementById('consegna-note').value || '').trim() || null;
+  const stato = document.getElementById('consegna-stato').value || 'prevista';
+
+  if (!data) {
+    showToast('Seleziona la data');
+    return;
+  }
+  if (!fornitore) {
+    showToast('Seleziona il fornitore');
+    return;
+  }
+  if (!supabase) {
+    showToast('Cloud non disponibile');
+    return;
+  }
+
+  const payload = {
+    data,
+    fornitore,
+    ora,
+    note,
+    stato,
+    updated_by: currentOperator || 'Sconosciuto',
+    updated_at: new Date().toISOString()
+  };
+
+  let error;
+  if (editingConsegnaId) {
+    const res = await supabase.from('consegne').update(payload).eq('id', editingConsegnaId);
+    error = res.error;
+  } else {
+    payload.created_by = currentOperator || 'Sconosciuto';
+    const res = await supabase.from('consegne').insert(payload);
+    error = res.error;
+  }
+
+  if (error) {
+    showToast('Errore: ' + error.message);
+    console.error(error);
+    return;
+  }
+  showToast(stato === 'consegnato' ? 'Consegna registrata ✓' : 'Consegna salvata');
+  closeConsegnaForm();
+  await loadConsegne();
+}
+
+async function deleteConsegna() {
+  if (!editingConsegnaId || !supabase) return;
+  if (!confirm('Eliminare questa consegna?')) return;
+  const { error } = await supabase.from('consegne').delete().eq('id', editingConsegnaId);
+  if (error) {
+    showToast('Errore: ' + error.message);
+    return;
+  }
+  showToast('Consegna eliminata');
+  closeConsegnaForm();
+  await loadConsegne();
+}
+
+
 // ---------- Init ----------
 async function init() {
   initTheme();
@@ -2124,6 +2345,24 @@ async function init() {
   if (_btnSettings) _btnSettings.onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
 
+  const btnNewConsegna = document.getElementById('btn-new-consegna');
+  if (btnNewConsegna) btnNewConsegna.onclick = () => openConsegnaForm(null);
+  const btnSaveConsegna = document.getElementById('btn-save-consegna');
+  if (btnSaveConsegna) btnSaveConsegna.onclick = saveConsegna;
+  const btnCancelConsegna = document.getElementById('btn-cancel-consegna');
+  if (btnCancelConsegna) btnCancelConsegna.onclick = closeConsegnaForm;
+  const btnDeleteConsegna = document.getElementById('btn-delete-consegna');
+  if (btnDeleteConsegna) btnDeleteConsegna.onclick = deleteConsegna;
+  document.querySelectorAll('#consegne-filters .task-filter-btn').forEach(btn => {
+    btn.onclick = () => {
+      consegneFilter = btn.dataset.cfilter;
+      document.querySelectorAll('#consegne-filters .task-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderConsegne();
+    };
+  });
+
+
   // Logo dropdown menu
   const btnLogoMenu = document.getElementById('btn-logo-menu');
   const logoDropdown = document.getElementById('logo-dropdown');
@@ -2158,6 +2397,7 @@ async function init() {
       if (page === 'turni') loadTurni();
       if (page === 'missione') refreshMissione();
       if (page === 'non-negozio') { loadNonInNegozio().then(() => renderNonInNegozio()); }
+      if (page === 'consegne') { loadConsegne(); }
       // highlight bottom nav if page has a tab
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
