@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.27 - password per operatore + bacheca + task
+// VERSION 1.28 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -156,7 +156,8 @@ function getStatusClass(days) {
   return 'ok';
 }
 
-function getBadge(days, signaled) {
+function getBadge(days, signaled, noExpiry) {
+  if (noExpiry) return '<span class="badge no-expiry">Senza scadenza</span>';
   if (signaled) return '<span class="badge signaled">Segnalato</span>';
   if (days === null) return '';
   if (days <= 0) return `<span class="badge expired">${days} gg</span>`;
@@ -185,6 +186,7 @@ async function loadCatalog() {
       expiry: null,
       signaled: false,
       signaledDate: null,
+      noExpiry: false,
       lastModified: null
     }));
     const chunkSize = 500;
@@ -225,6 +227,7 @@ async function loadScadenzeFromCloud() {
         map[row.ean].expiry = row.expiry || null;
         map[row.ean].signaled = !!row.signaled;
         map[row.ean].signaledDate = row.signaled_date || null;
+        map[row.ean].noExpiry = !!row.no_expiry;
         map[row.ean].lastModified = row.last_modified ? new Date(row.last_modified).getTime() : null;
         map[row.ean].updatedBy = row.updated_by || null;
       }
@@ -257,9 +260,10 @@ async function saveToCloud(product) {
   try {
     const payload = {
       ean: product.ean,
-      expiry: product.expiry || null,
-      signaled: !!product.signaled,
-      signaled_date: product.signaledDate || null,
+      expiry: product.noExpiry ? null : (product.expiry || null),
+      signaled: product.noExpiry ? false : !!product.signaled,
+      signaled_date: product.noExpiry ? null : (product.signaledDate || null),
+      no_expiry: !!product.noExpiry,
       last_modified: new Date().toISOString(),
       updated_by: currentOperator || 'Sconosciuto'
     };
@@ -344,15 +348,15 @@ function showPage(pageId) {
 }
 
 function renderProductCard(p) {
-  const days = daysRemaining(p.expiry);
-  const cls = getStatusClass(days);
+  const days = p.noExpiry ? null : daysRemaining(p.expiry);
+  const cls = p.noExpiry ? 'ok' : getStatusClass(days);
   const by = p.updatedBy ? `<span class="modified-by">👤 ${escapeHtml(p.updatedBy)}</span>` : '';
   return `
     <div class="product-card ${cls}" data-ean="${p.ean}">
       <div class="product-name">${escapeHtml(p.name)}</div>
       <div class="product-meta">
         <span>${p.ean}</span>
-        ${getBadge(days, p.signaled)}
+        ${getBadge(days, p.signaled, p.noExpiry)}
         ${p.supplier ? `<span>${escapeHtml(p.supplier.split(' ')[0])}</span>` : ''}
         ${by}
       </div>
@@ -367,7 +371,8 @@ function escapeHtml(str) {
 
 // ---------- Dashboard ----------
 function updateDashboard() {
-  const withDate = products.filter(p => p.expiry);
+  // Esclude prodotti registrati come "senza scadenza"
+  const withDate = products.filter(p => p.expiry && !p.noExpiry);
   const expired = withDate.filter(p => daysRemaining(p.expiry) <= 0);
   const urgent = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
   const attention = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
@@ -377,7 +382,7 @@ function updateDashboard() {
     return d !== null && d <= 120 && !p.signaled;
   });
 
-  const signaledCount = products.filter(p => p.signaled).length;
+  const signaledCount = products.filter(p => p.signaled && !p.noExpiry).length;
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card expired" data-filter="expired">
@@ -423,7 +428,7 @@ function updateDashboard() {
 
 // ---------- List / Filter ----------
 function renderFilteredList(filter) {
-  let list = products.filter(p => p.expiry);
+  let list = products.filter(p => p.expiry && !p.noExpiry);
   if (filter === 'expired') list = list.filter(p => daysRemaining(p.expiry) <= 0);
   else if (filter === 'urgent') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
   else if (filter === 'attention') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
@@ -432,7 +437,8 @@ function renderFilteredList(filter) {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120 && !p.signaled;
   });
-  else if (filter === 'signaled') list = products.filter(p => p.signaled);
+  else if (filter === 'signaled') list = products.filter(p => p.signaled && !p.noExpiry);
+  else if (filter === 'no-expiry') list = products.filter(p => p.noExpiry);
 
   list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
 
@@ -443,6 +449,7 @@ function renderFilteredList(filter) {
     monitor: 'Da monitorare (≤120 giorni)',
     unsignaled: 'Non segnalati',
     signaled: 'Solo segnalati',
+    'no-expiry': 'Senza scadenza (esclusi dal controllo)',
     all: 'Tutti con scadenza'
   };
   document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
@@ -491,33 +498,43 @@ function openProduct(ean, returnPage) {
   const days = daysRemaining(currentProduct.expiry);
   const condition = findCondition(currentProduct.supplier);
 
+  const isNoExp = !!currentProduct.noExpiry;
   document.getElementById('product-detail').innerHTML = `
     <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
     <div class="detail-ean">EAN: ${currentProduct.ean}</div>
 
     <div class="detail-row">
-      <label>Data di scadenza</label>
-      <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
+      <label class="check-label no-expiry-label">
+        <input type="checkbox" id="detail-no-expiry" ${isNoExp ? 'checked' : ''}>
+        <span>♾ Prodotto senza scadenza<br><small>Resta registrato, escluso dai controlli scadenze</small></span>
+      </label>
     </div>
 
-    <div class="detail-row">
-      <div class="days-display ${getStatusClass(days)}" id="detail-days">
-        ${days === null ? 'Nessuna data' : (days <= 0 ? `Scaduto da ${Math.abs(days)} giorni` : `${days} giorni rimanenti`)}
+    <div id="expiry-fields" style="${isNoExp ? 'display:none' : ''}">
+      <div class="detail-row">
+        <label>Data di scadenza</label>
+        <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
       </div>
-    </div>
 
-    <div class="detail-row">
-      <label>Stato</label>
-      <select id="detail-signaled">
-        <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
-        <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
-      </select>
-    </div>
+      <div class="detail-row">
+        <div class="days-display ${getStatusClass(days)}" id="detail-days">
+          ${days === null ? 'Nessuna data' : (days <= 0 ? `Scaduto da ${Math.abs(days)} giorni` : `${days} giorni rimanenti`)}
+        </div>
+      </div>
 
-    <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
-      <label>Data di segnalazione *</label>
-      <input type="date" id="detail-signaled-date" value="${currentProduct.signaledDate || ''}" required>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Obbligatoria se il prodotto è segnalato</p>
+      <div class="detail-row">
+        <label>Stato</label>
+        <select id="detail-signaled">
+          <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
+          <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
+        </select>
+      </div>
+
+      <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
+        <label>Data di segnalazione *</label>
+        <input type="date" id="detail-signaled-date" value="${currentProduct.signaledDate || ''}" required>
+        <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Obbligatoria se il prodotto è segnalato</p>
+      </div>
     </div>
 
     <div class="detail-row">
@@ -539,25 +556,41 @@ function openProduct(ean, returnPage) {
     <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">🗑️ Elimina prodotto</button>
   `;
 
-  document.getElementById('detail-expiry').addEventListener('change', (e) => {
-    const d = daysRemaining(e.target.value);
-    const el = document.getElementById('detail-days');
-    el.className = 'days-display ' + getStatusClass(d);
-    el.textContent = d === null ? 'Nessuna data' : (d <= 0 ? `Scaduto da ${Math.abs(d)} giorni` : `${d} giorni rimanenti`);
-  });
+  const noExpCb = document.getElementById('detail-no-expiry');
+  if (noExpCb) {
+    noExpCb.addEventListener('change', () => {
+      const fields = document.getElementById('expiry-fields');
+      if (fields) fields.style.display = noExpCb.checked ? 'none' : '';
+    });
+  }
 
-  document.getElementById('detail-signaled').addEventListener('change', (e) => {
-    const row = document.getElementById('signaled-date-row');
-    if (e.target.value === 'true') {
-      row.style.display = '';
-      const dateInput = document.getElementById('detail-signaled-date');
-      if (!dateInput.value) {
-        dateInput.value = new Date().toISOString().slice(0, 10);
+  const expiryInput = document.getElementById('detail-expiry');
+  if (expiryInput) {
+    expiryInput.addEventListener('change', (e) => {
+      const d = daysRemaining(e.target.value);
+      const el = document.getElementById('detail-days');
+      if (!el) return;
+      el.className = 'days-display ' + getStatusClass(d);
+      el.textContent = d === null ? 'Nessuna data' : (d <= 0 ? `Scaduto da ${Math.abs(d)} giorni` : `${d} giorni rimanenti`);
+    });
+  }
+
+  const sigSel = document.getElementById('detail-signaled');
+  if (sigSel) {
+    sigSel.addEventListener('change', (e) => {
+      const row = document.getElementById('signaled-date-row');
+      if (!row) return;
+      if (e.target.value === 'true') {
+        row.style.display = '';
+        const dateInput = document.getElementById('detail-signaled-date');
+        if (dateInput && !dateInput.value) {
+          dateInput.value = new Date().toISOString().slice(0, 10);
+        }
+      } else {
+        row.style.display = 'none';
       }
-    } else {
-      row.style.display = 'none';
-    }
-  });
+    });
+  }
 
   document.getElementById('btn-save-product').onclick = saveProduct;
   document.getElementById('btn-delete-product').onclick = deleteProduct;
@@ -568,17 +601,21 @@ function openProduct(ean, returnPage) {
 
 async function saveProduct() {
   if (!currentProduct) return;
-  const expiry = document.getElementById('detail-expiry').value || null;
-  const signaled = document.getElementById('detail-signaled').value === 'true';
+  const noExpiry = !!(document.getElementById('detail-no-expiry') && document.getElementById('detail-no-expiry').checked);
+  const expiryEl = document.getElementById('detail-expiry');
+  const expiry = noExpiry ? null : ((expiryEl && expiryEl.value) || null);
+  const sigEl = document.getElementById('detail-signaled');
+  const signaled = noExpiry ? false : (sigEl && sigEl.value === 'true');
   const signaledDateInput = document.getElementById('detail-signaled-date');
-  const signaledDate = signaledDateInput ? (signaledDateInput.value || null) : null;
+  const signaledDate = noExpiry ? null : (signaledDateInput ? (signaledDateInput.value || null) : null);
 
-  if (signaled && !signaledDate) {
+  if (!noExpiry && signaled && !signaledDate) {
     showToast('Inserisci la Data di segnalazione (obbligatoria)');
     if (signaledDateInput) signaledDateInput.focus();
     return;
   }
 
+  currentProduct.noExpiry = noExpiry;
   currentProduct.expiry = expiry;
   currentProduct.signaled = signaled;
   currentProduct.signaledDate = signaled ? signaledDate : null;
@@ -1693,17 +1730,18 @@ function isAfterMissionHour() {
 }
 
 function pickRandomProducts(n) {
-  // Include: senza scadenza + con scadenza entro 180 giorni (esclude non in negozio)
-  const inStore = (p) => p.ean && !nonInNegozio.has(p.ean);
-  const senzaScadenza = products.filter(p => inStore(p) && !p.expiry);
+  // Include: senza data ancora + con scadenza entro 180 gg
+  // Esclude: non in negozio + registrati come "senza scadenza" (noExpiry)
+  const eligible = (p) => p.ean && !nonInNegozio.has(p.ean) && !p.noExpiry;
+  const senzaData = products.filter(p => eligible(p) && !p.expiry);
   const conScadenza = products.filter(p => {
-    if (!inStore(p)) return false;
+    if (!eligible(p)) return false;
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 180;
   });
-  let pool = [...senzaScadenza, ...conScadenza];
+  let pool = [...senzaData, ...conScadenza];
   if (pool.length < n) {
-    pool = products.filter(p => inStore(p));
+    pool = products.filter(p => eligible(p));
   }
   // shuffle
   const arr = [...pool];
@@ -1876,7 +1914,7 @@ function renderMissione() {
       <div class="product-name">${escapeHtml(p.name)}</div>
       <div class="product-meta">
         <span>${ean}</span>
-        ${getBadge(days, p.signaled)}
+        ${getBadge(days, p.signaled, p.noExpiry)}
         ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
       </div>
       ${checked
@@ -1999,7 +2037,7 @@ function renderNonInNegozio() {
       <div class="product-name">${escapeHtml(p.name)}</div>
       <div class="product-meta">
         <span>${p.ean}</span>
-        ${getBadge(days, p.signaled)}
+        ${getBadge(days, p.signaled, p.noExpiry)}
         ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
       </div>
     </div>`;

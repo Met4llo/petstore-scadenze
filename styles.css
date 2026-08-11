@@ -444,6 +444,35 @@ body {
 .badge.monitor { background: #fef3c7; color: #b45309; }
 .badge.ok { background: #dcfce7; color: #15803d; }
 .badge.signaled { background: #e0e7ff; color: #4338ca; }
+.badge.no-expiry { background: #e0f2fe; color: #0369a1; }
+
+.check-label.no-expiry-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.check-label.no-expiry-label input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.check-label.no-expiry-label small {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.check-label.no-expiry-label:has(input:checked) {
+  border-color: #0284c7;
+  background: #e0f2fe;
+}
 
 .modified-by {
   font-size: 0.78rem;
