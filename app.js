@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.28 - password per operatore + bacheca + task
+// VERSION 1.29 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -501,7 +501,11 @@ function openProduct(ean, returnPage) {
   const isNoExp = !!currentProduct.noExpiry;
   document.getElementById('product-detail').innerHTML = `
     <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
-    <div class="detail-ean">EAN: ${currentProduct.ean}</div>
+    <div class="detail-row">
+      <label>EAN (modificabile)</label>
+      <input type="text" id="detail-ean" inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(currentProduct.ean || '')}" autocomplete="off">
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Se cambi l'EAN, i dati scadenza restano collegati al nuovo codice</p>
+    </div>
 
     <div class="detail-row">
       <label class="check-label no-expiry-label">
@@ -601,6 +605,9 @@ function openProduct(ean, returnPage) {
 
 async function saveProduct() {
   if (!currentProduct) return;
+  const oldEan = currentProduct.ean;
+  const eanInput = document.getElementById('detail-ean');
+  const newEan = ((eanInput && eanInput.value) || '').trim().replace(/\D/g, '');
   const noExpiry = !!(document.getElementById('detail-no-expiry') && document.getElementById('detail-no-expiry').checked);
   const expiryEl = document.getElementById('detail-expiry');
   const expiry = noExpiry ? null : ((expiryEl && expiryEl.value) || null);
@@ -609,10 +616,25 @@ async function saveProduct() {
   const signaledDateInput = document.getElementById('detail-signaled-date');
   const signaledDate = noExpiry ? null : (signaledDateInput ? (signaledDateInput.value || null) : null);
 
+  if (!newEan || newEan.length < 5) {
+    showToast('Inserisci un EAN valido (solo numeri)');
+    if (eanInput) eanInput.focus();
+    return;
+  }
+
   if (!noExpiry && signaled && !signaledDate) {
     showToast('Inserisci la Data di segnalazione (obbligatoria)');
     if (signaledDateInput) signaledDateInput.focus();
     return;
+  }
+
+  // EAN cambiato: controlla duplicati
+  if (newEan !== oldEan) {
+    const exists = products.find(p => p.ean === newEan);
+    if (exists) {
+      showToast('Questo EAN è già usato da: ' + (exists.name || newEan));
+      return;
+    }
   }
 
   currentProduct.noExpiry = noExpiry;
@@ -621,14 +643,17 @@ async function saveProduct() {
   currentProduct.signaledDate = signaled ? signaledDate : null;
   currentProduct.lastModified = Date.now();
   currentProduct.updatedBy = currentOperator || 'Sconosciuto';
+  currentProduct.ean = newEan;
 
-  const idx = products.findIndex(p => p.ean === currentProduct.ean);
+  const idx = products.findIndex(p => p.ean === oldEan || p.ean === newEan);
   if (idx >= 0) products[idx] = currentProduct;
+  else products.push(currentProduct);
 
-  // Diagnostic
-  console.log('=== SAVE DIAGNOSTIC ===');
-  console.log('supabase client:', supabase);
-  console.log('window.supabase:', typeof window.supabase);
+  // Aggiorna set non-in-negozio se EAN cambiato
+  if (newEan !== oldEan && nonInNegozio.has(oldEan)) {
+    nonInNegozio.delete(oldEan);
+    nonInNegozio.add(newEan);
+  }
 
   if (!supabase) {
     showToast('ERRORE: Client Supabase non inizializzato. Ricarica la pagina.');
@@ -637,13 +662,52 @@ async function saveProduct() {
   }
 
   showToast('Salvataggio su cloud in corso...');
-  const ok = await saveToCloud(currentProduct);
-  if (ok) {
-    showToast('Salvato e sincronizzato!');
+  let ok = true;
+
+  if (newEan !== oldEan) {
+    // 1) Scrivi i dati sul nuovo EAN
+    ok = await saveToCloud(currentProduct);
+    if (ok) {
+      // 2) Elimina la riga vecchia su scadenze
+      try {
+        await supabase.from('scadenze').delete().eq('ean', oldEan);
+      } catch (e) {
+        console.error('delete old ean scadenze:', e);
+      }
+      // 3) prodotti_custom: sposta se presente
+      try {
+        const { data: customRows } = await supabase.from('prodotti_custom').select('*').eq('ean', oldEan);
+        if (customRows && customRows.length) {
+          const row = { ...customRows[0], ean: newEan };
+          await supabase.from('prodotti_custom').upsert(row, { onConflict: 'ean' });
+          await supabase.from('prodotti_custom').delete().eq('ean', oldEan);
+        }
+      } catch (e) {
+        console.error('move prodotti_custom:', e);
+      }
+      // 4) non in negozio
+      try {
+        const { data: nn } = await supabase.from('prodotti_non_in_negozio').select('*').eq('ean', oldEan);
+        if (nn && nn.length) {
+          await supabase.from('prodotti_non_in_negozio').upsert({
+            ean: newEan,
+            updated_by: currentOperator || 'Sconosciuto',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'ean' });
+          await supabase.from('prodotti_non_in_negozio').delete().eq('ean', oldEan);
+        }
+      } catch (e) {
+        console.error('move non_in_negozio:', e);
+      }
+    }
+  } else {
+    ok = await saveToCloud(currentProduct);
   }
-  // se non ok, saveToCloud ha già mostrato il messaggio di errore specifico
+
+  if (ok) {
+    showToast(newEan !== oldEan ? 'EAN aggiornato e salvato!' : 'Salvato e sincronizzato!');
+  }
   updateDashboard();
-  // Dopo il salvataggio torna allo scanner
   detailReturnPage = 'scanner';
   showPage('scanner');
 }
