@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.26 - password per operatore + bacheca + task
+// VERSION 1.27 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -606,6 +606,9 @@ async function saveProduct() {
   }
   // se non ok, saveToCloud ha già mostrato il messaggio di errore specifico
   updateDashboard();
+  // Dopo il salvataggio torna allo scanner
+  detailReturnPage = 'scanner';
+  showPage('scanner');
 }
 
 
