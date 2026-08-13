@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.31 - password per operatore + bacheca + task
+// VERSION 1.32 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -27,7 +27,7 @@ let editingTurnoDate = null;
 let missioneOggi = null;
 let missioneProgress = [];
 let missioneCompletate = [];
-const MISSIONE_COUNT = 10;
+const MISSIONE_COUNT = 20; // obiettivo: coprire tutti i prodotti senza data in 3-4 mesi
 const MISSIONE_HOUR = 9;
 let detailReturnPage = 'dashboard';
 let nonInNegozio = new Set(); // EANs not in store
@@ -1859,21 +1859,25 @@ function isAfterMissionHour() {
   return new Date().getHours() >= MISSIONE_HOUR;
 }
 
+function countProdottiSenzaData() {
+  // Prodotti in negozio, non accessori, ancora senza data di scadenza
+  return products.filter(p =>
+    p.ean &&
+    !nonInNegozio.has(p.ean) &&
+    !p.noExpiry &&
+    !p.expiry
+  ).length;
+}
+
 function pickRandomProducts(n) {
-  // Include: senza data ancora + con scadenza entro 180 gg
-  // Esclude: non in negozio + registrati come "senza scadenza" (noExpiry)
-  const eligible = (p) => p.ean && !nonInNegozio.has(p.ean) && !p.noExpiry;
-  const senzaData = products.filter(p => eligible(p) && !p.expiry);
-  const conScadenza = products.filter(p => {
-    if (!eligible(p)) return false;
-    const d = daysRemaining(p.expiry);
-    return d !== null && d <= 180;
-  });
-  let pool = [...senzaData, ...conScadenza];
-  if (pool.length < n) {
-    pool = products.filter(p => eligible(p));
-  }
-  // shuffle
+  // Obiettivo 3-4 mesi: solo prodotti SENZA data di scadenza da inserire
+  // Esclude: non in negozio + accessori / senza scadenza (noExpiry)
+  const pool = products.filter(p =>
+    p.ean &&
+    !nonInNegozio.has(p.ean) &&
+    !p.noExpiry &&
+    !p.expiry
+  );
   const arr = [...pool];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2007,8 +2011,11 @@ function renderMissione() {
   }
 
   if (!missioneOggi || !missioneOggi.prodotti || !missioneOggi.prodotti.length) {
+    const restanti = countProdottiSenzaData();
     statusEl.innerHTML = `<div class="mission-title">Nessuna missione</div>
-      <p class="mission-progress">Non è stato possibile generare prodotti da controllare.</p>`;
+      <p class="mission-progress">${restanti === 0
+        ? 'Tutti i prodotti in negozio hanno già la data di scadenza. Ottimo lavoro!'
+        : 'Non è stato possibile generare prodotti da controllare.'}</p>`;
     listEl.innerHTML = '';
     return;
   }
@@ -2016,12 +2023,17 @@ function renderMissione() {
   const { done, total } = myMissionProgress();
   const pct = total ? Math.round((done / total) * 100) : 0;
   const completed = myMissionDone();
+  const restanti = countProdottiSenzaData();
 
   statusEl.innerHTML = `
-    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 Controlla le scadenze di questi prodotti'}</div>
+    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 Inserisci la scadenza di questi prodotti'}</div>
     <p class="mission-progress">Il tuo progresso: <strong>${done}/${total}</strong> controllati</p>
     <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">Apri ogni prodotto, verifica la scadenza e segna come controllato.</p>
+    <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">
+      Obiettivo: entro 3–4 mesi tutti i prodotti in negozio con data inserita.<br>
+      Restano <strong>${restanti}</strong> prodotti senza scadenza (esclusi non in negozio e accessori).<br>
+      Apri ogni prodotto, inserisci la data e segna come controllato.
+    </p>
   `;
 
   // Operators status
