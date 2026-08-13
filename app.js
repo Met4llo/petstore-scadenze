@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.33 - password per operatore + bacheca + task
+// VERSION 1.34 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1976,14 +1976,16 @@ function countProdottiSenzaData() {
   ).length;
 }
 
-function pickRandomProducts(n) {
+function pickRandomProducts(n, excludeEans) {
   // Obiettivo 3-4 mesi: solo prodotti SENZA data di scadenza da inserire
-  // Esclude: non in negozio + accessori / senza scadenza (noExpiry)
+  // Esclude: non in negozio + accessori / senza scadenza (noExpiry) + già assegnati oggi
+  const exclude = excludeEans instanceof Set ? excludeEans : new Set(excludeEans || []);
   const pool = products.filter(p =>
     p.ean &&
     !nonInNegozio.has(p.ean) &&
     !p.noExpiry &&
-    !p.expiry
+    !p.expiry &&
+    !exclude.has(p.ean)
   );
   const arr = [...pool];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -1994,35 +1996,62 @@ function pickRandomProducts(n) {
 }
 
 async function ensureMissioneOggi() {
-  if (!supabase || !products.length) return null;
+  if (!supabase || !products.length || !currentOperator) return null;
   if (!isAfterMissionHour()) {
-    // Prima delle 9: nessuna missione ancora
     missioneOggi = null;
     return null;
   }
   const data = todayStr();
+  const op = currentOperator;
   try {
+    // Missione PERSONALE per operatore (non più condivisa)
     let { data: row, error } = await supabase
       .from('missioni')
       .select('*')
       .eq('data', data)
+      .eq('operator', op)
       .maybeSingle();
     if (error) {
       console.error('missione load:', error);
+      // Fallback: se manca la colonna operator, messaggio chiaro
+      if (error.message && error.message.toLowerCase().includes('operator')) {
+        showToast('Serve colonna operator su tabella missioni (vedi istruzioni)');
+      }
       return null;
     }
     if (!row) {
-      // Crea missione del giorno
-      const eans = pickRandomProducts(MISSIONE_COUNT);
+      // Evita che due operatori ricevano gli stessi prodotti nello stesso giorno
+      let assigned = new Set();
+      try {
+        const { data: others } = await supabase
+          .from('missioni')
+          .select('prodotti')
+          .eq('data', data);
+        (others || []).forEach(m => {
+          (m.prodotti || []).forEach(e => assigned.add(e));
+        });
+      } catch (e) {}
+
+      const eans = pickRandomProducts(MISSIONE_COUNT, assigned);
       if (!eans.length) return null;
       const { data: created, error: insErr } = await supabase
         .from('missioni')
-        .insert({ data, prodotti: eans, created_by: currentOperator || 'sistema' })
+        .insert({
+          data,
+          operator: op,
+          prodotti: eans,
+          created_by: op
+        })
         .select()
         .maybeSingle();
       if (insErr) {
-        // Race: un altro operatore l'ha già creata
-        const retry = await supabase.from('missioni').select('*').eq('data', data).maybeSingle();
+        // Race: già creata per questo operatore
+        const retry = await supabase
+          .from('missioni')
+          .select('*')
+          .eq('data', data)
+          .eq('operator', op)
+          .maybeSingle();
         row = retry.data;
       } else {
         row = created;
@@ -2038,10 +2067,12 @@ async function ensureMissioneOggi() {
 }
 
 async function loadMissioneProgress() {
-  if (!supabase || !missioneOggi) return;
+  if (!supabase || !missioneOggi || !currentOperator) return;
   const data = missioneOggi.data;
+  const op = currentOperator;
+  // Progresso e completamento solo per QUESTO operatore
   const [prog, comp] = await Promise.all([
-    supabase.from('missioni_progress').select('*').eq('data', data),
+    supabase.from('missioni_progress').select('*').eq('data', data).eq('operator', op),
     supabase.from('missioni_completate').select('*').eq('data', data)
   ]);
   missioneProgress = prog.data || [];
@@ -2133,21 +2164,23 @@ function renderMissione() {
   const restanti = countProdottiSenzaData();
 
   statusEl.innerHTML = `
-    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 Inserisci la scadenza di questi prodotti'}</div>
-    <p class="mission-progress">Il tuo progresso: <strong>${done}/${total}</strong> controllati</p>
+    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 La tua missione di oggi'}</div>
+    <p class="mission-progress">Progresso di <strong>${escapeHtml(currentOperator || '')}</strong>: <strong>${done}/${total}</strong></p>
     <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
     <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">
-      Obiettivo: entro 3–4 mesi tutti i prodotti in negozio con data inserita.<br>
-      Restano <strong>${restanti}</strong> prodotti senza scadenza (esclusi non in negozio e accessori).<br>
-      Apri ogni prodotto, inserisci la data e segna come controllato.
+      Ogni operatore ha <strong>prodotti diversi</strong>. Solo tu vedi e completi questa lista.<br>
+      Obiettivo: entro 3–4 mesi tutte le scadenze in negozio.<br>
+      Restano <strong>${restanti}</strong> prodotti senza data (esclusi non in negozio e accessori).<br>
+      Apri ogni prodotto, inserisci la scadenza e segna controllato.
     </p>
   `;
 
-  // Operators status
+  // Stato completamento missioni personali degli altri
   if (opsEl) {
     opsEl.innerHTML = OPERATORS.map(op => {
       const doneOp = missioneCompletate.some(c => c.operator === op);
-      return `<span class="missione-op-chip ${doneOp ? 'done' : ''}">${doneOp ? '✓ ' : ''}${op}</span>`;
+      const mine = op === currentOperator;
+      return `<span class="missione-op-chip ${doneOp ? 'done' : ''} ${mine ? 'mine' : ''}">${doneOp ? '✓ ' : ''}${op}${mine ? ' (tu)' : ''}</span>`;
     }).join('');
   }
 
