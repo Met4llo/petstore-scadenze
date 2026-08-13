@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.29 - password per operatore + bacheca + task
+// VERSION 1.30 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -428,19 +428,51 @@ function updateDashboard() {
 
 // ---------- List / Filter ----------
 function renderFilteredList(filter) {
-  let list = products.filter(p => p.expiry && !p.noExpiry);
-  if (filter === 'expired') list = list.filter(p => daysRemaining(p.expiry) <= 0);
-  else if (filter === 'urgent') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
-  else if (filter === 'attention') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
-  else if (filter === 'monitor') list = list.filter(p => { const d = daysRemaining(p.expiry); return d > 30 && d <= 120; });
-  else if (filter === 'unsignaled') list = list.filter(p => {
-    const d = daysRemaining(p.expiry);
-    return d !== null && d <= 120 && !p.signaled;
-  });
-  else if (filter === 'signaled') list = products.filter(p => p.signaled && !p.noExpiry);
-  else if (filter === 'no-expiry') list = products.filter(p => p.noExpiry);
+  let list;
+  if (filter === 'all' || filter === 'no-date') {
+    // Prodotti ancora senza data di scadenza (da completare) — esclusi i "senza scadenza" definitivi
+    list = products.filter(p => !p.expiry && !p.noExpiry);
+  } else if (filter === 'with-date') {
+    list = products.filter(p => p.expiry && !p.noExpiry);
+  } else if (filter === 'expired') {
+    list = products.filter(p => p.expiry && !p.noExpiry && daysRemaining(p.expiry) <= 0);
+  } else if (filter === 'urgent') {
+    list = products.filter(p => {
+      if (!p.expiry || p.noExpiry) return false;
+      const d = daysRemaining(p.expiry);
+      return d > 0 && d <= 7;
+    });
+  } else if (filter === 'attention') {
+    list = products.filter(p => {
+      if (!p.expiry || p.noExpiry) return false;
+      const d = daysRemaining(p.expiry);
+      return d > 7 && d <= 30;
+    });
+  } else if (filter === 'monitor') {
+    list = products.filter(p => {
+      if (!p.expiry || p.noExpiry) return false;
+      const d = daysRemaining(p.expiry);
+      return d > 30 && d <= 120;
+    });
+  } else if (filter === 'unsignaled') {
+    list = products.filter(p => {
+      if (!p.expiry || p.noExpiry || p.signaled) return false;
+      const d = daysRemaining(p.expiry);
+      return d !== null && d <= 120;
+    });
+  } else if (filter === 'signaled') {
+    list = products.filter(p => p.signaled && !p.noExpiry);
+  } else if (filter === 'no-expiry') {
+    list = products.filter(p => p.noExpiry);
+  } else {
+    list = products.filter(p => !p.expiry && !p.noExpiry);
+  }
 
-  list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
+  if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
+  } else {
+    list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
+  }
 
   const titles = {
     expired: 'Prodotti scaduti',
@@ -450,7 +482,9 @@ function renderFilteredList(filter) {
     unsignaled: 'Non segnalati',
     signaled: 'Solo segnalati',
     'no-expiry': 'Senza scadenza (esclusi dal controllo)',
-    all: 'Tutti con scadenza'
+    'with-date': 'Con data inserita',
+    'no-date': 'Senza data di scadenza',
+    all: 'Senza data di scadenza'
   };
   document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
 

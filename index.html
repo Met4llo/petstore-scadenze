@@ -12,7 +12,7 @@
   <script>
     (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="styles.css?v=1.29">
+  <link rel="stylesheet" href="styles.css?v=1.30">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 </head>
@@ -336,15 +336,15 @@
         <div class="list-header">
           <h2 class="page-title" id="list-title">Tutti i prodotti</h2>
           <select id="list-filter">
-            <option value="all">Tutti con scadenza</option>
+            <option value="all">Senza data di scadenza</option>
+            <option value="with-date">Con data inserita</option>
             <option value="expired">Scaduti (≤0)</option>
             <option value="urgent">Urgenti (≤7)</option>
             <option value="attention">Attenzione (≤30)</option>
             <option value="monitor">Da monitorare (≤120)</option>
             <option value="unsignaled">Non segnalati</option>
             <option value="signaled">Solo segnalati</option>
-            <option value="no-expiry">Senza scadenza</option>
-            <option value="with-date">Con data inserita</option>
+            <option value="no-expiry">Senza scadenza (esclusi)</option>
           </select>
         </div>
         <div id="filtered-list" class="product-list"></div>
@@ -428,7 +428,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.29 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.30 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -438,6 +438,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.29"></script>
+  <script src="app.js?v=1.30"></script>
 </body>
 </html>
