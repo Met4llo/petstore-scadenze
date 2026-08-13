@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.32 - password per operatore + bacheca + task
+// VERSION 1.33 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -227,6 +227,79 @@ async function loadCatalog() {
   } catch (err) {
     console.error(err);
     showToast('Errore caricamento catalogo');
+  }
+}
+
+// ---------- Rinomina EAN persistenti (cloud) ----------
+async function loadEanRinomin() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('ean_rinomini').select('*');
+    if (error) {
+      // Tabella assente: non bloccare l'app
+      console.warn('ean_rinomini:', error.message);
+      return;
+    }
+    if (!data || !data.length) return;
+
+    // Mappa old → new e risolvi catene A→B→C
+    const direct = {};
+    data.forEach(r => {
+      if (r.old_ean && r.new_ean) direct[r.old_ean] = r.new_ean;
+    });
+    function resolve(ean) {
+      let cur = ean;
+      const seen = new Set();
+      while (direct[cur] && !seen.has(cur)) {
+        seen.add(cur);
+        cur = direct[cur];
+      }
+      return cur;
+    }
+
+    const byEan = {};
+    products.forEach(p => { byEan[p.ean] = p; });
+
+    const next = [];
+    const used = new Set();
+    let renamed = 0;
+
+    for (const p of products) {
+      const finalEan = resolve(p.ean);
+      if (finalEan === p.ean) {
+        if (!used.has(p.ean)) {
+          next.push(p);
+          used.add(p.ean);
+        }
+        continue;
+      }
+      // Prodotto rinominato
+      if (byEan[finalEan] && byEan[finalEan] !== p) {
+        // Esiste già il nuovo: scarta il vecchio
+        if (!used.has(finalEan)) {
+          next.push(byEan[finalEan]);
+          used.add(finalEan);
+        }
+        try { await idbDelete(STORE_PRODUCTS, p.ean); } catch (e) {}
+        renamed++;
+      } else {
+        if (!used.has(finalEan)) {
+          const old = p.ean;
+          p.ean = finalEan;
+          next.push(p);
+          used.add(finalEan);
+          try {
+            await idbDelete(STORE_PRODUCTS, old);
+            await idbPut(STORE_PRODUCTS, p);
+          } catch (e) {}
+          renamed++;
+        }
+      }
+    }
+    products = next;
+    if (renamed) console.log('Applicate rinomine EAN:', renamed);
+  } catch (e) {
+    console.error('loadEanRinomin:', e);
   }
 }
 
@@ -731,27 +804,48 @@ async function saveProduct() {
   let ok = true;
 
   if (newEan !== oldEan) {
-    // 1) Scrivi i dati sul nuovo EAN
+    // 1) Dati scadenza sul nuovo EAN
     ok = await saveToCloud(currentProduct);
     if (ok) {
-      // 2) Elimina la riga vecchia su scadenze
+      // 2) Elimina scadenza sul vecchio EAN
       try {
         await supabase.from('scadenze').delete().eq('ean', oldEan);
       } catch (e) {
         console.error('delete old ean scadenze:', e);
       }
-      // 3) prodotti_custom: sposta se presente
+
+      // 3) Anagrafica sul nuovo EAN (sempre, così tutti i dispositivi lo vedono)
       try {
-        const { data: customRows } = await supabase.from('prodotti_custom').select('*').eq('ean', oldEan);
-        if (customRows && customRows.length) {
-          const row = { ...customRows[0], ean: newEan };
-          await supabase.from('prodotti_custom').upsert(row, { onConflict: 'ean' });
-          await supabase.from('prodotti_custom').delete().eq('ean', oldEan);
-        }
+        await supabase.from('prodotti_custom').upsert({
+          ean: newEan,
+          name: currentProduct.name || '',
+          supplier: currentProduct.supplier || '',
+          created_by: currentOperator || 'Sconosciuto'
+        }, { onConflict: 'ean' });
+        await supabase.from('prodotti_custom').delete().eq('ean', oldEan);
       } catch (e) {
-        console.error('move prodotti_custom:', e);
+        console.error('prodotti_custom rename:', e);
       }
-      // 4) non in negozio
+
+      // 4) Mappa rinomina EAN (persistente su cloud per tutti)
+      try {
+        await supabase.from('ean_rinomini').upsert({
+          old_ean: oldEan,
+          new_ean: newEan,
+          updated_by: currentOperator || 'Sconosciuto',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'old_ean' });
+        // Catena: se qualcuno puntava già a oldEan come new_ean, aggiorna a newEan
+        await supabase.from('ean_rinomini').update({
+          new_ean: newEan,
+          updated_at: new Date().toISOString()
+        }).eq('new_ean', oldEan);
+      } catch (e) {
+        console.error('ean_rinomini:', e);
+        showToast('Attenzione: mappa EAN non salvata (crea tabella ean_rinomini)');
+      }
+
+      // 5) non in negozio
       try {
         const { data: nn } = await supabase.from('prodotti_non_in_negozio').select('*').eq('ean', oldEan);
         if (nn && nn.length) {
@@ -765,9 +859,20 @@ async function saveProduct() {
       } catch (e) {
         console.error('move non_in_negozio:', e);
       }
+
+      // 6) IndexedDB locale: rimuovi vecchio, salva nuovo (altrimenti al reload torna indietro)
+      try {
+        await idbDelete(STORE_PRODUCTS, oldEan);
+        await idbPut(STORE_PRODUCTS, currentProduct);
+      } catch (e) {
+        console.error('idb rename:', e);
+      }
     }
   } else {
     ok = await saveToCloud(currentProduct);
+    try {
+      await idbPut(STORE_PRODUCTS, currentProduct);
+    } catch (e) {}
   }
 
   if (ok) {
@@ -925,8 +1030,10 @@ async function runSync(silent) {
   autoSyncRunning = true;
   try {
     if (!silent) showToast('Sincronizzazione in corso...');
-    await loadScadenzeFromCloud();
+    await loadEanRinomin();
     await loadCustomProducts();
+    await loadScadenzeFromCloud();
+    applyAccessoriesNoExpiry();
     await loadBacheca();
     await loadTasks();
     await loadTurni();
@@ -2523,10 +2630,11 @@ async function init() {
   await loadSupplierConditions();
   await loadAccessoryEans();
   await loadCatalog();
+  await loadEanRinomin();
+  await loadCustomProducts();
   applyAccessoriesNoExpiry();
   await loadScadenzeFromCloud();
   applyAccessoriesNoExpiry();
-  await loadCustomProducts();
 
   document.getElementById('products-count').textContent = products.length;
 
