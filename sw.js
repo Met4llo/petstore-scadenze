@@ -1,14 +1,15 @@
-const CACHE_NAME = 'petstore-scadenze-v130';
+const CACHE_NAME = 'petstore-scadenze-v131';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=1.30',
-  './app.js?v=1.30',
+  './styles.css?v=1.31',
+  './app.js?v=1.31',
   './styles.css',
   './app.js',
   './manifest.json',
   './logo-petstore.png',
   './products.json',
+  './accessory-eans.json',
   './supplier-conditions.json',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js'

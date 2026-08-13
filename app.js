@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.30 - password per operatore + bacheca + task
+// VERSION 1.31 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -168,10 +168,40 @@ function getBadge(days, signaled, noExpiry) {
 }
 
 // ---------- Load catalog (static) ----------
+let accessoryEans = new Set();
+
+async function loadAccessoryEans() {
+  try {
+    const res = await fetch('accessory-eans.json');
+    if (!res.ok) return;
+    const list = await res.json();
+    accessoryEans = new Set(list || []);
+    console.log('Accessori senza scadenza:', accessoryEans.size);
+  } catch (e) {
+    console.warn('accessory-eans.json non caricato', e);
+  }
+}
+
+function applyAccessoriesNoExpiry() {
+  if (!accessoryEans.size) return;
+  let n = 0;
+  products.forEach(p => {
+    // Solo se non ha già una data e non è già gestito dal cloud come noExpiry false con expiry
+    if (accessoryEans.has(p.ean) && !p.expiry) {
+      if (!p.noExpiry) n++;
+      p.noExpiry = true;
+    }
+  });
+  if (n) console.log('Marcati accessori senza scadenza:', n);
+}
+
 async function loadCatalog() {
   const existing = await idbGetAll(STORE_PRODUCTS);
   if (existing && existing.length > 1000) {
-    products = existing;
+    products = existing.map(p => ({
+      ...p,
+      noExpiry: !!p.noExpiry
+    }));
     console.log('Catalog from IndexedDB:', products.length);
     return;
   }
@@ -233,6 +263,8 @@ async function loadScadenzeFromCloud() {
       }
     });
     products = Object.values(map);
+    // Accessori (guinzagli, giochi, ecc.): senza scadenza se non hanno data
+    applyAccessoriesNoExpiry();
     console.log('Merged', data.length, 'scadenze from Supabase');
     showToast(`Sincronizzate ${data.length} scadenze`);
   } catch (err) {
@@ -2477,8 +2509,11 @@ async function init() {
 
   db = await openDB();
   await loadSupplierConditions();
+  await loadAccessoryEans();
   await loadCatalog();
+  applyAccessoriesNoExpiry();
   await loadScadenzeFromCloud();
+  applyAccessoriesNoExpiry();
   await loadCustomProducts();
 
   document.getElementById('products-count').textContent = products.length;
