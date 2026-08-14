@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.34 - password per operatore + bacheca + task
+// VERSION 1.35 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1996,7 +1996,18 @@ function pickRandomProducts(n, excludeEans) {
 }
 
 async function ensureMissioneOggi() {
-  if (!supabase || !products.length || !currentOperator) return null;
+  if (!supabase) {
+    console.warn('missione: supabase null');
+    return null;
+  }
+  if (!products.length) {
+    console.warn('missione: catalogo vuoto');
+    return null;
+  }
+  if (!currentOperator) {
+    console.warn('missione: nessun operatore');
+    return null;
+  }
   if (!isAfterMissionHour()) {
     missioneOggi = null;
     return null;
@@ -2004,37 +2015,58 @@ async function ensureMissioneOggi() {
   const data = todayStr();
   const op = currentOperator;
   try {
-    // Missione PERSONALE per operatore (non più condivisa)
-    let { data: row, error } = await supabase
+    // 1) Cerca missione personale di oggi
+    let row = null;
+    let { data: rows, error } = await supabase
       .from('missioni')
       .select('*')
       .eq('data', data)
       .eq('operator', op)
-      .maybeSingle();
+      .limit(1);
     if (error) {
       console.error('missione load:', error);
-      // Fallback: se manca la colonna operator, messaggio chiaro
-      if (error.message && error.message.toLowerCase().includes('operator')) {
-        showToast('Serve colonna operator su tabella missioni (vedi istruzioni)');
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('operator') || msg.includes('column')) {
+        showToast('SQL: aggiungi colonna operator alla tabella missioni');
+      } else {
+        showToast('Errore missione: ' + error.message);
       }
       return null;
     }
+    row = (rows && rows[0]) || null;
+
     if (!row) {
-      // Evita che due operatori ricevano gli stessi prodotti nello stesso giorno
+      // 2) Prodotti già assegnati oggi ad altri operatori
       let assigned = new Set();
       try {
         const { data: others } = await supabase
           .from('missioni')
-          .select('prodotti')
+          .select('prodotti, operator')
           .eq('data', data);
         (others || []).forEach(m => {
-          (m.prodotti || []).forEach(e => assigned.add(e));
+          const list = Array.isArray(m.prodotti) ? m.prodotti : [];
+          list.forEach(e => assigned.add(e));
         });
       } catch (e) {}
 
-      const eans = pickRandomProducts(MISSIONE_COUNT, assigned);
-      if (!eans.length) return null;
-      const { data: created, error: insErr } = await supabase
+      let eans = pickRandomProducts(MISSIONE_COUNT, assigned);
+      // Se il pool escluso è troppo stretto, riprova senza esclusioni
+      if (!eans.length) {
+        eans = pickRandomProducts(MISSIONE_COUNT, new Set());
+      }
+      if (!eans.length) {
+        console.warn('missione: nessun prodotto senza data disponibile');
+        missioneOggi = null;
+        return null;
+      }
+
+      // 3) Rimuovi missioni legacy di oggi senza operatore (bloccano unique su data)
+      try {
+        await supabase.from('missioni').delete().eq('data', data).is('operator', null);
+      } catch (e) {}
+
+      // 4) Inserisci missione personale
+      let { data: created, error: insErr } = await supabase
         .from('missioni')
         .insert({
           data,
@@ -2043,25 +2075,64 @@ async function ensureMissioneOggi() {
           created_by: op
         })
         .select()
-        .maybeSingle();
+        .limit(1);
       if (insErr) {
-        // Race: già creata per questo operatore
-        const retry = await supabase
+        console.error('missione insert:', insErr);
+        // Possibile unique(data) ancora attivo: aggiorna la riga del giorno
+        const { data: existing } = await supabase
           .from('missioni')
           .select('*')
           .eq('data', data)
-          .eq('operator', op)
-          .maybeSingle();
-        row = retry.data;
+          .limit(5);
+        const mine = (existing || []).find(r => r.operator === op);
+        if (mine) {
+          row = mine;
+        } else if (existing && existing.length === 1 && !existing[0].operator) {
+          const { data: updated, error: upErr } = await supabase
+            .from('missioni')
+            .update({ operator: op, prodotti: eans, created_by: op })
+            .eq('data', data)
+            .select()
+            .limit(1);
+          if (upErr) {
+            showToast('Errore salvataggio missione: ' + upErr.message);
+            return null;
+          }
+          row = updated && updated[0];
+        } else if (existing && existing.length >= 1) {
+          // Unique solo su data: crea lista personale in locale per non bloccare il negozio
+          row = {
+            data,
+            operator: op,
+            prodotti: eans,
+            created_by: op,
+            _localOnly: true
+          };
+          showToast('Missione locale (esegui SQL unique data+operator)');
+        } else {
+          showToast('Errore creazione missione: ' + insErr.message);
+          return null;
+        }
       } else {
-        row = created;
+        row = (created && created[0]) || null;
       }
     }
+
+    // Normalizza prodotti (array)
+    if (row && row.prodotti && !Array.isArray(row.prodotti)) {
+      try {
+        row.prodotti = typeof row.prodotti === 'string' ? JSON.parse(row.prodotti) : [];
+      } catch (e) {
+        row.prodotti = [];
+      }
+    }
+
     missioneOggi = row;
     await loadMissioneProgress();
     return row;
   } catch (e) {
-    console.error(e);
+    console.error('ensureMissioneOggi', e);
+    showToast('Errore missione: ' + (e.message || e));
     return null;
   }
 }
@@ -2153,8 +2224,11 @@ function renderMissione() {
     statusEl.innerHTML = `<div class="mission-title">Nessuna missione</div>
       <p class="mission-progress">${restanti === 0
         ? 'Tutti i prodotti in negozio hanno già la data di scadenza. Ottimo lavoro!'
-        : 'Non è stato possibile generare prodotti da controllare.'}</p>`;
+        : 'Impossibile creare la missione. Controlla Supabase (colonna <strong>operator</strong> + indice unico su data+operator) oppure tocca 🔄 Sincronizza.<br><br>Prodotti ancora senza data: <strong>' + restanti + '</strong>'}</p>
+      <button type="button" class="btn btn-primary" id="btn-retry-missione" style="margin-top:12px;">Riprova a generare</button>`;
     listEl.innerHTML = '';
+    const btn = document.getElementById('btn-retry-missione');
+    if (btn) btn.onclick = () => refreshMissione();
     return;
   }
 
