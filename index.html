@@ -12,9 +12,10 @@
   <script>
     (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
   </script>
-  <link rel="stylesheet" href="styles.css?v=1.35">
+  <link rel="stylesheet" href="styles.css?v=1.36">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- LOGIN: scegli operatore -->
@@ -60,6 +61,7 @@
           <button type="button" class="logo-dropdown-item" data-page="missione">🎯  Missione</button>
           <button type="button" class="logo-dropdown-item" data-page="turni">🗓️  Turni</button>
           <button type="button" class="logo-dropdown-item" data-page="consegne">📅  Consegne</button>
+          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">🛒  Ordini fornitore</button>
           <button type="button" class="logo-dropdown-item" data-page="scanner">📷  Scanner / Cerca</button>
           <button type="button" class="logo-dropdown-item" data-page="list">📋  Lista scadenze</button>
           <button type="button" class="logo-dropdown-item" data-page="non-negozio">📦  Non in negozio</button>
@@ -311,6 +313,45 @@
         </div>
       </section>
 
+      <!-- ORDINI FORNITORE (solo Santoemma) -->
+      <section id="page-ordini" class="page">
+        <h2 class="page-title">🛒 Ordini fornitore</h2>
+        <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
+
+        <div class="ordini-setup card-block">
+          <div class="detail-row">
+            <label>Nome fornitore *</label>
+            <input type="text" id="ordine-fornitore" placeholder="Es. FARMAZOO, LIUJO, CAMON...">
+          </div>
+          <div class="detail-row">
+            <label>Periodo (testo libero)</label>
+            <input type="text" id="ordine-periodo" placeholder="Es. 18/06/2026 → 11/08/2026">
+          </div>
+          <div class="detail-row">
+            <label>File statistica (.xlsx)</label>
+            <input type="file" id="ordine-file" accept=".xlsx,.xls,.csv">
+          </div>
+          <button type="button" id="btn-parse-ordine" class="btn btn-primary btn-large">Analizza file</button>
+          <p id="ordine-parse-msg" class="msg hidden"></p>
+        </div>
+
+        <div id="ordine-result" class="hidden">
+          <div class="list-header" style="margin-top:16px;">
+            <h3 class="page-title" style="font-size:1.05rem;" id="ordine-result-title">Proposta ordine</h3>
+            <select id="ordine-filter">
+              <option value="da-ordinare">Solo da ordinare</option>
+              <option value="alta">Priorità alta</option>
+              <option value="tutti">Tutti i prodotti</option>
+            </select>
+          </div>
+          <p id="ordine-summary" class="turni-hint"></p>
+          <div id="ordine-table-wrap" class="ordine-table-wrap"></div>
+          <button type="button" id="btn-copy-ordine" class="btn btn-primary btn-large" style="margin-top:12px;">📋 Copia ordine da inviare</button>
+          <button type="button" id="btn-share-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">📤 Condividi</button>
+          <button type="button" id="btn-clear-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Nuova analisi</button>
+        </div>
+      </section>
+
       <!-- SCANNER + CERCA -->
       <section id="page-scanner" class="page">
         <h2 class="page-title">Scanner / Cerca</h2>
@@ -429,7 +470,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.35 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.36 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -439,6 +480,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.35"></script>
+  <script src="app.js?v=1.36"></script>
 </body>
 </html>

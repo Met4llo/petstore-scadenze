@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.35 - password per operatore + bacheca + task
+// VERSION 1.36 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -444,6 +444,11 @@ function showToast(msg, duration = 2800) {
 }
 
 function showPage(pageId) {
+  if (pageId === 'ordini' && currentOperator !== 'Santoemma') {
+    showToast('Sezione riservata a Santoemma');
+    pageId = 'dashboard';
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + pageId).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => {
@@ -1092,6 +1097,11 @@ function updateOperatorUI() {
   if (el) el.textContent = currentOperator || '';
   const settingsName = document.getElementById('settings-operator-name');
   if (settingsName) settingsName.textContent = currentOperator || 'Nessuno';
+  // Sezione ordini: solo Santoemma
+  document.querySelectorAll('.menu-santoemma-only').forEach(btn => {
+    if (currentOperator === 'Santoemma') btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
 }
 
 let pendingOperator = null;
@@ -2704,6 +2714,338 @@ async function deleteConsegna() {
 }
 
 
+// ========== ORDINI FORNITORE (solo Santoemma) ==========
+let ordineRows = [];
+let ordineMeta = { fornitore: '', periodo: '' };
+
+function isSantoemma() {
+  return currentOperator === 'Santoemma';
+
+function normalizeHeader(h) {
+  return String(h || '')
+    .toLowerCase()
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findCol(headers, candidates) {
+  for (let i = 0; i < headers.length; i++) {
+    const h = normalizeHeader(headers[i]);
+    for (const c of candidates) {
+      if (h.includes(c)) return i;
+    }
+  }
+  return -1;
+}
+
+function toNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' && !isNaN(v)) return v;
+  const s = String(v).replace(',', '.').replace(/[^\d.-]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function calcOrdineConsigliato(venduti, giorni, giacenza, proiezione, pzCartone) {
+  // Proiezione 30 gg se non presente
+  let proj = proiezione;
+  if (proj === null || proj === undefined) {
+    if (venduti !== null && giorni && giorni > 0) proj = (venduti / giorni) * 30;
+    else proj = venduti || 0;
+  }
+  const gia = giacenza === null || giacenza === undefined ? 0 : giacenza;
+  let pezzi = Math.max(0, Math.ceil((proj || 0) - gia));
+  // Se giacenza negativa, almeno coprire il buco + un minimo di rotazione
+  if (gia < 0) pezzi = Math.max(pezzi, Math.ceil(Math.abs(gia) + (proj || 0) * 0.5));
+  const pz = pzCartone && pzCartone > 1 ? pzCartone : 1;
+  if (pz > 1) {
+    // Ordine a cartoni: arrotonda per eccesso
+    const cartoni = Math.ceil(pezzi / pz);
+    return { pezzi: cartoni * pz, cartoni, unita: 'cartoni', pzCartone: pz };
+  }
+  return { pezzi, cartoni: pezzi, unita: 'pezzi', pzCartone: 1 };
+}
+
+function parseStatisticaSheet(workbook) {
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+  if (!rows.length) throw new Error('Foglio vuoto');
+
+  // Cerca riga intestazione con "Prodotto"
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const r = rows[i] || [];
+    const joined = r.map(normalizeHeader).join('|');
+    if (joined.includes('prodotto') && (joined.includes('giacenza') || joined.includes('vendut'))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx < 0) throw new Error('Intestazione non trovata (serve colonna Prodotto)');
+
+  const headers = rows[headerIdx];
+  const colProdotto = findCol(headers, ['prodotto']);
+  const colCodice = findCol(headers, ['codice fornitore', 'codice', 'ean']);
+  const colPz = findCol(headers, ['pz/cartone', 'pz cartone', 'pezzi/cartone', 'conf']);
+  const colVenduti = findCol(headers, ['venduti']);
+  const colMedia = findCol(headers, ['media']);
+  const colProiezione = findCol(headers, ['proiezione']);
+  const colGiacenza = findCol(headers, ['giacenza']);
+  const colOrdine = findCol(headers, ['ordine']);
+  const colPrio = findCol(headers, ['priorità', 'priorita']);
+  const colNote = findCol(headers, ['note', 'categoria']);
+
+  if (colProdotto < 0) throw new Error('Colonna Prodotto mancante');
+
+  // Giorni dal periodo in riga 3 se presente
+  let giorni = 30;
+  for (let i = 0; i < headerIdx; i++) {
+    const t = (rows[i] || []).map(x => String(x || '')).join(' ');
+    const m = t.match(/(\d+)\s*giorni/i);
+    if (m) { giorni = parseInt(m[1], 10); break; }
+  }
+
+  const out = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const nome = r[colProdotto];
+    if (!nome || String(nome).trim() === '') continue;
+    const venduti = colVenduti >= 0 ? toNum(r[colVenduti]) : null;
+    const proiezione = colProiezione >= 0 ? toNum(r[colProiezione]) : null;
+    const giacenza = colGiacenza >= 0 ? toNum(r[colGiacenza]) : null;
+    const pzCartone = colPz >= 0 ? (toNum(r[colPz]) || 1) : 1;
+    let ordineFile = colOrdine >= 0 ? toNum(r[colOrdine]) : null;
+    const calc = calcOrdineConsigliato(venduti, giorni, giacenza, proiezione, pzCartone);
+    // Se il file ha già ordine consigliato in pezzi, rispettalo ma normalizza a cartoni
+    let ordinePezzi = calc.pezzi;
+    let ordineCartoni = calc.cartoni;
+    let unita = calc.unita;
+    if (ordineFile !== null && ordineFile > 0) {
+      if (pzCartone > 1) {
+        ordineCartoni = Math.ceil(ordineFile / pzCartone);
+        // se il valore nel file è piccolo rispetto a pz, potrebbe già essere in cartoni
+        if (ordineFile <= 30 && ordineFile < pzCartone) {
+          ordineCartoni = Math.ceil(ordineFile);
+        }
+        ordinePezzi = ordineCartoni * pzCartone;
+        unita = 'cartoni';
+      } else {
+        ordinePezzi = Math.ceil(ordineFile);
+        ordineCartoni = ordinePezzi;
+        unita = 'pezzi';
+      }
+    }
+    const prio = colPrio >= 0 ? String(r[colPrio] || '').toUpperCase() : '';
+    out.push({
+      nome: String(nome).trim(),
+      codice: colCodice >= 0 ? String(r[colCodice] || '').trim() : '',
+      pzCartone: pzCartone > 0 ? pzCartone : 1,
+      venduti: venduti,
+      proiezione: proiezione,
+      giacenza: giacenza,
+      ordinePezzi,
+      ordineCartoni,
+      ordineQty: unita === 'cartoni' ? ordineCartoni : ordinePezzi,
+      unita,
+      priorita: prio.includes('ALTA') ? 'ALTA' : prio.includes('MEDIA') ? 'MEDIA' : prio.includes('BASSA') ? 'BASSA' : '',
+      note: colNote >= 0 ? String(r[colNote] || '') : ''
+    });
+  }
+  return { rows: out, giorni };
+}
+
+async function handleParseOrdine() {
+  if (!isSantoemma()) {
+    showToast('Sezione riservata a Santoemma');
+    return;
+  }
+  const fileInput = document.getElementById('ordine-file');
+  const forn = (document.getElementById('ordine-fornitore').value || '').trim();
+  const periodo = (document.getElementById('ordine-periodo').value || '').trim();
+  const msg = document.getElementById('ordine-parse-msg');
+  if (!forn) {
+    showToast('Inserisci il nome fornitore');
+    return;
+  }
+  if (!fileInput.files || !fileInput.files[0]) {
+    showToast('Seleziona il file Excel');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    showToast('Libreria Excel non caricata — serve internet al primo avvio');
+    return;
+  }
+  try {
+    const buf = await fileInput.files[0].arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const parsed = parseStatisticaSheet(wb);
+    ordineRows = parsed.rows;
+    ordineMeta = { fornitore: forn, periodo: periodo || ('periodo ~' + parsed.giorni + ' gg') };
+    msg.textContent = 'Importati ' + ordineRows.length + ' prodotti';
+    msg.className = 'msg success';
+    msg.classList.remove('hidden');
+    document.getElementById('ordine-result').classList.remove('hidden');
+    renderOrdineTable();
+    showToast('Statistica caricata');
+  } catch (e) {
+    console.error(e);
+    msg.textContent = 'Errore: ' + (e.message || e);
+    msg.className = 'msg error';
+    msg.classList.remove('hidden');
+    showToast('File non valido');
+  }
+}
+
+function filteredOrdineRows() {
+  const f = (document.getElementById('ordine-filter') || {}).value || 'da-ordinare';
+  let list = [...ordineRows];
+  if (f === 'da-ordinare') list = list.filter(r => (r.ordineQty || 0) > 0);
+  else if (f === 'alta') list = list.filter(r => r.priorita === 'ALTA' || (r.ordineQty || 0) > 0 && (r.giacenza === null || r.giacenza <= 0));
+  list.sort((a, b) => (b.ordineQty || 0) - (a.ordineQty || 0));
+  return list;
+}
+
+function renderOrdineTable() {
+  const wrap = document.getElementById('ordine-table-wrap');
+  const summary = document.getElementById('ordine-summary');
+  const title = document.getElementById('ordine-result-title');
+  if (!wrap) return;
+  const list = filteredOrdineRows();
+  const daOrd = ordineRows.filter(r => (r.ordineQty || 0) > 0);
+  const totPezzi = daOrd.reduce((s, r) => s + (r.unita === 'cartoni' ? (r.ordineQty * r.pzCartone) : r.ordineQty), 0);
+  if (title) title.textContent = 'Ordine ' + ordineMeta.fornitore;
+  if (summary) {
+    summary.textContent = (ordineMeta.periodo ? ordineMeta.periodo + ' · ' : '') +
+      daOrd.length + ' riferimenti da ordinare · ~' + totPezzi + ' pezzi totali';
+  }
+  if (!list.length) {
+    wrap.innerHTML = '<p class="muted-center">Nessuna riga in questo filtro</p>';
+    return;
+  }
+  wrap.innerHTML = `<table class="ordine-table">
+    <thead>
+      <tr>
+        <th>Prodotto</th>
+        <th>Cod.</th>
+        <th>Pz/Ct</th>
+        <th>Vend.</th>
+        <th>Giac.</th>
+        <th>Ordine</th>
+        <th>UdM</th>
+        <th>Prio</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${list.map((r, idx) => {
+        const realIdx = ordineRows.indexOf(r);
+        const prioCls = r.priorita === 'ALTA' ? 'prio-alta' : r.priorita === 'MEDIA' ? 'prio-media' : 'prio-bassa';
+        return `<tr data-idx="${realIdx}">
+          <td>${escapeHtml(r.nome)}</td>
+          <td>${escapeHtml(r.codice)}</td>
+          <td>${r.pzCartone}</td>
+          <td>${r.venduti !== null && r.venduti !== undefined ? r.venduti : '—'}</td>
+          <td>${r.giacenza !== null && r.giacenza !== undefined ? r.giacenza : '—'}</td>
+          <td><input class="ordine-qty" type="number" min="0" step="1" value="${r.ordineQty || 0}" data-idx="${realIdx}"></td>
+          <td><span class="ordine-unit">${r.unita === 'cartoni' ? 'cartoni' : 'pz'}</span></td>
+          <td class="${prioCls}">${escapeHtml(r.priorita || '')}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+
+  wrap.querySelectorAll('input.ordine-qty').forEach(inp => {
+    inp.onchange = () => {
+      const i = parseInt(inp.dataset.idx, 10);
+      if (ordineRows[i]) {
+        ordineRows[i].ordineQty = Math.max(0, parseInt(inp.value, 10) || 0);
+        if (ordineRows[i].unita === 'cartoni') {
+          ordineRows[i].ordineCartoni = ordineRows[i].ordineQty;
+          ordineRows[i].ordinePezzi = ordineRows[i].ordineQty * ordineRows[i].pzCartone;
+        } else {
+          ordineRows[i].ordinePezzi = ordineRows[i].ordineQty;
+          ordineRows[i].ordineCartoni = ordineRows[i].ordineQty;
+        }
+      }
+      const summaryEl = document.getElementById('ordine-summary');
+      if (summaryEl) {
+        const da = ordineRows.filter(r => (r.ordineQty || 0) > 0);
+        const tot = da.reduce((s, r) => s + (r.unita === 'cartoni' ? r.ordineQty * r.pzCartone : r.ordineQty), 0);
+        summaryEl.textContent = (ordineMeta.periodo ? ordineMeta.periodo + ' · ' : '') +
+          da.length + ' riferimenti da ordinare · ~' + tot + ' pezzi totali';
+      }
+    };
+  });
+}
+
+function buildOrdineText() {
+  const lines = [];
+  lines.push('ORDINE ' + ordineMeta.fornitore.toUpperCase());
+  if (ordineMeta.periodo) lines.push('Periodo: ' + ordineMeta.periodo);
+  lines.push('Data: ' + todayStr());
+  lines.push('Operatore: ' + (currentOperator || ''));
+  lines.push('');
+  const list = ordineRows.filter(r => (r.ordineQty || 0) > 0)
+    .sort((a, b) => (b.ordineQty || 0) - (a.ordineQty || 0));
+  list.forEach(r => {
+    const qty = r.ordineQty;
+    const udm = r.unita === 'cartoni' ? 'cartoni' : 'pz';
+    const extra = r.unita === 'cartoni' ? ` (${qty * r.pzCartone} pz)` : '';
+    lines.push(`${qty} ${udm}${extra} — ${r.nome}${r.codice ? ' [' + r.codice + ']' : ''}`);
+  });
+  lines.push('');
+  lines.push('Totale riferimenti: ' + list.length);
+  return lines.join('\n');
+}
+
+async function copyOrdine() {
+  const text = buildOrdineText();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Ordine copiato');
+  } catch (e) {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Ordine copiato');
+  }
+}
+
+async function shareOrdine() {
+  const text = buildOrdineText();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Ordine ' + ordineMeta.fornitore, text });
+      return;
+    } catch (e) {}
+  }
+  await copyOrdine();
+}
+
+function clearOrdine() {
+  ordineRows = [];
+  ordineMeta = { fornitore: '', periodo: '' };
+  const file = document.getElementById('ordine-file');
+  if (file) file.value = '';
+  document.getElementById('ordine-result').classList.add('hidden');
+  const msg = document.getElementById('ordine-parse-msg');
+  if (msg) msg.classList.add('hidden');
+}
+
+function guardOrdiniPage() {
+  if (!isSantoemma()) {
+    showToast('Sezione riservata a Santoemma');
+    showPage('dashboard');
+    return false;
+  }
+  return true;
+}
+
 // ---------- Init ----------
 async function init() {
   initTheme();
@@ -2871,6 +3213,9 @@ async function init() {
       if (page === 'missione') refreshMissione();
       if (page === 'non-negozio') { loadNonInNegozio().then(() => renderNonInNegozio()); }
       if (page === 'consegne') { loadConsegne(); }
+      if (page === 'ordini') {
+        if (!guardOrdiniPage()) return;
+      }
       // highlight bottom nav if page has a tab
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
@@ -2880,6 +3225,17 @@ async function init() {
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.logo-menu-wrap')) closeLogoMenu();
   });
+
+  const btnParseOrdine = document.getElementById('btn-parse-ordine');
+  if (btnParseOrdine) btnParseOrdine.onclick = handleParseOrdine;
+  const btnCopyOrdine = document.getElementById('btn-copy-ordine');
+  if (btnCopyOrdine) btnCopyOrdine.onclick = copyOrdine;
+  const btnShareOrdine = document.getElementById('btn-share-ordine');
+  if (btnShareOrdine) btnShareOrdine.onclick = shareOrdine;
+  const btnClearOrdine = document.getElementById('btn-clear-ordine');
+  if (btnClearOrdine) btnClearOrdine.onclick = clearOrdine;
+  const ordineFilter = document.getElementById('ordine-filter');
+  if (ordineFilter) ordineFilter.onchange = renderOrdineTable;
 
 
   const btnThemeLight = document.getElementById('btn-theme-light');

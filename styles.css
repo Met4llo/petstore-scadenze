@@ -1808,3 +1808,58 @@ body {
 [data-theme="dark"] .consegna-badge.consegnato { background: #14532d; color: #86efac; }
 
 .missione-op-chip.mine { outline: 2px solid var(--primary); }
+
+
+/* ===== Ordini fornitore ===== */
+.card-block {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+}
+.ordine-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 8px;
+}
+.ordine-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 640px;
+}
+.ordine-table th {
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 6px;
+  text-align: left;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+}
+.ordine-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.ordine-table tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+[data-theme="dark"] .ordine-table tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+.ordine-table input.ordine-qty {
+  width: 56px;
+  padding: 6px;
+  text-align: center;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+.prio-alta { color: #b91c1c; font-weight: 700; }
+.prio-media { color: #c2410c; font-weight: 650; }
+.prio-bassa { color: var(--muted); }
+.ordine-unit {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+}
