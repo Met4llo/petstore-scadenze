@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.36 - password per operatore + bacheca + task
+// VERSION 1.37 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -110,15 +110,23 @@ const DEFAULT_PASSWORDS = {
 };
 
 async function getOperatorPassword(opName) {
-  const meta = await idbGetAll(STORE_META);
-  const entry = meta.find(m => m.key === 'pwd_' + opName);
-  if (entry && entry.value) return entry.value;
+  try {
+    if (db) {
+      const meta = await idbGetAll(STORE_META);
+      const entry = (meta || []).find(m => m.key === 'pwd_' + opName);
+      if (entry && entry.value) return entry.value;
+    }
+  } catch (e) {
+    console.warn('pwd idb', e);
+  }
   // Try Supabase
   if (supabase) {
     try {
       const { data } = await supabase.from('operatori_pwd').select('password').eq('nome', opName).maybeSingle();
       if (data && data.password) {
-        await idbPut(STORE_META, { key: 'pwd_' + opName, value: data.password });
+        try {
+          if (db) await idbPut(STORE_META, { key: 'pwd_' + opName, value: data.password });
+        } catch (e) {}
         return data.password;
       }
     } catch (e) {}
@@ -3049,6 +3057,56 @@ function guardOrdiniPage() {
 // ---------- Init ----------
 async function init() {
   initTheme();
+
+  // --- LOGIN SUBITO (prima di catalogo/cloud, altrimenti iOS resta bloccato sui tasti) ---
+  document.querySelectorAll('.operator-btn').forEach(btn => {
+    btn.onclick = () => selectOperator(btn.dataset.op);
+  });
+  const loginBtn = document.getElementById('login-btn');
+  const pwdInput = document.getElementById('login-password');
+  if (loginBtn) {
+    loginBtn.onclick = async () => {
+      const op = pendingOperator;
+      if (!op) {
+        showToast('Seleziona prima un operatore');
+        return;
+      }
+      try {
+        const stored = await getOperatorPassword(op);
+        if (pwdInput && pwdInput.value === stored) {
+          currentOperator = op;
+          localStorage.setItem('petstore_operator', op);
+          const errEl = document.getElementById('login-error');
+          if (errEl) errEl.classList.add('hidden');
+          enterApp();
+        } else {
+          const errEl = document.getElementById('login-error');
+          if (errEl) {
+            errEl.classList.remove('hidden');
+            errEl.textContent = 'Password non corretta per ' + op;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        showToast('Errore accesso: ' + (e.message || e));
+      }
+    };
+  }
+  if (pwdInput) {
+    pwdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && loginBtn) loginBtn.click();
+    });
+  }
+  const btnBackOps = document.getElementById('btn-back-to-operators');
+  if (btnBackOps) {
+    btnBackOps.onclick = () => {
+      pendingOperator = null;
+      document.getElementById('password-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('login-error').classList.add('hidden');
+    };
+  }
+
   // Create Supabase client (library already loaded from index.html)
   try {
     const sb = window.supabase;
@@ -3061,13 +3119,17 @@ async function init() {
       throw new Error('Libreria Supabase non trovata. Controlla la connessione internet.');
     }
     console.log('Supabase client OK');
-    // Quick connection test
-    const { error: testErr } = await supabase.from('scadenze').select('ean').limit(1);
-    if (testErr) {
-      console.error('Connection test failed:', testErr);
-      showToast('Avviso: ' + testErr.message);
-    } else {
-      console.log('Connection test OK');
+    // Quick connection test (non bloccare il login se fallisce)
+    try {
+      const { error: testErr } = await supabase.from('scadenze').select('ean').limit(1);
+      if (testErr) {
+        console.error('Connection test failed:', testErr);
+        showToast('Avviso cloud: ' + testErr.message);
+      } else {
+        console.log('Connection test OK');
+      }
+    } catch (e) {
+      console.warn('Connection test skip', e);
     }
   } catch (err) {
     console.error('Supabase init error:', err);
@@ -3075,50 +3137,25 @@ async function init() {
     supabase = null;
   }
 
-  db = await openDB();
-  await loadSupplierConditions();
-  await loadAccessoryEans();
-  await loadCatalog();
-  await loadEanRinomin();
-  await loadCustomProducts();
-  applyAccessoriesNoExpiry();
-  await loadScadenzeFromCloud();
-  applyAccessoriesNoExpiry();
-
-  document.getElementById('products-count').textContent = products.length;
-
-  // Login
-  const loginBtn = document.getElementById('login-btn');
-  const pwdInput = document.getElementById('login-password');
-  loginBtn.onclick = async () => {
-    const op = pendingOperator;
-    if (!op) {
-      showToast('Seleziona prima un operatore');
-      return;
-    }
-    const stored = await getOperatorPassword(op);
-    if (pwdInput.value === stored) {
-      currentOperator = op;
-      localStorage.setItem('petstore_operator', op);
-      document.getElementById('login-error').classList.add('hidden');
-      enterApp();
-    } else {
-      document.getElementById('login-error').classList.remove('hidden');
-      document.getElementById('login-error').textContent = 'Password non corretta per ' + op;
-    }
-  };
-  pwdInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') loginBtn.click();
-  });
-  const btnBackOps = document.getElementById('btn-back-to-operators');
-  if (btnBackOps) {
-    btnBackOps.onclick = () => {
-      pendingOperator = null;
-      document.getElementById('password-screen').classList.add('hidden');
-      document.getElementById('login-screen').classList.remove('hidden');
-      document.getElementById('login-error').classList.add('hidden');
-    };
+  try {
+    db = await openDB();
+  } catch (e) {
+    console.error('IndexedDB open failed', e);
+    showToast('Errore memoria locale');
   }
+
+  // Caricamento dati: errori non devono bloccare l'accesso
+  try { await loadSupplierConditions(); } catch (e) { console.error(e); }
+  try { await loadAccessoryEans(); } catch (e) { console.error(e); }
+  try { await loadCatalog(); } catch (e) { console.error(e); showToast('Catalogo non caricato'); }
+  try { await loadEanRinomin(); } catch (e) { console.error(e); }
+  try { await loadCustomProducts(); } catch (e) { console.error(e); }
+  try { applyAccessoriesNoExpiry(); } catch (e) { console.error(e); }
+  try { await loadScadenzeFromCloud(); } catch (e) { console.error(e); }
+  try { applyAccessoriesNoExpiry(); } catch (e) { console.error(e); }
+
+  const pc = document.getElementById('products-count');
+  if (pc) pc.textContent = products.length;
 
   // Navigation
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -3322,10 +3359,7 @@ async function init() {
   if (btnSaveNew) btnSaveNew.onclick = saveNewProduct;
 
 
-  // Operator selection
-  document.querySelectorAll('.operator-btn').forEach(btn => {
-    btn.onclick = () => selectOperator(btn.dataset.op);
-  });
+  // Operator change (selezione già collegata all'inizio di init)
   const btnChangeOp = document.getElementById('btn-change-operator');
   if (btnChangeOp) {
     btnChangeOp.onclick = () => {
