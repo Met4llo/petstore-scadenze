@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.38 - password per operatore + bacheca + task
+// VERSION 1.39 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2808,12 +2808,58 @@ function parseStatisticaSheet(workbook) {
 
   if (colProdotto < 0) throw new Error('Colonna Prodotto mancante');
 
-  // Giorni dal periodo in riga 3 se presente
+  // Giorni del periodo: legge le due date nell'intestazione (es. 18/06/2026 → 11/08/2026)
   let giorni = 30;
+  let periodoTesto = '';
+  let dataInizio = null;
+  let dataFine = null;
+
+  function parseItaDate(s) {
+    // dd/mm/yyyy o dd-mm-yyyy o yyyy-mm-dd
+    let m = String(s).trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+    if (m) {
+      const d = parseInt(m[1], 10), mo = parseInt(m[2], 10) - 1, y = parseInt(m[3], 10);
+      const dt = new Date(y, mo, d);
+      if (!isNaN(dt.getTime())) return dt;
+    }
+    m = String(s).trim().match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (m) {
+      const y = parseInt(m[1], 10), mo = parseInt(m[2], 10) - 1, d = parseInt(m[3], 10);
+      const dt = new Date(y, mo, d);
+      if (!isNaN(dt.getTime())) return dt;
+    }
+    return null;
+  }
+
+  function daysBetween(a, b) {
+    const ms = 24 * 60 * 60 * 1000;
+    const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+    const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+    return Math.max(1, Math.round((db - da) / ms) + 1); // inclusivo
+  }
+
   for (let i = 0; i < headerIdx; i++) {
     const t = (rows[i] || []).map(x => String(x || '')).join(' ');
+    // Cerca due date nella stessa riga
+    const dateMatches = t.match(/(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/g);
+    if (dateMatches && dateMatches.length >= 2) {
+      const d1 = parseItaDate(dateMatches[0]);
+      const d2 = parseItaDate(dateMatches[1]);
+      if (d1 && d2) {
+        dataInizio = d1 <= d2 ? d1 : d2;
+        dataFine = d1 <= d2 ? d2 : d1;
+        giorni = daysBetween(dataInizio, dataFine);
+        const fmt = (d) => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+        periodoTesto = fmt(dataInizio) + ' → ' + fmt(dataFine) + ' (' + giorni + ' giorni)';
+        break;
+      }
+    }
+    // Fallback: testo "54 giorni"
     const m = t.match(/(\d+)\s*giorni/i);
-    if (m) { giorni = parseInt(m[1], 10); break; }
+    if (m && !dataInizio) {
+      giorni = parseInt(m[1], 10) || 30;
+      periodoTesto = giorni + ' giorni';
+    }
   }
 
   const out = [];
@@ -2862,7 +2908,7 @@ function parseStatisticaSheet(workbook) {
       note: colNote >= 0 ? String(r[colNote] || '') : ''
     });
   }
-  return { rows: out, giorni };
+  return { rows: out, giorni, periodoTesto, dataInizio, dataFine };
 }
 
 async function handleParseOrdine() {
@@ -2891,7 +2937,10 @@ async function handleParseOrdine() {
     const wb = XLSX.read(buf, { type: 'array' });
     const parsed = parseStatisticaSheet(wb);
     ordineRows = parsed.rows;
-    ordineMeta = { fornitore: forn, periodo: periodo || ('periodo ~' + parsed.giorni + ' gg') };
+    ordineMeta = { fornitore: forn, periodo: periodo || parsed.periodoTesto || (parsed.giorni + ' giorni') };
+    const perEl = document.getElementById('ordine-periodo');
+    if (perEl && !periodo && parsed.periodoTesto) perEl.value = parsed.periodoTesto;
+    showToast('Periodo: ' + ordineMeta.periodo + ' · proiezione 30 gg');
     msg.textContent = 'Importati ' + ordineRows.length + ' prodotti';
     msg.className = 'msg success';
     msg.classList.remove('hidden');
