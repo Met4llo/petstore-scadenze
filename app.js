@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.45 - password per operatore + bacheca + task
+// VERSION 1.46 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -166,8 +166,8 @@ function getStatusClass(days) {
 
 function getBadge(days, signaled, noExpiry) {
   if (noExpiry) return '<span class="badge no-expiry">Senza scadenza</span>';
+  if (days === null) return '<span class="badge nodate">Senza data</span>';
   if (signaled) return '<span class="badge signaled">Segnalato</span>';
-  if (days === null) return '';
   if (days <= 0) return `<span class="badge expired">${days} gg</span>`;
   if (days <= 7) return `<span class="badge urgent">${days} gg</span>`;
   if (days <= 30) return `<span class="badge attention">${days} gg</span>`;
@@ -469,14 +469,17 @@ function renderProductCard(p) {
   const days = p.noExpiry ? null : daysRemaining(p.expiry);
   const cls = p.noExpiry ? 'ok' : getStatusClass(days);
   const by = p.updatedBy ? `<span class="modified-by">${escapeHtml(p.updatedBy)}</span>` : '';
+  const supplier = p.supplier ? escapeHtml(p.supplier) : '';
   return `
     <div class="product-card ${cls}" data-ean="${p.ean}">
-      <div class="product-name">${escapeHtml(p.name)}</div>
-      <div class="product-meta">
-        <span>${p.ean}</span>
+      <div class="product-card-top">
+        <div class="product-name">${escapeHtml(p.name)}</div>
         ${getBadge(days, p.signaled, p.noExpiry)}
-        ${p.supplier ? `<span>${escapeHtml(p.supplier.split(' ')[0])}</span>` : ''}
+      </div>
+      <div class="product-meta">
+        ${supplier ? `<span class="product-supplier">${supplier}</span>` : ''}
         ${by}
+        <span class="product-ean">${escapeHtml(p.ean)}</span>
       </div>
     </div>
   `;
