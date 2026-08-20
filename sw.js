@@ -3,15 +3,17 @@ const ASSETS = [
   './',
   './index.html',
   './styles.css?v=1.55',
+  './sheet-overlay.css?v=1.55',
   './app.js?v=1.55',
   './styles.css',
   './app.js',
   './manifest.json',
   './logo-petstore.png',
   './products.json',
-  './suppliers.json',
+  './accessory-eans.json',
   './supplier-conditions.json',
-  './accessory-eans.json'
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,14 +35,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((res) => {
-        const clone = res.clone();
-        if (event.request.method === 'GET' && res.status === 200) {
+      return cached || fetch(event.request).then((response) => {
+        if (response.ok && event.request.url.startsWith(self.location.origin)) {
+          const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
-        return res;
-      }).catch(() => caches.match('./index.html'));
+        return response;
+      }).catch(() => cached);
     })
   );
 });
