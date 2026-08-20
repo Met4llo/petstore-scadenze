@@ -14,37 +14,39 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.43">
+  <link rel="stylesheet" href="styles.css?v=1.44">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- LOGIN: scegli operatore -->
-  <div id="login-screen" class="screen">
+  <div id="login-screen" class="screen login-screen">
     <div class="login-box">
       <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
       <h1>Accesso operatori</h1>
-      <p class="subtitle">Seleziona il tuo nome</p>
+      <p class="subtitle">Tocca il tuo nome</p>
       <div class="operator-grid" id="operator-grid">
-        <button class="btn btn-primary operator-btn" data-op="Santoemma">Santoemma</button>
-        <button class="btn btn-primary operator-btn" data-op="Fuschi">Fuschi</button>
-        <button class="btn btn-primary operator-btn" data-op="Pizzimenti">Pizzimenti</button>
-        <button class="btn btn-primary operator-btn" data-op="Sorrentino">Sorrentino</button>
+        <button type="button" class="operator-card operator-btn" data-op="Santoemma"><span>Santoemma</span></button>
+        <button type="button" class="operator-card operator-btn" data-op="Fuschi"><span>Fuschi</span></button>
+        <button type="button" class="operator-card operator-btn" data-op="Pizzimenti"><span>Pizzimenti</span></button>
+        <button type="button" class="operator-card operator-btn" data-op="Sorrentino"><span>Sorrentino</span></button>
       </div>
     </div>
   </div>
 
   <!-- PASSWORD per operatore scelto -->
-  <div id="password-screen" class="screen hidden">
-    <div class="login-box">
+  <div id="password-screen" class="screen login-screen hidden">
+    <div class="login-box login-box-pwd">
       <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
       <h1 id="pwd-operator-name">Password</h1>
       <p class="subtitle">Inserisci la tua password personale</p>
       <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-      <button id="login-btn" class="btn btn-primary" style="width:100%">Entra</button>
-      <button id="btn-back-to-operators" class="btn btn-secondary" style="width:100%;margin-top:8px;">← Cambia operatore</button>
       <p id="login-error" class="error hidden">Password non corretta</p>
+      <button type="button" id="btn-back-to-operators" class="btn-text-back">Cambia operatore</button>
+    </div>
+    <div class="login-footer">
+      <button id="login-btn" class="btn btn-primary btn-large">Entra</button>
     </div>
   </div>
 
@@ -474,7 +476,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.43 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.44 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -484,6 +486,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.43"></script>
+  <script src="app.js?v=1.44"></script>
 </body>
 </html>

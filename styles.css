@@ -43,82 +43,137 @@ body {
 #login-screen,
 #password-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   background: var(--bg);
-  padding: 24px;
+  padding: 28px 20px calc(28px + env(safe-area-inset-bottom));
+}
+
+#password-screen {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 .login-box {
-  background: var(--card);
-  padding: 32px 24px;
-  border-radius: 28px;
+  background: transparent;
+  padding: 8px 0 24px;
+  border-radius: 0;
   box-shadow: none;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
+  margin: 0 auto;
   text-align: center;
-  border: 1px solid var(--border);
+  border: none;
+  flex: 1;
 }
 
 .logo-login {
-  max-width: 200px;
-  margin-bottom: 20px;
-  filter: drop-shadow(0 2px 8px rgba(232, 90, 42, 0.15));
+  max-width: 260px;
+  width: 72%;
+  height: auto;
+  margin: 12px auto 24px;
+  display: block;
+  filter: none;
 }
 
 .login-box h1 {
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.55rem;
+  font-weight: 650;
   margin-bottom: 6px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-family: "Fraunces", Georgia, serif;
 }
 
 .subtitle {
   color: var(--muted);
-  font-size: 0.92rem;
-  margin-bottom: 28px;
+  font-size: 0.95rem;
+  margin-bottom: 22px;
 }
 
 #login-password {
   width: 100%;
-  padding: 15px 18px;
-  border: 2px solid var(--border);
+  padding: 16px 18px;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  font-size: 1.05rem;
-  margin-bottom: 14px;
-  background: #fafafa;
+  font-size: 1.08rem;
+  margin-bottom: 12px;
+  background: var(--card);
+  text-align: center;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 #login-password:focus {
   outline: none;
   border-color: var(--primary);
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(232, 90, 42, 0.12);
+  background: var(--card);
+  box-shadow: 0 0 0 4px rgba(196, 90, 42, 0.12);
 }
 
 .error {
   color: var(--danger);
   font-size: 0.9rem;
-  margin-top: 12px;
+  margin-top: 4px;
   font-weight: 500;
 }
 
 .operator-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
 }
 
+.operator-card,
 .operator-btn {
   width: 100%;
-  padding: 16px;
-  font-size: 1.1rem;
-  border-radius: 14px !important;
-  font-weight: 600;
+  padding: 22px 12px;
+  font-size: 1.05rem;
+  border-radius: 18px !important;
+  font-weight: 650;
   letter-spacing: -0.01em;
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  min-height: 72px;
+}
+
+.operator-card:active,
+.operator-btn:active {
+  transform: scale(0.97);
+  border-color: var(--primary) !important;
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+}
+
+.btn-text-back {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 16px;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.login-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+  background: color-mix(in oklab, var(--bg) 92%, white);
+  border-top: 1px solid var(--border);
+  z-index: 120;
+}
+.login-footer .btn {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: block;
 }
 
 /* ===== HEADER ===== */
@@ -1395,15 +1450,18 @@ body {
 
 [data-theme="dark"] #login-screen,
 [data-theme="dark"] #password-screen {
-  background:
-    radial-gradient(ellipse at top, #3a1f14 0%, transparent 50%),
-    linear-gradient(180deg, #0c0e12 0%, #141820 100%);
+  background: var(--bg);
 }
 
 [data-theme="dark"] .login-box {
-  background: #171a21;
-  border: 1px solid #2a303c;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .login-footer {
+  background: color-mix(in oklab, var(--bg) 92%, black);
+  border-top-color: var(--border);
 }
 
 [data-theme="dark"] .header {
