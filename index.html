@@ -14,7 +14,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.47">
+  <link rel="stylesheet" href="styles.css?v=1.48">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -360,23 +360,21 @@
 
       <!-- SCANNER + CERCA -->
       <section id="page-scanner" class="page">
-        <h2 class="page-title">Scanner / Cerca</h2>
-
+        <p class="dash-kicker">Scanner</p>
         <div class="scanner-section">
           <div id="reader" class="scanner-box"></div>
-          <p class="scanner-hint">Inquadra il codice a barre del prodotto</p>
+          <p class="scanner-hint">Inquadra il codice a barre</p>
           <button id="btn-start-scanner" class="btn btn-primary btn-large">Avvia fotocamera</button>
           <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
           <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
         </div>
 
-        <div class="search-divider">
-          <span>oppure cerca manualmente</span>
+        <div class="search-panel">
+          <p class="dash-kicker">Oppure cerca</p>
+          <input type="search" id="search-input" placeholder="EAN o nome prodotto" class="search-input" enterkeyhint="search">
+          <div id="search-results" class="product-list"></div>
+          <button id="btn-go-add" class="btn-text-back" style="display:block;width:100%;margin-top:16px;">Aggiungi prodotto manualmente</button>
         </div>
-
-        <input type="search" id="search-input" placeholder="EAN o nome prodotto..." class="search-input">
-        <button id="btn-go-add" class="btn btn-secondary btn-large" style="margin-bottom:14px;">Aggiungi prodotto manualmente</button>
-        <div id="search-results" class="product-list"></div>
       </section>
 
       <!-- LIST (filtered) -->
@@ -476,7 +474,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.47 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.48 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -486,6 +484,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.47"></script>
+  <script src="app.js?v=1.48"></script>
 </body>
 </html>

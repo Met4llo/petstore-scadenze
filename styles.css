@@ -818,22 +818,43 @@ body {
 }
 
 /* ===== SCANNER ===== */
+.scanner-section {
+  margin-bottom: 8px;
+}
 .scanner-box {
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto 14px;
-  border-radius: var(--radius);
+  max-width: none;
+  margin: 0 auto 12px;
+  border-radius: 20px;
   overflow: hidden;
-  background: #0f172a;
-  min-height: 220px;
-  box-shadow: var(--shadow-md);
+  background: #1c1917;
+  min-height: 260px;
+  height: min(70vw, 380px);
+  max-height: 52vh;
+  border: 1px solid var(--border);
 }
-
+.scanner-box video,
+.scanner-box canvas,
+.scanner-box img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
 .scanner-hint {
   text-align: center;
   color: var(--muted);
   font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.search-panel {
+  margin-top: 18px;
+  padding-top: 4px;
+}
+.search-input {
   margin-bottom: 14px;
+  min-height: 52px;
+  font-size: 1.05rem;
 }
 
 .manual-ean {
