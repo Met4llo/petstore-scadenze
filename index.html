@@ -14,14 +14,13 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.55">
-  <link rel="stylesheet" href="sheet-overlay.css?v=1.55">
+  <link rel="stylesheet" href="styles.css?v=1.56">
+  <link rel="stylesheet" href="sheet-overlay.css?v=1.56">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <!-- LOGIN: scegli operatore -->
   <div id="login-screen" class="screen login-screen">
     <div class="login-box">
       <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
@@ -36,7 +35,6 @@
     </div>
   </div>
 
-  <!-- PASSWORD per operatore scelto -->
   <div id="password-screen" class="screen login-screen hidden">
     <div class="login-box login-box-pwd">
       <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
@@ -51,9 +49,7 @@
     </div>
   </div>
 
-  <!-- APP -->
   <div id="app" class="hidden">
-    <!-- HEADER -->
     <header class="header">
       <div class="logo-menu-wrap">
         <button type="button" id="btn-logo-menu" class="logo-menu-btn" title="Menu">
@@ -82,7 +78,6 @@
       </div>
     </header>
 
-    <!-- NAV (senza Lista) -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-page="dashboard">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg></span>
@@ -102,16 +97,13 @@
       </button>
     </nav>
 
-    <!-- PAGES -->
     <main class="main">
-      <!-- DASHBOARD -->
       <section id="page-dashboard" class="page active">
         <p class="dash-kicker">Oggi in negozio</p>
         <div id="missione-dash" class="missione-dash home-alert hidden"></div>
         <div id="consegne-dash" class="consegne-dash home-alert hidden"></div>
         <div id="my-tasks-alert" class="my-tasks-alert home-alert hidden"></div>
         <div id="turni-dash" class="hidden"></div>
-
         <div class="bacheca-box">
           <div class="bacheca-header">
             <h3>Bacheca</h3>
@@ -129,11 +121,9 @@
             </div>
           </div>
         </div>
-
         <p class="dash-kicker">Da fare sulle scadenze</p>
         <div class="stats-grid stats-grid-home" id="stats-grid"></div>
         <p class="stats-hint">Scaduti e senza data: Lista scadenze (menu)</p>
-
         <div class="quick-actions">
           <button id="btn-go-scanner" class="btn btn-primary btn-large">Scansiona / Cerca prodotto</button>
           <button id="btn-go-add-dash" class="btn btn-secondary btn-large" style="margin-top:8px;">Aggiungi prodotto</button>
@@ -141,7 +131,6 @@
         </div>
       </section>
 
-      <!-- TASKS -->
       <section id="page-tasks" class="page">
         <div class="list-header">
           <p class="dash-kicker" style="margin:0">Task di reparto</p>
@@ -156,8 +145,6 @@
         <div id="tasks-list" class="tasks-list">
           <p class="muted-center">Caricamento...</p>
         </div>
-
-        <!-- NEW/EDIT TASK FORM -->
         <div id="task-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
             <div class="sheet-handle" aria-hidden="true"></div>
@@ -196,9 +183,8 @@
         </div>
       </section>
 
-      <!-- MISSIONE GIORNALIERA -->
       <section id="page-missione" class="page">
-        <h2 class="page-title">Missione di oggi</h2>
+        <p class="dash-kicker">Missione di oggi</p>
         <p class="turni-hint">Prodotti in negozio ancora senza data. Ogni operatore ha una lista diversa.</p>
         <div id="missione-status" class="missione-status">
           <p class="muted-center">Caricamento...</p>
@@ -209,10 +195,9 @@
         </div>
       </section>
 
-      <!-- TURNI -->
       <section id="page-turni" class="page">
         <div class="list-header">
-          <h2 class="page-title">Turni</h2>
+          <p class="dash-kicker" style="margin:0">Turni</p>
           <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">Carica settimana</button>
         </div>
         <p class="turni-hint">Foto del foglio turni. Tocco per ingrandire. Lo storico resta sotto.</p>
@@ -221,7 +206,6 @@
         <div id="turni-list" class="turni-list">
           <p class="muted-center">Caricamento...</p>
         </div>
-
         <div id="turno-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
             <div class="sheet-handle" aria-hidden="true"></div>
@@ -252,7 +236,6 @@
             </div>
           </div>
         </div>
-
         <div id="turno-viewer" class="turno-viewer hidden">
           <div class="turno-viewer-toolbar">
             <button id="btn-close-viewer" class="turno-viewer-close">Chiudi</button>
@@ -270,10 +253,9 @@
         </div>
       </section>
 
-      <!-- CONSEGNE -->
       <section id="page-consegne" class="page">
         <div class="list-header">
-          <h2 class="page-title">Consegne</h2>
+          <p class="dash-kicker" style="margin:0">Consegne</p>
           <button id="btn-new-consegna" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuova</button>
         </div>
         <p class="turni-hint">Arrivi fornitori. Il giorno della consegna compare in Home.</p>
@@ -285,7 +267,6 @@
         <div id="consegne-list" class="consegne-list">
           <p class="muted-center">Caricamento...</p>
         </div>
-
         <div id="consegna-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
             <div class="sheet-handle" aria-hidden="true"></div>
@@ -326,9 +307,8 @@
         </div>
       </section>
 
-      <!-- ORDINI FORNITORE (solo Santoemma) -->
       <section id="page-ordini" class="page">
-        <h2 class="page-title">Ordini fornitore</h2>
+        <p class="dash-kicker">Ordini fornitore</p>
         <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
         <div class="ordini-setup card-block">
           <div class="detail-row">
@@ -348,7 +328,7 @@
         </div>
         <div id="ordine-result" class="hidden">
           <div class="list-header" style="margin-top:16px;">
-            <h3 class="page-title" style="font-size:1.05rem;" id="ordine-result-title">Proposta ordine</h3>
+            <p class="dash-kicker" style="margin:0" id="ordine-result-title">Proposta ordine</p>
             <select id="ordine-filter">
               <option value="da-ordinare">Solo da ordinare</option>
               <option value="alta">Priorità alta</option>
@@ -363,7 +343,6 @@
         </div>
       </section>
 
-      <!-- SCANNER + CERCA -->
       <section id="page-scanner" class="page">
         <p class="dash-kicker">Scanner</p>
         <div class="scanner-section">
@@ -381,10 +360,9 @@
         </div>
       </section>
 
-      <!-- LIST (filtered) -->
       <section id="page-list" class="page">
         <div class="list-header">
-          <h2 class="page-title" id="list-title">Tutti i prodotti</h2>
+          <p class="dash-kicker" style="margin:0" id="list-title">Tutti i prodotti</p>
           <select id="list-filter">
             <option value="all">Senza data di scadenza</option>
             <option value="with-date">Con data inserita</option>
@@ -400,10 +378,9 @@
         <div id="filtered-list" class="product-list"></div>
       </section>
 
-      <!-- ADD PRODUCT -->
       <section id="page-add" class="page">
         <button id="btn-back-add" class="btn-back">← Indietro</button>
-        <h2 class="page-title">Aggiungi prodotto</h2>
+        <p class="dash-kicker">Aggiungi prodotto</p>
         <div class="detail-card">
           <div class="detail-row">
             <label>Codice a barre (EAN) *</label>
@@ -428,22 +405,19 @@
         </div>
       </section>
 
-      <!-- NON IN NEGOZIO -->
       <section id="page-non-negozio" class="page">
-        <h2 class="page-title">Non in negozio</h2>
+        <p class="dash-kicker">Non in negozio</p>
         <p class="turni-hint">Prodotti in assortimento generale ma non presenti a scaffale. Puoi segnarli dal dettaglio prodotto.</p>
         <div id="non-negozio-list" class="product-list">
           <p class="muted-center">Caricamento...</p>
         </div>
       </section>
 
-      <!-- PRODUCT DETAIL -->
       <section id="page-detail" class="page">
         <button id="btn-back" class="btn-back">← Indietro</button>
         <div id="product-detail" class="detail-stack"></div>
       </section>
 
-      <!-- SETTINGS -->
       <section id="page-settings" class="page">
         <p class="dash-kicker">Impostazioni</p>
         <div class="settings-group">
@@ -473,13 +447,13 @@
           <button id="btn-import" class="btn btn-secondary" style="margin-top:8px;">Importa backup</button>
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
-        <p class="info" id="app-version">Versione 1.55 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 1.56 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.55"></script>
+  <script src="app.js?v=1.56"></script>
 </body>
 </html>
