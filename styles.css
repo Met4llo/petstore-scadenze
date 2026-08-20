@@ -1320,115 +1320,92 @@ body {
 .turni-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .turno-card {
   background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(0,0,0,0.03);
+  border-radius: 18px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: none;
+  border: 1px solid var(--border);
   cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.15s;
+  display: flex;
+  gap: 0;
+  align-items: stretch;
 }
 .turno-card:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-md);
+  transform: scale(0.99);
 }
-.turno-card.oggi {
-  border-left: 5px solid var(--primary);
-  background: linear-gradient(135deg, #fff 60%, var(--primary-soft));
-}
-.turno-card.weekend {
-  background: #f8fafc;
+.turno-card-body {
+  padding: 12px 14px;
+  flex: 1;
+  min-width: 0;
 }
 .turno-day {
-  font-weight: 750;
+  font-weight: 650;
   font-size: 0.98rem;
   margin-bottom: 4px;
   letter-spacing: -0.01em;
 }
-.turno-people {
-  font-size: 0.9rem;
-  color: var(--text);
-  margin-top: 6px;
-}
-.turno-people.empty {
-  color: var(--muted);
-  font-style: italic;
-  font-size: 0.85rem;
-}
 .turno-meta {
   font-size: 0.78rem;
   color: var(--muted);
-  margin-top: 4px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
-.turno-fascia-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
+.section-label {
   font-size: 0.72rem;
   font-weight: 700;
-  background: #e0e7ff;
-  color: #3730a3;
-}
-.turni-form-date {
-  font-size: 0.95rem;
   color: var(--muted);
-  margin-bottom: 14px;
-  font-weight: 600;
-}
-
-.section-label {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--muted);
-  margin: 18px 0 10px;
+  margin: 20px 0 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 .turni-corrente {
-  background: linear-gradient(135deg, var(--primary-soft), #ffe8dc);
-  border: 1px solid var(--primary-mid);
-  border-radius: var(--radius);
-  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 14px;
   margin-bottom: 8px;
 }
 .turni-corrente-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--primary);
+  letter-spacing: 0.08em;
+  color: var(--muted);
   margin-bottom: 4px;
 }
 .turni-corrente-range {
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: 1.15rem;
+  font-weight: 650;
   margin-bottom: 12px;
   letter-spacing: -0.02em;
+  font-family: "Fraunces", Georgia, serif;
 }
 .turno-thumb {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 14px;
   display: block;
   cursor: pointer;
-  box-shadow: var(--shadow);
-  max-height: 280px;
+  max-height: none;
+  min-height: 220px;
+  height: min(70vh, 520px);
   object-fit: contain;
-  background: #fff;
+  background: var(--bg);
 }
 .turno-thumb-sm {
-  width: 100%;
-  max-height: 140px;
+  width: 88px;
+  min-height: 72px;
+  max-height: none;
   object-fit: cover;
-  border-radius: 10px;
-  margin: 8px 0;
+  border-radius: 0;
+  margin: 0;
   cursor: pointer;
-  background: #f1f5f9;
+  background: var(--bg);
+  flex-shrink: 0;
 }
 .turno-note {
   font-size: 0.88rem;

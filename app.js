@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.49 - password per operatore + bacheca + task
+// VERSION 1.50 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1655,27 +1655,29 @@ function renderTurni() {
     }
   }
 
-  el.innerHTML = turniList.map(t => {
-    const isCur = isCurrentWeek(t.settimana_inizio, t.settimana_fine);
-    return `<div class="turno-card ${isCur ? 'oggi' : ''}" data-id="${t.id}">
-      <div class="turno-day">${formatRange(t.settimana_inizio, t.settimana_fine)}${isCur ? ' · in corso' : ''}</div>
+  const past = turniList.filter(t => !isCurrentWeek(t.settimana_inizio, t.settimana_fine));
+  if (!past.length) {
+    el.innerHTML = '<p class="muted-center">Nessuna settimana precedente in archivio.</p>';
+    return;
+  }
+  el.innerHTML = past.map(t => {
+    return `<div class="turno-card" data-id="${t.id}">
       ${t.image_url ? `<img class="turno-thumb-sm" src="${t.image_url}" alt="Turni">` : ''}
-      ${t.note ? `<div class="turno-note">${escapeHtml(t.note)}</div>` : ''}
-      <div class="turno-meta">
-        <span>${escapeHtml(t.uploaded_by || '')}</span>
-        <span>${t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : ''}</span>
-      </div>
-      <div class="task-actions" style="margin-top:10px;">
-        <button class="btn btn-primary btn-view-turno" data-id="${t.id}">Vedi foto</button>
-        <button class="btn btn-secondary btn-del-settimana" data-id="${t.id}">Elimina</button>
+      <div class="turno-card-body">
+        <div class="turno-day">${formatRange(t.settimana_inizio, t.settimana_fine)}</div>
+        <div class="turno-meta">
+          <span>${escapeHtml(t.uploaded_by || '')}</span>
+          <span>${t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : ''}</span>
+        </div>
+        ${t.note ? `<div class="turno-note">${escapeHtml(t.note)}</div>` : ''}
+        <button type="button" class="btn-text-back btn-del-settimana" data-id="${t.id}">Elimina</button>
       </div>
     </div>`;
   }).join('');
 
-  el.querySelectorAll('.btn-view-turno').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const t = turniList.find(x => x.id === btn.dataset.id);
+  el.querySelectorAll('.turno-card').forEach(card => {
+    card.onclick = () => {
+      const t = turniList.find(x => String(x.id) === String(card.dataset.id));
       if (t) openTurnoViewer(t);
     };
   });
@@ -1683,14 +1685,6 @@ function renderTurni() {
     btn.onclick = (e) => {
       e.stopPropagation();
       deleteSettimana(btn.dataset.id);
-    };
-  });
-  el.querySelectorAll('.turno-thumb-sm').forEach(img => {
-    img.onclick = (e) => {
-      e.stopPropagation();
-      const card = img.closest('.turno-card');
-      const t = turniList.find(x => x.id === card.dataset.id);
-      if (t) openTurnoViewer(t);
     };
   });
 }
