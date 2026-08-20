@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.46 - password per operatore + bacheca + task
+// VERSION 1.47 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -635,64 +635,65 @@ function openProduct(ean, returnPage) {
 
   const isNoExp = !!currentProduct.noExpiry;
   document.getElementById('product-detail').innerHTML = `
-    <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
-    <div class="detail-row">
-      <label>EAN (modificabile)</label>
-      <input type="text" id="detail-ean" inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(currentProduct.ean || '')}" autocomplete="off">
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Se cambi l'EAN, i dati scadenza restano collegati al nuovo codice</p>
-    </div>
-
-    <div class="detail-row">
-      <label class="check-label no-expiry-label">
-        <input type="checkbox" id="detail-no-expiry" ${isNoExp ? 'checked' : ''}>
-        <span>Prodotto senza scadenza<br><small>Resta registrato, escluso dai controlli scadenze</small></span>
-      </label>
-    </div>
-
-    <div id="expiry-fields" style="${isNoExp ? 'display:none' : ''}">
+    <div class="detail-block">
+      <p class="detail-kicker">Prodotto</p>
+      <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
       <div class="detail-row">
-        <label>Data di scadenza</label>
-        <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
+        <label>EAN</label>
+        <input type="text" id="detail-ean" inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(currentProduct.ean || '')}" autocomplete="off">
+        <p class="field-hint">Se cambi l'EAN, i dati scadenza restano sul nuovo codice</p>
       </div>
+      <div class="supplier-box">
+        <label>Fornitore</label>
+        <div class="supplier-value">${escapeHtml(currentProduct.supplier) || 'Non specificato'}</div>
+        ${condition ? `<div class="conditions-text"><strong>Condizioni reso</strong><br>${escapeHtml(condition)}</div>` : '<div class="conditions-text">Condizioni non trovate nel database fornitori</div>'}
+      </div>
+    </div>
 
+    <div class="detail-block">
+      <p class="detail-kicker">Scadenza</p>
       <div class="detail-row">
+        <label class="check-label no-expiry-label">
+          <input type="checkbox" id="detail-no-expiry" ${isNoExp ? 'checked' : ''}>
+          <span>Prodotto senza scadenza<br><small>Resta registrato, escluso dai controlli</small></span>
+        </label>
+      </div>
+      <div id="expiry-fields" style="${isNoExp ? 'display:none' : ''}">
+        <div class="detail-row">
+          <label>Data di scadenza</label>
+          <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
+        </div>
         <div class="days-display ${getStatusClass(days)}" id="detail-days">
           ${days === null ? 'Nessuna data' : (days <= 0 ? `Scaduto da ${Math.abs(days)} giorni` : `${days} giorni rimanenti`)}
         </div>
+        <div class="detail-row">
+          <label>Stato</label>
+          <select id="detail-signaled">
+            <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
+            <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
+          </select>
+        </div>
+        <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
+          <label>Data di segnalazione</label>
+          <input type="date" id="detail-signaled-date" value="${currentProduct.signaledDate || ''}">
+          <p class="field-hint">Obbligatoria se il prodotto è segnalato</p>
+        </div>
       </div>
-
-      <div class="detail-row">
-        <label>Stato</label>
-        <select id="detail-signaled">
-          <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
-          <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
-        </select>
-      </div>
-
-      <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
-        <label>Data di segnalazione *</label>
-        <input type="date" id="detail-signaled-date" value="${currentProduct.signaledDate || ''}" required>
-        <p style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Obbligatoria se il prodotto è segnalato</p>
-      </div>
-    </div>
-
-    <div class="detail-row">
       <div class="modified-by" id="detail-modified-by">
-        ${currentProduct.updatedBy ? 'Ultima modifica di: <strong>' + escapeHtml(currentProduct.updatedBy) + '</strong>' : 'Nessuna modifica registrata'}
+        ${currentProduct.updatedBy ? 'Ultima modifica di <strong>' + escapeHtml(currentProduct.updatedBy) + '</strong>' : 'Nessuna modifica registrata'}
       </div>
     </div>
 
-    <div class="supplier-box">
-      <strong>Fornitore</strong>
-      ${escapeHtml(currentProduct.supplier) || 'Non specificato'}
-      ${condition ? `<div class="conditions-text"><strong>Condizioni reso:</strong><br>${escapeHtml(condition)}</div>` : '<div class="conditions-text">Condizioni non trovate nel database fornitori</div>'}
+    <div class="detail-block detail-block-actions">
+      <button id="btn-toggle-non-negozio" class="btn btn-secondary btn-large">
+        ${nonInNegozio.has(currentProduct.ean) ? 'Segna come in negozio' : 'Segna come non in negozio'}
+      </button>
+      <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:8px;">Elimina prodotto</button>
     </div>
 
-    <button id="btn-toggle-non-negozio" class="btn btn-secondary btn-large" style="margin-top:20px;">
-      ${nonInNegozio.has(currentProduct.ean) ? 'Segna come in negozio' : 'Segna come non in negozio'}
-    </button>
-    <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:10px;">Salva modifiche</button>
-    <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">Elimina prodotto</button>
+    <div class="detail-save-bar">
+      <button id="btn-save-product" class="btn btn-primary btn-large">Salva modifiche</button>
+    </div>
   `;
 
   const noExpCb = document.getElementById('detail-no-expiry');
