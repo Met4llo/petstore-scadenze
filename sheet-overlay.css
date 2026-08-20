@@ -1,4 +1,4 @@
-/* v1.56 overlay sheet overrides */
+/* v1.57 overlay sheet overrides */
 .task-form-overlay {
   background: rgba(28, 22, 18, 0.45) !important;
   backdrop-filter: blur(6px);
@@ -59,7 +59,7 @@
   border-top-color: var(--border);
 }
 
-/* v1.56 titoli uniformi */
+/* titoli uniformi */
 .list-header .dash-kicker {
   margin-bottom: 0;
 }
