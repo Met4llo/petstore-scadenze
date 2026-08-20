@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.50 - password per operatore + bacheca + task
+// VERSION 1.51 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2525,15 +2525,19 @@ function renderConsegne() {
     const isOggi = dNorm === oggi;
     const stato = c.stato === 'consegnato' ? 'consegnato' : 'prevista';
     const d = dNorm ? formatGiornoSafe(dNorm) : '';
+    const statoLabel = stato === 'consegnato' ? 'Consegnato' : (isOggi ? 'Oggi' : 'In arrivo');
+    const statoClass = stato === 'consegnato' ? 'consegnato' : (isOggi ? 'oggi' : 'prevista');
     return `<div class="consegna-card ${isOggi ? 'oggi' : ''} ${stato}" data-id="${c.id}">
-      <div class="consegna-fornitore">${escapeHtml(c.fornitore || '')}</div>
+      <div class="product-card-top">
+        <div class="consegna-fornitore">${escapeHtml(c.fornitore || '')}</div>
+        <span class="consegna-badge ${statoClass}">${statoLabel}</span>
+      </div>
       <div class="consegna-meta">
-        <span class="consegna-badge ${stato}">${stato === 'consegnato' ? '✓ Consegnato' : 'Prevista'}</span>
         <span>${d}</span>
         ${c.ora ? '<span>' + escapeHtml(String(c.ora).slice(0,5)) + '</span>' : ''}
-        ${c.created_by ? '<span>da ' + escapeHtml(c.created_by) + '</span>' : ''}
+        ${c.created_by ? '<span>' + escapeHtml(c.created_by) + '</span>' : ''}
       </div>
-      ${c.note ? '<div style="font-size:0.85rem;color:var(--muted);margin-top:6px;">' + escapeHtml(c.note) + '</div>' : ''}
+      ${c.note ? '<div class="turno-note">' + escapeHtml(c.note) + '</div>' : ''}
     </div>`;
   }).join('');
 
