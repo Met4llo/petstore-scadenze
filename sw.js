@@ -1,18 +1,17 @@
-const CACHE_NAME = 'petstore-scadenze-v154';
+const CACHE_NAME = 'petstore-scadenze-v155';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=1.54',
-  './app.js?v=1.54',
+  './styles.css?v=1.55',
+  './app.js?v=1.55',
   './styles.css',
   './app.js',
   './manifest.json',
   './logo-petstore.png',
   './products.json',
-  './accessory-eans.json',
+  './suppliers.json',
   './supplier-conditions.json',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js'
+  './accessory-eans.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,14 +33,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        // Cache new successful responses for same-origin
-        if (response.ok && event.request.url.startsWith(self.location.origin)) {
-          const clone = response.clone();
+      if (cached) return cached;
+      return fetch(event.request).then((res) => {
+        const clone = res.clone();
+        if (event.request.method === 'GET' && res.status === 200) {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
-        return response;
-      }).catch(() => cached);
+        return res;
+      }).catch(() => caches.match('./index.html'));
     })
   );
 });
