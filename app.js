@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.41 - password per operatore + bacheca + task
+// VERSION 1.42 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -500,32 +500,20 @@ function updateDashboard() {
     return d !== null && d <= 120 && !p.signaled;
   });
 
-  const signaledCount = products.filter(p => p.signaled && !p.noExpiry).length;
+  const noDate = products.filter(p => !p.expiry && !p.noExpiry);
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card expired" data-filter="expired">
       <div class="count">${expired.length}</div>
-      <div class="label">Scaduti (≤0 gg)</div>
+      <div class="label">Scaduti</div>
     </div>
     <div class="stat-card urgent" data-filter="urgent">
       <div class="count">${urgent.length}</div>
-      <div class="label">Urgenti (≤7 gg)</div>
+      <div class="label">Entro 7 gg</div>
     </div>
-    <div class="stat-card attention" data-filter="attention">
-      <div class="count">${attention.length}</div>
-      <div class="label">Attenzione (≤30 gg)</div>
-    </div>
-    <div class="stat-card monitor" data-filter="monitor">
-      <div class="count">${monitor.length}</div>
-      <div class="label">Da monitorare (≤120)</div>
-    </div>
-    <div class="stat-card unsignaled" data-filter="unsignaled">
-      <div class="count">${unsignaled.length}</div>
-      <div class="label">Non segnalati (≤120)</div>
-    </div>
-    <div class="stat-card signaled" data-filter="signaled" style="grid-column: span 2; background:#eef2ff;">
-      <div class="count">${signaledCount}</div>
-      <div class="label">Già segnalati — tocca per vedere la lista</div>
+    <div class="stat-card nodate" data-filter="no-date">
+      <div class="count">${noDate.length}</div>
+      <div class="label">Senza data</div>
     </div>
   `;
 
@@ -1299,7 +1287,9 @@ function renderBacheca() {
     el.innerHTML = '<p class="muted-center">Nessun messaggio in bacheca</p>';
     return;
   }
-  el.innerHTML = bachecaMessages.map(m => {
+  const shown = bachecaMessages.slice(0, 2);
+  const extra = bachecaMessages.length - shown.length;
+  el.innerHTML = shown.map(m => {
     const date = m.created_at ? new Date(m.created_at).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
     return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''}">
       <div>${escapeHtml(m.testo)}</div>
@@ -1308,7 +1298,7 @@ function renderBacheca() {
         <button class="bacheca-del" data-id="${m.id}">Elimina</button>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (extra > 0 ? `<p class="bacheca-more">${extra} altri messaggi</p>` : '');
   el.querySelectorAll('.bacheca-del').forEach(btn => {
     btn.onclick = () => deleteBacheca(btn.dataset.id);
   });
@@ -2312,7 +2302,7 @@ function updateMissioneDash() {
 
   if (!isAfterMissionHour()) {
     el.classList.remove('hidden', 'done');
-    el.innerHTML = `⏰ Missione giornaliera dalle ${MISSIONE_HOUR}:00`;
+    el.innerHTML = `Missione dalle ${MISSIONE_HOUR}:00`;
     el.onclick = () => showPage('missione');
     return;
   }
@@ -2330,7 +2320,7 @@ function updateMissioneDash() {
     el.innerHTML = `Missione di oggi completata (${total}/${total})`;
   } else {
     el.classList.remove('done');
-    el.innerHTML = `Missione di oggi: <strong>${done}/${total}</strong> prodotti controllati — tocca per aprire`;
+    el.innerHTML = `Missione di oggi: <strong>${done}/${total}</strong> — tocca per aprire`;
   }
   el.onclick = () => { showPage('missione'); renderMissione(); };
 }
@@ -3218,6 +3208,8 @@ async function init() {
   document.getElementById('btn-go-scanner').onclick = () => {
     showPage('scanner');
   };
+  const btnOrdiniDash = document.getElementById('btn-go-ordini-dash');
+  if (btnOrdiniDash) btnOrdiniDash.onclick = () => showPage('ordini');
   document.getElementById('btn-stop-scanner').onclick = stopScanner;
   const btnStartScanner = document.getElementById('btn-start-scanner');
   if (btnStartScanner) {
