@@ -14,7 +14,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.54">
+  <link rel="stylesheet" href="styles.css?v=1.55">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -140,7 +140,6 @@
         </div>
       </section>
 
-      
       <!-- TASKS -->
       <section id="page-tasks" class="page">
         <div class="list-header">
@@ -160,39 +159,42 @@
         <!-- NEW/EDIT TASK FORM -->
         <div id="task-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
-            <h3 id="task-form-title">Nuovo task</h3>
-            <div class="detail-row">
-              <label>Titolo *</label>
-              <input type="text" id="task-titolo" placeholder="Cosa c'è da fare">
-            </div>
-            <div class="detail-row">
-              <label>Descrizione</label>
-              <textarea id="task-descrizione" rows="2" placeholder="Dettagli opzionali"></textarea>
-            </div>
-            <div class="detail-row">
-              <label>Priorità</label>
-              <select id="task-priorita">
-                <option value="normale">Normale</option>
-                <option value="alta">Alta</option>
-              </select>
-            </div>
-            <div class="detail-row">
-              <label>Responsabili * (seleziona uno o più)</label>
-              <div class="operator-checks" id="task-responsabili">
-                <label class="check-label"><input type="checkbox" value="Santoemma"> Santoemma</label>
-                <label class="check-label"><input type="checkbox" value="Fuschi"> Fuschi</label>
-                <label class="check-label"><input type="checkbox" value="Pizzimenti"> Pizzimenti</label>
-                <label class="check-label"><input type="checkbox" value="Sorrentino"> Sorrentino</label>
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="task-form-title">Nuovo task</h3>
+              <div class="detail-row">
+                <label>Titolo *</label>
+                <input type="text" id="task-titolo" placeholder="Cosa c'è da fare">
               </div>
+              <div class="detail-row">
+                <label>Descrizione</label>
+                <textarea id="task-descrizione" rows="2" placeholder="Dettagli opzionali"></textarea>
+              </div>
+              <div class="detail-row">
+                <label>Priorità</label>
+                <select id="task-priorita">
+                  <option value="normale">Normale</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
+              <div class="detail-row">
+                <label>Responsabili * (seleziona uno o più)</label>
+                <div class="operator-checks" id="task-responsabili">
+                  <label class="check-label"><input type="checkbox" value="Santoemma"> Santoemma</label>
+                  <label class="check-label"><input type="checkbox" value="Fuschi"> Fuschi</label>
+                  <label class="check-label"><input type="checkbox" value="Pizzimenti"> Pizzimenti</label>
+                  <label class="check-label"><input type="checkbox" value="Sorrentino"> Sorrentino</label>
+                </div>
+              </div>
+              <button type="button" id="btn-cancel-task" class="btn-text-back">Annulla</button>
             </div>
-            <button id="btn-save-task" class="btn btn-primary btn-large">Salva task</button>
-            <button id="btn-cancel-task" class="btn btn-secondary btn-large" style="margin-top:8px;">Annulla</button>
+            <div class="sheet-footer">
+              <button id="btn-save-task" class="btn btn-primary btn-large">Salva task</button>
+            </div>
           </div>
         </div>
       </section>
 
-      
-      
       <!-- MISSIONE GIORNALIERA -->
       <section id="page-missione" class="page">
         <h2 class="page-title">Missione di oggi</h2>
@@ -206,49 +208,50 @@
         </div>
       </section>
 
-      <!-- TURNI (foto settimanale + storico) -->
+      <!-- TURNI -->
       <section id="page-turni" class="page">
         <div class="list-header">
           <h2 class="page-title">Turni</h2>
           <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">Carica settimana</button>
         </div>
         <p class="turni-hint">Foto del foglio turni. Tocco per ingrandire. Lo storico resta sotto.</p>
-
         <div id="turni-corrente" class="turni-corrente hidden"></div>
-
         <h3 class="section-label">Storico settimane</h3>
         <div id="turni-list" class="turni-list">
           <p class="muted-center">Caricamento...</p>
         </div>
 
-        <!-- FORM NUOVA SETTIMANA -->
         <div id="turno-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
-            <h3 id="turno-form-title">Carica foglio turni</h3>
-            <div class="detail-row">
-              <label>Inizio settimana (lunedì) *</label>
-              <input type="date" id="turno-inizio">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="turno-form-title">Carica foglio turni</h3>
+              <div class="detail-row">
+                <label>Inizio settimana (lunedì) *</label>
+                <input type="date" id="turno-inizio">
+              </div>
+              <div class="detail-row">
+                <label>Fine settimana (domenica)</label>
+                <input type="date" id="turno-fine">
+              </div>
+              <div class="detail-row">
+                <label>Foto del foglio turni *</label>
+                <input type="file" id="turno-foto" accept="image/*" capture="environment">
+                <div id="turno-foto-preview" class="turno-foto-preview hidden"></div>
+              </div>
+              <div class="detail-row">
+                <label>Note (opzionale)</label>
+                <input type="text" id="turno-note" placeholder="Es. settimana con inventario">
+              </div>
+              <p id="turno-upload-msg" class="msg hidden"></p>
+              <button type="button" id="btn-cancel-turno" class="btn-text-back">Annulla</button>
             </div>
-            <div class="detail-row">
-              <label>Fine settimana (domenica)</label>
-              <input type="date" id="turno-fine">
+            <div class="sheet-footer">
+              <button id="btn-save-turno" class="btn btn-primary btn-large">Salva in archivio</button>
             </div>
-            <div class="detail-row">
-              <label>Foto del foglio turni *</label>
-              <input type="file" id="turno-foto" accept="image/*" capture="environment">
-              <div id="turno-foto-preview" class="turno-foto-preview hidden"></div>
-            </div>
-            <div class="detail-row">
-              <label>Note (opzionale)</label>
-              <input type="text" id="turno-note" placeholder="Es. settimana con inventario">
-            </div>
-            <button id="btn-save-turno" class="btn btn-primary btn-large">Salva in archivio</button>
-            <button id="btn-cancel-turno" class="btn btn-secondary btn-large" style="margin-top:8px;">Annulla</button>
-            <p id="turno-upload-msg" class="msg hidden"></p>
           </div>
         </div>
 
-        <!-- VISUALIZZA FOTO FULLSCREEN -->
         <div id="turno-viewer" class="turno-viewer hidden">
           <div class="turno-viewer-toolbar">
             <button id="btn-close-viewer" class="turno-viewer-close">Chiudi</button>
@@ -266,7 +269,6 @@
         </div>
       </section>
 
-      
       <!-- CONSEGNE -->
       <section id="page-consegne" class="page">
         <div class="list-header">
@@ -285,35 +287,40 @@
 
         <div id="consegna-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
-            <h3 id="consegna-form-title">Nuova consegna</h3>
-            <div class="detail-row">
-              <label>Data *</label>
-              <input type="date" id="consegna-data">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="consegna-form-title">Nuova consegna</h3>
+              <div class="detail-row">
+                <label>Data *</label>
+                <input type="date" id="consegna-data">
+              </div>
+              <div class="detail-row">
+                <label>Fornitore *</label>
+                <select id="consegna-fornitore">
+                  <option value="">— Seleziona fornitore —</option>
+                </select>
+              </div>
+              <div class="detail-row">
+                <label>Ora (opzionale)</label>
+                <input type="time" id="consegna-ora">
+              </div>
+              <div class="detail-row">
+                <label>Note</label>
+                <input type="text" id="consegna-note" placeholder="Es. scarico retro, 20 colli...">
+              </div>
+              <div class="detail-row">
+                <label>Stato</label>
+                <select id="consegna-stato">
+                  <option value="prevista">Prevista</option>
+                  <option value="consegnato">Consegnato</option>
+                </select>
+              </div>
+              <button type="button" id="btn-delete-consegna" class="btn-text-back btn-danger-text hidden">Elimina consegna</button>
+              <button type="button" id="btn-cancel-consegna" class="btn-text-back">Annulla</button>
             </div>
-            <div class="detail-row">
-              <label>Fornitore *</label>
-              <select id="consegna-fornitore">
-                <option value="">— Seleziona fornitore —</option>
-              </select>
+            <div class="sheet-footer">
+              <button id="btn-save-consegna" class="btn btn-primary btn-large">Salva</button>
             </div>
-            <div class="detail-row">
-              <label>Ora (opzionale)</label>
-              <input type="time" id="consegna-ora">
-            </div>
-            <div class="detail-row">
-              <label>Note</label>
-              <input type="text" id="consegna-note" placeholder="Es. scarico retro, 20 colli...">
-            </div>
-            <div class="detail-row">
-              <label>Stato</label>
-              <select id="consegna-stato">
-                <option value="prevista">Prevista</option>
-                <option value="consegnato">Consegnato</option>
-              </select>
-            </div>
-            <button id="btn-save-consegna" class="btn btn-primary btn-large">Salva</button>
-            <button id="btn-delete-consegna" class="btn btn-danger btn-large hidden" style="margin-top:8px;">Elimina</button>
-            <button id="btn-cancel-consegna" class="btn btn-secondary btn-large" style="margin-top:8px;">Annulla</button>
           </div>
         </div>
       </section>
@@ -322,7 +329,6 @@
       <section id="page-ordini" class="page">
         <h2 class="page-title">Ordini fornitore</h2>
         <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
-
         <div class="ordini-setup card-block">
           <div class="detail-row">
             <label>Nome fornitore *</label>
@@ -339,7 +345,6 @@
           <button type="button" id="btn-parse-ordine" class="btn btn-primary btn-large">Analizza file</button>
           <p id="ordine-parse-msg" class="msg hidden"></p>
         </div>
-
         <div id="ordine-result" class="hidden">
           <div class="list-header" style="margin-top:16px;">
             <h3 class="page-title" style="font-size:1.05rem;" id="ordine-result-title">Proposta ordine</h3>
@@ -367,7 +372,6 @@
           <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
           <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
         </div>
-
         <div class="search-panel">
           <p class="dash-kicker">Oppure cerca</p>
           <input type="search" id="search-input" placeholder="EAN o nome prodotto" class="search-input" enterkeyhint="search">
@@ -395,7 +399,6 @@
         <div id="filtered-list" class="product-list"></div>
       </section>
 
-      
       <!-- ADD PRODUCT -->
       <section id="page-add" class="page">
         <button id="btn-back-add" class="btn-back">← Indietro</button>
@@ -424,7 +427,6 @@
         </div>
       </section>
 
-      
       <!-- NON IN NEGOZIO -->
       <section id="page-non-negozio" class="page">
         <h2 class="page-title">Non in negozio</h2>
@@ -437,9 +439,7 @@
       <!-- PRODUCT DETAIL -->
       <section id="page-detail" class="page">
         <button id="btn-back" class="btn-back">← Indietro</button>
-        <div id="product-detail" class="detail-stack">
-          <!-- filled by JS -->
-        </div>
+        <div id="product-detail" class="detail-stack"></div>
       </section>
 
       <!-- SETTINGS -->
@@ -472,15 +472,13 @@
           <button id="btn-import" class="btn btn-secondary" style="margin-top:8px;">Importa backup</button>
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
-        <p class="info" id="app-version">Versione 1.54 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 1.55 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
   </div>
 
-  <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
-
-  <script src="app.js?v=1.54"></script>
+  <script src="app.js?v=1.55"></script>
 </body>
 </html>
