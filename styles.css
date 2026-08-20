@@ -215,8 +215,15 @@ body {
 }
 
 .nav-btn .nav-icon {
-  font-size: 1.4rem;
+  display: grid;
+  place-items: center;
   line-height: 1;
+}
+.nav-btn .nav-icon svg {
+  display: block;
+}
+.icon-btn svg {
+  display: block;
 }
 
 .nav-btn.active {

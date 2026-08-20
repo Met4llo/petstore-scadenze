@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.40 - password per operatore + bacheca + task
+// VERSION 1.41 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -468,7 +468,7 @@ function showPage(pageId) {
 function renderProductCard(p) {
   const days = p.noExpiry ? null : daysRemaining(p.expiry);
   const cls = p.noExpiry ? 'ok' : getStatusClass(days);
-  const by = p.updatedBy ? `<span class="modified-by">👤 ${escapeHtml(p.updatedBy)}</span>` : '';
+  const by = p.updatedBy ? `<span class="modified-by">${escapeHtml(p.updatedBy)}</span>` : '';
   return `
     <div class="product-card ${cls}" data-ean="${p.ean}">
       <div class="product-name">${escapeHtml(p.name)}</div>
@@ -504,32 +504,26 @@ function updateDashboard() {
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card expired" data-filter="expired">
-      <div class="stat-emoji">⛔</div>
       <div class="count">${expired.length}</div>
       <div class="label">Scaduti (≤0 gg)</div>
     </div>
     <div class="stat-card urgent" data-filter="urgent">
-      <div class="stat-emoji">🔥</div>
       <div class="count">${urgent.length}</div>
       <div class="label">Urgenti (≤7 gg)</div>
     </div>
     <div class="stat-card attention" data-filter="attention">
-      <div class="stat-emoji">⚠️</div>
       <div class="count">${attention.length}</div>
       <div class="label">Attenzione (≤30 gg)</div>
     </div>
     <div class="stat-card monitor" data-filter="monitor">
-      <div class="stat-emoji">👀</div>
       <div class="count">${monitor.length}</div>
       <div class="label">Da monitorare (≤120)</div>
     </div>
     <div class="stat-card unsignaled" data-filter="unsignaled">
-      <div class="stat-emoji">📢</div>
       <div class="count">${unsignaled.length}</div>
       <div class="label">Non segnalati (≤120)</div>
     </div>
     <div class="stat-card signaled" data-filter="signaled" style="grid-column: span 2; background:#eef2ff;">
-      <div class="stat-emoji">✅</div>
       <div class="count">${signaledCount}</div>
       <div class="label">Già segnalati — tocca per vedere la lista</div>
     </div>
@@ -662,7 +656,7 @@ function openProduct(ean, returnPage) {
     <div class="detail-row">
       <label class="check-label no-expiry-label">
         <input type="checkbox" id="detail-no-expiry" ${isNoExp ? 'checked' : ''}>
-        <span>♾ Prodotto senza scadenza<br><small>Resta registrato, escluso dai controlli scadenze</small></span>
+        <span>Prodotto senza scadenza<br><small>Resta registrato, escluso dai controlli scadenze</small></span>
       </label>
     </div>
 
@@ -706,10 +700,10 @@ function openProduct(ean, returnPage) {
     </div>
 
     <button id="btn-toggle-non-negozio" class="btn btn-secondary btn-large" style="margin-top:20px;">
-      ${nonInNegozio.has(currentProduct.ean) ? '🛒  Segna come in negozio' : '📦  Segna come non in negozio'}
+      ${nonInNegozio.has(currentProduct.ean) ? 'Segna come in negozio' : 'Segna come non in negozio'}
     </button>
     <button id="btn-save-product" class="btn btn-primary btn-large" style="margin-top:10px;">Salva modifiche</button>
-    <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">🗑️ Elimina prodotto</button>
+    <button id="btn-delete-product" class="btn btn-danger btn-large" style="margin-top:10px;">Elimina prodotto</button>
   `;
 
   const noExpCb = document.getElementById('detail-no-expiry');
@@ -1310,7 +1304,7 @@ function renderBacheca() {
     return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''}">
       <div>${escapeHtml(m.testo)}</div>
       <div class="bacheca-meta">
-        <span>${escapeHtml(m.created_by || '')} · ${date}${m.fixed ? ' · 📌' : ''}</span>
+        <span>${escapeHtml(m.created_by || '')} · ${date}${m.fixed ? ' · in evidenza' : ''}</span>
         <button class="bacheca-del" data-id="${m.id}">Elimina</button>
       </div>
     </div>`;
@@ -1400,7 +1394,7 @@ function updateMyTasksAlert() {
   }
   const alte = mine.filter(t => t.priorita === 'alta').length;
   el.classList.remove('hidden');
-  el.innerHTML = `⚠️ Hai <strong>${mine.length}</strong> task da fare` +
+  el.innerHTML = `Hai <strong>${mine.length}</strong> task da fare` +
     (alte ? ` (di cui <strong>${alte}</strong> ad alta priorità)` : '') +
     ` — tocca per aprirle`;
   el.onclick = () => {
@@ -1465,7 +1459,7 @@ function renderTasks() {
       <div class="task-card-meta">
         <span class="task-badge ${t.priorita}">${t.priorita === 'alta' ? 'Alta priorità' : 'Normale'}</span>
         ${isDone ? '<span class="task-badge fatto">Completato</span>' : ''}
-        <span>👤 ${escapeHtml(resp)}</span>
+        <span>${escapeHtml(resp)}</span>
         <span>${date}</span>
         ${t.created_by ? `<span>da ${escapeHtml(t.created_by)}</span>` : ''}
       </div>
@@ -2215,7 +2209,7 @@ async function markProductChecked(ean) {
       completed_at: new Date().toISOString()
     }, { onConflict: 'data,operator' });
     await loadMissioneProgress();
-    showToast('🎯 Missione completata! Ottimo lavoro');
+    showToast('Missione completata');
   } else {
     showToast('Prodotto controllato ✓');
   }
@@ -2242,7 +2236,7 @@ function renderMissione() {
     statusEl.innerHTML = `<div class="mission-title">Nessuna missione</div>
       <p class="mission-progress">${restanti === 0
         ? 'Tutti i prodotti in negozio hanno già la data di scadenza. Ottimo lavoro!'
-        : 'Impossibile creare la missione. Controlla Supabase (colonna <strong>operator</strong> + indice unico su data+operator) oppure tocca 🔄 Sincronizza.<br><br>Prodotti ancora senza data: <strong>' + restanti + '</strong>'}</p>
+        : 'Impossibile creare la missione. Controlla Supabase (colonna <strong>operator</strong> + indice unico su data+operator) oppure tocca Sincronizza.<br><br>Prodotti ancora senza data: <strong>' + restanti + '</strong>'}</p>
       <button type="button" class="btn btn-primary" id="btn-retry-missione" style="margin-top:12px;">Riprova a generare</button>`;
     listEl.innerHTML = '';
     const btn = document.getElementById('btn-retry-missione');
@@ -2256,7 +2250,7 @@ function renderMissione() {
   const restanti = countProdottiSenzaData();
 
   statusEl.innerHTML = `
-    <div class="mission-title">${completed ? '🏆 Missione completata!' : '🎯 La tua missione di oggi'}</div>
+    <div class="mission-title">${completed ? 'Missione completata' : 'La tua missione di oggi'}</div>
     <p class="mission-progress">Progresso di <strong>${escapeHtml(currentOperator || '')}</strong>: <strong>${done}/${total}</strong></p>
     <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
     <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">
@@ -2333,10 +2327,10 @@ function updateMissioneDash() {
   el.classList.remove('hidden');
   if (completed) {
     el.classList.add('done');
-    el.innerHTML = `🏆 Missione di oggi completata (${total}/${total})`;
+    el.innerHTML = `Missione di oggi completata (${total}/${total})`;
   } else {
     el.classList.remove('done');
-    el.innerHTML = `🎯 Missione di oggi: <strong>${done}/${total}</strong> prodotti controllati — tocca per aprire`;
+    el.innerHTML = `Missione di oggi: <strong>${done}/${total}</strong> prodotti controllati — tocca per aprire`;
   }
   el.onclick = () => { showPage('missione'); renderMissione(); };
 }
@@ -2541,7 +2535,7 @@ function renderConsegne() {
       <div class="consegna-meta">
         <span class="consegna-badge ${stato}">${stato === 'consegnato' ? '✓ Consegnato' : 'Prevista'}</span>
         <span>${d}</span>
-        ${c.ora ? '<span>🕒 ' + escapeHtml(String(c.ora).slice(0,5)) + '</span>' : ''}
+        ${c.ora ? '<span>' + escapeHtml(String(c.ora).slice(0,5)) + '</span>' : ''}
         ${c.created_by ? '<span>da ' + escapeHtml(c.created_by) + '</span>' : ''}
       </div>
       ${c.note ? '<div style="font-size:0.85rem;color:var(--muted);margin-top:6px;">' + escapeHtml(c.note) + '</div>' : ''}
@@ -2576,10 +2570,10 @@ function updateConsegneDash() {
   el.classList.remove('hidden');
   if (pending.length) {
     const names = pending.map(c => c.fornitore).join(', ');
-    el.innerHTML = '📅 Oggi in arrivo: <strong>' + escapeHtml(names) + '</strong>' +
+    el.innerHTML = 'Oggi in arrivo: <strong>' + escapeHtml(names) + '</strong>' +
       (done.length ? ' · ' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') : '');
   } else {
-    el.innerHTML = '📅 Consegne di oggi: tutte segnate come consegnate ✓';
+    el.innerHTML = 'Consegne di oggi: tutte segnate come consegnate';
   }
   el.onclick = () => {
     setConsegneFilter('oggi');

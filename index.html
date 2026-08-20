@@ -14,7 +14,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.40">
+  <link rel="stylesheet" href="styles.css?v=1.41">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -58,41 +58,43 @@
           <span class="logo-menu-caret">▾</span>
         </button>
         <div id="logo-dropdown" class="logo-dropdown hidden">
-          <button type="button" class="logo-dropdown-item" data-page="dashboard">🏠  Home</button>
-          <button type="button" class="logo-dropdown-item" data-page="tasks">✅  Task</button>
-          <button type="button" class="logo-dropdown-item" data-page="missione">🎯  Missione</button>
-          <button type="button" class="logo-dropdown-item" data-page="turni">🗓️  Turni</button>
-          <button type="button" class="logo-dropdown-item" data-page="consegne">📅  Consegne</button>
-          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">🛒  Ordini fornitore</button>
-          <button type="button" class="logo-dropdown-item" data-page="scanner">📷  Scanner / Cerca</button>
-          <button type="button" class="logo-dropdown-item" data-page="list">📋  Lista scadenze</button>
-          <button type="button" class="logo-dropdown-item" data-page="non-negozio">📦  Non in negozio</button>
+          <button type="button" class="logo-dropdown-item" data-page="dashboard">Home</button>
+          <button type="button" class="logo-dropdown-item" data-page="tasks">Task</button>
+          <button type="button" class="logo-dropdown-item" data-page="missione">Missione</button>
+          <button type="button" class="logo-dropdown-item" data-page="turni">Turni</button>
+          <button type="button" class="logo-dropdown-item" data-page="consegne">Consegne</button>
+          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">Ordini fornitore</button>
+          <button type="button" class="logo-dropdown-item" data-page="scanner">Scanner / Cerca</button>
+          <button type="button" class="logo-dropdown-item" data-page="list">Lista scadenze</button>
+          <button type="button" class="logo-dropdown-item" data-page="non-negozio">Non in negozio</button>
           <div class="logo-dropdown-divider"></div>
-          <button type="button" class="logo-dropdown-item" data-page="settings">⚙️  Impostazioni</button>
+          <button type="button" class="logo-dropdown-item" data-page="settings">Impostazioni</button>
         </div>
       </div>
       <div class="header-actions">
         <span id="current-operator" class="current-op"></span>
-        <button id="btn-sync" class="icon-btn" title="Sincronizza">🔄</button>
+        <button id="btn-sync" class="icon-btn" title="Sincronizza" aria-label="Sincronizza">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </button>
       </div>
     </header>
 
     <!-- NAV (senza Lista) -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-page="dashboard">
-        <span class="nav-icon">🏠</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg></span>
         <span>Home</span>
       </button>
       <button class="nav-btn" data-page="tasks">
-        <span class="nav-icon">✅</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
         <span>Task</span>
       </button>
       <button class="nav-btn" data-page="turni">
-        <span class="nav-icon">🗓️</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
         <span>Turni</span>
       </button>
       <button class="nav-btn" data-page="scanner">
-        <span class="nav-icon">📷</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></span>
         <span>Scanner</span>
       </button>
     </nav>
@@ -105,8 +107,8 @@
         <!-- BACHECA -->
         <div class="bacheca-box">
           <div class="bacheca-header">
-            <h3>📌 Bacheca</h3>
-            <button id="btn-new-bacheca" class="btn-small">＋ Messaggio</button>
+            <h3>Bacheca</h3>
+            <button id="btn-new-bacheca" class="btn-small">Messaggio</button>
           </div>
           <div id="bacheca-list" class="bacheca-list">
             <p class="muted-center">Caricamento...</p>
@@ -131,8 +133,8 @@
           <!-- cards generated by JS -->
         </div>
         <div class="quick-actions">
-          <button id="btn-go-scanner" class="btn btn-primary btn-large">📷  Scansiona / Cerca prodotto</button>
-          <button id="btn-go-add-dash" class="btn btn-secondary btn-large" style="margin-top:10px;">🛒  Aggiungi prodotto</button>
+          <button id="btn-go-scanner" class="btn btn-primary btn-large">Scansiona / Cerca prodotto</button>
+          <button id="btn-go-add-dash" class="btn btn-secondary btn-large" style="margin-top:10px;">Aggiungi prodotto</button>
         </div>
       </section>
 
@@ -141,7 +143,7 @@
       <section id="page-tasks" class="page">
         <div class="list-header">
           <h2 class="page-title">Task di reparto</h2>
-          <button id="btn-new-task" class="btn btn-primary" style="width:auto;padding:10px 16px;">＋ Nuovo task</button>
+          <button id="btn-new-task" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuovo task</button>
         </div>
         <div class="task-filters">
           <button class="task-filter-btn active" data-filter="miei">I miei</button>
@@ -191,7 +193,7 @@
       
       <!-- MISSIONE GIORNALIERA -->
       <section id="page-missione" class="page">
-        <h2 class="page-title">🎯 Missione di oggi</h2>
+        <h2 class="page-title">Missione di oggi</h2>
         <p class="turni-hint">Prodotti in negozio ancora senza data di scadenza. Esclusi accessori e «non in negozio».</p>
         <div id="missione-status" class="missione-status">
           <p class="muted-center">Caricamento...</p>
@@ -206,7 +208,7 @@
       <section id="page-turni" class="page">
         <div class="list-header">
           <h2 class="page-title">Turni</h2>
-          <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">＋ Carica settimana</button>
+          <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">Carica settimana</button>
         </div>
         <p class="turni-hint">Carica la foto del foglio turni (Excel). Resta in archivio e puoi rivedere le settimane precedenti.</p>
 
@@ -247,7 +249,7 @@
         <!-- VISUALIZZA FOTO FULLSCREEN -->
         <div id="turno-viewer" class="turno-viewer hidden">
           <div class="turno-viewer-toolbar">
-            <button id="btn-close-viewer" class="turno-viewer-close">✕ Chiudi</button>
+            <button id="btn-close-viewer" class="turno-viewer-close">Chiudi</button>
             <span id="turno-viewer-caption" class="turno-viewer-caption"></span>
             <div class="turno-zoom-btns">
               <button type="button" id="btn-zoom-out" class="turno-zoom-btn">−</button>
@@ -266,8 +268,8 @@
       <!-- CONSEGNE -->
       <section id="page-consegne" class="page">
         <div class="list-header">
-          <h2 class="page-title">📅 Consegne</h2>
-          <button id="btn-new-consegna" class="btn btn-primary" style="width:auto;padding:10px 16px;">＋ Nuova</button>
+          <h2 class="page-title">Consegne</h2>
+          <button id="btn-new-consegna" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuova</button>
         </div>
         <p class="turni-hint">Programma gli arrivi fornitori. Restano in storico; il giorno della consegna compare in Home.</p>
         <div class="task-filters" id="consegne-filters">
@@ -317,7 +319,7 @@
 
       <!-- ORDINI FORNITORE (solo Santoemma) -->
       <section id="page-ordini" class="page">
-        <h2 class="page-title">🛒 Ordini fornitore</h2>
+        <h2 class="page-title">Ordini fornitore</h2>
         <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
 
         <div class="ordini-setup card-block">
@@ -348,8 +350,8 @@
           </div>
           <p id="ordine-summary" class="turni-hint"></p>
           <div id="ordine-table-wrap" class="ordine-table-wrap"></div>
-          <button type="button" id="btn-copy-ordine" class="btn btn-primary btn-large" style="margin-top:12px;">📋 Copia ordine da inviare</button>
-          <button type="button" id="btn-share-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">📤 Condividi</button>
+          <button type="button" id="btn-copy-ordine" class="btn btn-primary btn-large" style="margin-top:12px;">Copia ordine da inviare</button>
+          <button type="button" id="btn-share-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Condividi</button>
           <button type="button" id="btn-clear-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Nuova analisi</button>
         </div>
       </section>
@@ -361,7 +363,7 @@
         <div class="scanner-section">
           <div id="reader" class="scanner-box"></div>
           <p class="scanner-hint">Inquadra il codice a barre del prodotto</p>
-          <button id="btn-start-scanner" class="btn btn-primary btn-large">📷 Avvia fotocamera</button>
+          <button id="btn-start-scanner" class="btn btn-primary btn-large">Avvia fotocamera</button>
           <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
           <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
         </div>
@@ -371,7 +373,7 @@
         </div>
 
         <input type="search" id="search-input" placeholder="EAN o nome prodotto..." class="search-input">
-        <button id="btn-go-add" class="btn btn-secondary btn-large" style="margin-bottom:14px;">＋ Aggiungi prodotto manualmente</button>
+        <button id="btn-go-add" class="btn btn-secondary btn-large" style="margin-bottom:14px;">Aggiungi prodotto manualmente</button>
         <div id="search-results" class="product-list"></div>
       </section>
 
@@ -426,7 +428,7 @@
       
       <!-- NON IN NEGOZIO -->
       <section id="page-non-negozio" class="page">
-        <h2 class="page-title">📦 Non in negozio</h2>
+        <h2 class="page-title">Non in negozio</h2>
         <p class="turni-hint">Prodotti in assortimento generale ma non presenti a scaffale. Puoi segnarli dal dettaglio prodotto.</p>
         <div id="non-negozio-list" class="product-list">
           <p class="muted-center">Caricamento...</p>
@@ -453,8 +455,8 @@
           <label>Aspetto</label>
           <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px;">Modalità chiara o scura</p>
           <div class="theme-toggle">
-            <button type="button" id="btn-theme-light" class="theme-btn">☀️ Chiara</button>
-            <button type="button" id="btn-theme-dark" class="theme-btn">🌙 Scura</button>
+            <button type="button" id="btn-theme-light" class="theme-btn">Chiara</button>
+            <button type="button" id="btn-theme-dark" class="theme-btn">Scura</button>
           </div>
         </div>
         <div class="settings-group">
@@ -472,7 +474,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.40 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.41 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -482,6 +484,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.40"></script>
+  <script src="app.js?v=1.41"></script>
 </body>
 </html>
