@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.48 - password per operatore + bacheca + task
+// VERSION 1.49 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2216,8 +2216,8 @@ function renderMissione() {
   if (!statusEl || !listEl) return;
 
   if (!isAfterMissionHour()) {
-    statusEl.innerHTML = `<div class="mission-title">⏰ Missione non ancora attiva</div>
-      <p class="mission-progress">La missione del giorno si genera alle ore ${MISSIONE_HOUR}:00.</p>`;
+    statusEl.innerHTML = `<div class="mission-title">Missione non ancora attiva</div>
+      <p class="mission-progress">Si genera alle ${MISSIONE_HOUR}:00.</p>`;
     listEl.innerHTML = '';
     if (opsEl) opsEl.innerHTML = '';
     return;
@@ -2242,15 +2242,11 @@ function renderMissione() {
   const restanti = countProdottiSenzaData();
 
   statusEl.innerHTML = `
-    <div class="mission-title">${completed ? 'Missione completata' : 'La tua missione di oggi'}</div>
-    <p class="mission-progress">Progresso di <strong>${escapeHtml(currentOperator || '')}</strong>: <strong>${done}/${total}</strong></p>
-    <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">
-      Ogni operatore ha <strong>prodotti diversi</strong>. Solo tu vedi e completi questa lista.<br>
-      Obiettivo: entro 3–4 mesi tutte le scadenze in negozio.<br>
-      Restano <strong>${restanti}</strong> prodotti senza data (esclusi non in negozio e accessori).<br>
-      Apri ogni prodotto, inserisci la scadenza e segna controllato.
-    </p>
+    <div class="mission-hero ${completed ? 'done' : ''}">
+      <div class="mission-count">${done}/${total}</div>
+      <div class="missione-progress-bar"><span style="width:${pct}%"></span></div>
+      <p class="mission-progress">${completed ? 'Missione completata' : 'Da controllare oggi'}</p>
+    </div>
   `;
 
   // Stato completamento missioni personali degli altri
@@ -2258,31 +2254,44 @@ function renderMissione() {
     opsEl.innerHTML = OPERATORS.map(op => {
       const doneOp = missioneCompletate.some(c => c.operator === op);
       const mine = op === currentOperator;
-      return `<span class="missione-op-chip ${doneOp ? 'done' : ''} ${mine ? 'mine' : ''}">${doneOp ? '✓ ' : ''}${op}${mine ? ' (tu)' : ''}</span>`;
+      return `<span class="missione-op-chip ${doneOp ? 'done' : ''} ${mine ? 'mine' : ''}">${op}${mine ? ' · tu' : ''}${doneOp ? ' · fatto' : ''}</span>`;
     }).join('');
   }
 
-  listEl.innerHTML = missioneOggi.prodotti.map(ean => {
+  const todo = [];
+  const doneEans = [];
+  (missioneOggi.prodotti || []).forEach(ean => {
+    if (isProductCheckedByMe(ean)) doneEans.push(ean);
+    else todo.push(ean);
+  });
+
+  function missionCard(ean, checked) {
     const p = products.find(x => x.ean === ean);
     if (!p) {
-      return `<div class="product-card"><div class="product-name">EAN ${ean}</div><div class="product-meta">Prodotto non in catalogo</div></div>`;
+      return `<div class="product-card" data-ean="${ean}"><div class="product-name">EAN ${ean}</div></div>`;
     }
-    const checked = isProductCheckedByMe(ean);
-    const days = daysRemaining(p.expiry);
-    const cls = getStatusClass(days);
+    const days = p.noExpiry ? null : daysRemaining(p.expiry);
+    const cls = p.noExpiry ? 'ok' : getStatusClass(days);
+    const supplier = p.supplier ? escapeHtml(p.supplier) : '';
     return `<div class="product-card ${cls} ${checked ? 'mission-checked' : ''}" data-ean="${ean}">
-      <div class="product-name">${escapeHtml(p.name)}</div>
-      <div class="product-meta">
-        <span>${ean}</span>
+      <div class="product-card-top">
+        <div class="product-name">${escapeHtml(p.name)}</div>
         ${getBadge(days, p.signaled, p.noExpiry)}
-        ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
+      </div>
+      <div class="product-meta">
+        ${supplier ? `<span class="product-supplier">${supplier}</span>` : ''}
+        <span class="product-ean">${escapeHtml(ean)}</span>
       </div>
       ${checked
-        ? `<button class="btn btn-secondary mission-check-btn" disabled>✓ Controllato da te</button>`
-        : `<button class="btn btn-primary mission-check-btn btn-check-mission" data-ean="${ean}">✓ Segna controllato</button>`
+        ? `<button class="btn btn-secondary mission-check-btn" disabled>Fatto</button>`
+        : `<button class="btn btn-primary mission-check-btn btn-check-mission" data-ean="${ean}">Segna controllato</button>`
       }
     </div>`;
-  }).join('');
+  }
+
+  listEl.innerHTML =
+    (todo.length ? todo.map(ean => missionCard(ean, false)).join('') : (completed ? '<p class="muted-center">Niente da fare: missione completa.</p>' : '')) +
+    (doneEans.length ? `<details class="mission-done-fold"><summary>Già fatti (${doneEans.length})</summary>${doneEans.map(ean => missionCard(ean, true)).join('')}</details>` : '');
 
   listEl.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('click', (e) => {
