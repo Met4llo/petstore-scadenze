@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.53 - password per operatore + bacheca + task
+// VERSION 1.54 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1445,22 +1445,26 @@ function renderTasks() {
     const date = t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : '';
     const isDone = t.stato === 'fatto';
     const cls = (t.priorita === 'alta' ? 'alta ' : '') + (isDone ? 'fatto' : '');
+    const badge = isDone
+      ? '<span class="task-badge fatto">Fatto</span>'
+      : (t.priorita === 'alta'
+        ? '<span class="task-badge alta">Alta</span>'
+        : '<span class="task-badge normale">Normale</span>');
     return `<div class="task-card ${cls}" data-id="${t.id}">
-      <div class="task-card-title">${escapeHtml(t.titolo)}</div>
+      <div class="product-card-top">
+        <div class="task-card-title">${escapeHtml(t.titolo)}</div>
+        ${badge}
+      </div>
       ${t.descrizione ? `<div class="task-card-desc">${escapeHtml(t.descrizione)}</div>` : ''}
       <div class="task-card-meta">
-        <span class="task-badge ${t.priorita}">${t.priorita === 'alta' ? 'Alta priorità' : 'Normale'}</span>
-        ${isDone ? '<span class="task-badge fatto">Completato</span>' : ''}
-        <span>${escapeHtml(resp)}</span>
-        <span>${date}</span>
-        ${t.created_by ? `<span>da ${escapeHtml(t.created_by)}</span>` : ''}
+        ${resp ? `<span class="product-supplier">${escapeHtml(resp)}</span>` : ''}
+        ${t.created_by ? `<span>${escapeHtml(t.created_by)}</span>` : ''}
+        ${date ? `<span>${date}</span>` : ''}
       </div>
-      ${!isDone ? `<div class="task-actions">
-        <button class="btn btn-primary btn-complete-task" data-id="${t.id}">✓ Completa</button>
-        <button class="btn btn-secondary btn-delete-task" data-id="${t.id}">Elimina</button>
-      </div>` : `<div class="task-actions">
-        <button class="btn btn-secondary btn-delete-task" data-id="${t.id}">Elimina</button>
-      </div>`}
+      ${!isDone
+        ? `<button class="btn btn-primary mission-check-btn btn-complete-task" data-id="${t.id}">Completa</button>
+           <button type="button" class="btn-text-back btn-delete-task" data-id="${t.id}">Elimina</button>`
+        : `<button type="button" class="btn-text-back btn-delete-task" data-id="${t.id}">Elimina</button>`}
     </div>`;
   }).join('');
 
