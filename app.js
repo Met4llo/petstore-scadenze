@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.42 - password per operatore + bacheca + task
+// VERSION 1.43 - password per operatore + bacheca + task
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -500,20 +500,18 @@ function updateDashboard() {
     return d !== null && d <= 120 && !p.signaled;
   });
 
-  const noDate = products.filter(p => !p.expiry && !p.noExpiry);
-
   document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card expired" data-filter="expired">
-      <div class="count">${expired.length}</div>
-      <div class="label">Scaduti</div>
-    </div>
     <div class="stat-card urgent" data-filter="urgent">
       <div class="count">${urgent.length}</div>
-      <div class="label">Entro 7 gg</div>
+      <div class="label">7 giorni</div>
     </div>
-    <div class="stat-card nodate" data-filter="no-date">
-      <div class="count">${noDate.length}</div>
-      <div class="label">Senza data</div>
+    <div class="stat-card attention" data-filter="attention">
+      <div class="count">${attention.length}</div>
+      <div class="label">30 giorni</div>
+    </div>
+    <div class="stat-card monitor" data-filter="monitor">
+      <div class="count">${monitor.length}</div>
+      <div class="label">120 giorni</div>
     </div>
   `;
 

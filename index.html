@@ -14,7 +14,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.42">
+  <link rel="stylesheet" href="styles.css?v=1.43">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -129,7 +129,7 @@
 
         <p class="dash-kicker">Da fare sulle scadenze</p>
         <div class="stats-grid stats-grid-home" id="stats-grid"></div>
-        <p class="stats-hint">30 / 120 giorni e segnalati: Lista scadenze (menu)</p>
+        <p class="stats-hint">Scaduti e senza data: Lista scadenze (menu)</p>
 
         <div class="quick-actions">
           <button id="btn-go-scanner" class="btn btn-primary btn-large">Scansiona / Cerca prodotto</button>
@@ -474,7 +474,7 @@
           <input type="file" id="import-file" accept=".json" class="hidden">
         </div>
         <div class="settings-group">
-          <p class="info" id="app-version">Versione 1.42 – PetStore Conad Scadenze</p>
+          <p class="info" id="app-version">Versione 1.43 – PetStore Conad Scadenze</p>
           <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
         </div>
       </section>
@@ -484,6 +484,6 @@
   <!-- TOAST -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js?v=1.42"></script>
+  <script src="app.js?v=1.43"></script>
 </body>
 </html>
