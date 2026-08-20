@@ -5,6 +5,7 @@ const ASSETS = [
   './styles.css?v=1.57',
   './sheet-overlay.css?v=1.57',
   './app.js?v=1.57',
+  './fuschi-home.js?v=1.57',
   './styles.css',
   './app.js',
   './manifest.json',
