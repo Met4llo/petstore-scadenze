@@ -630,6 +630,40 @@ body {
   margin-top: 4px;
 }
 
+.product-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.history-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0;
+}
+.history-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.history-what {
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.history-what span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.history-meta {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 550;
+}
+
 /* ===== DETAIL ===== */
 .detail-stack {
   display: flex;

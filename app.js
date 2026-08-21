@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.69 - feedback scanner iPhone + Android
+// VERSION 1.70 - storico modifiche prodotto
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -18,6 +18,20 @@ let lastScanAt = 0;
 let lastScanCode = '';
 let scanAudioCtx = null;
 let supabase = null;
+let scadenzeLogMissing = false;
+const SCADENZE_LOG_SQL = `create table if not exists scadenze_log (
+  id uuid primary key default gen_random_uuid(),
+  ean text not null,
+  operator text,
+  changed_at timestamptz not null default now(),
+  field text not null,
+  old_value text,
+  new_value text
+);
+create index if not exists scadenze_log_ean_idx on scadenze_log (ean, changed_at desc);
+alter table scadenze_log enable row level security;
+drop policy if exists scadenze_log_all on scadenze_log;
+create policy scadenze_log_all on scadenze_log for all using (true) with check (true);`;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
@@ -827,6 +841,11 @@ function openProduct(ean, returnPage) {
       </div>
     </div>
 
+    <div class="detail-block" id="product-history-block">
+      <p class="detail-kicker">Storico modifiche</p>
+      <div id="product-history" class="product-history"><p class="history-empty">Caricamento...</p></div>
+    </div>
+
     <div class="detail-block detail-block-actions">
       <button id="btn-toggle-non-negozio" class="btn btn-secondary btn-large">
         ${nonInNegozio.has(currentProduct.ean) ? 'Segna come in negozio' : 'Segna come non in negozio'}
@@ -880,11 +899,145 @@ function openProduct(ean, returnPage) {
   const btnNonNeg = document.getElementById('btn-toggle-non-negozio');
   if (btnNonNeg) btnNonNeg.onclick = () => toggleNonInNegozio(currentProduct.ean);
   showPage('detail');
+  loadProductHistory(currentProduct.ean);
+}
+
+function formatLogValue(val) {
+  if (val === null || val === undefined || val === '') return '—';
+  const s = String(val);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, d] = s.slice(0, 10).split('-');
+    return d + '/' + m + '/' + y;
+  }
+  return s;
+}
+
+function formatLogField(field) {
+  const map = {
+    ean: 'EAN',
+    expiry: 'Scadenza',
+    signaled: 'Segnalato',
+    signaled_date: 'Data segnalazione',
+    no_expiry: 'Senza scadenza'
+  };
+  return map[field] || field;
+}
+
+function formatLogWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function markLogTableMissing(error) {
+  const msg = (error && (error.message || error.code || '')) + '';
+  if (/does not exist|schema cache|42P01|scadenze_log/i.test(msg)) {
+    scadenzeLogMissing = true;
+  }
+}
+
+async function writeProductLog(before, after) {
+  if (!supabase || scadenzeLogMissing) return;
+  const rows = [];
+  const push = (field, oldV, newV) => {
+    const a = oldV == null || oldV === '' ? '' : String(oldV);
+    const b = newV == null || newV === '' ? '' : String(newV);
+    if (a === b) return;
+    rows.push({
+      ean: after.ean,
+      operator: currentOperator || 'Sconosciuto',
+      field,
+      old_value: a || null,
+      new_value: b || null
+    });
+  };
+  push('ean', before.ean, after.ean);
+  push('expiry', before.expiry, after.expiry);
+  push('no_expiry', before.noExpiry ? 'sì' : 'no', after.noExpiry ? 'sì' : 'no');
+  push('signaled', before.signaled ? 'sì' : 'no', after.signaled ? 'sì' : 'no');
+  push('signaled_date', before.signaledDate, after.signaledDate);
+  if (!rows.length) return;
+  try {
+    if (before.ean && after.ean && before.ean !== after.ean) {
+      await supabase.from('scadenze_log').update({ ean: after.ean }).eq('ean', before.ean);
+    }
+    const { error } = await supabase.from('scadenze_log').insert(rows);
+    if (error) {
+      console.warn('scadenze_log insert:', error);
+      markLogTableMissing(error);
+    }
+  } catch (e) {
+    console.warn('scadenze_log:', e);
+    markLogTableMissing(e);
+  }
+}
+
+function logProductChanges(before, after) {
+  return writeProductLog(before, after);
+}
+
+function renderProductHistory(rows) {
+  const el = document.getElementById('product-history');
+  if (!el) return;
+  if (scadenzeLogMissing) {
+    el.innerHTML = '<p class="history-empty">Storico non attivo. In Impostazioni copia e avvia lo SQL della tabella.</p>';
+    return;
+  }
+  if (!rows || !rows.length) {
+    el.innerHTML = '<p class="history-empty">Nessuna modifica registrata ancora.</p>';
+    return;
+  }
+  el.innerHTML = rows.map(r => {
+    return `<div class="history-item">
+      <div class="history-what"><strong>${escapeHtml(formatLogField(r.field))}</strong>
+        <span>${escapeHtml(formatLogValue(r.old_value))} → ${escapeHtml(formatLogValue(r.new_value))}</span>
+      </div>
+      <div class="history-meta">${escapeHtml(r.operator || '')} · ${escapeHtml(formatLogWhen(r.changed_at))}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadProductHistory(ean) {
+  const el = document.getElementById('product-history');
+  if (!el || !ean) return;
+  if (!supabase) {
+    el.innerHTML = '<p class="history-empty">Cloud non disponibile.</p>';
+    return;
+  }
+  if (scadenzeLogMissing) {
+    renderProductHistory(null);
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('scadenze_log')
+      .select('ean,operator,changed_at,field,old_value,new_value')
+      .eq('ean', ean)
+      .order('changed_at', { ascending: false })
+      .limit(5);
+    if (error) {
+      markLogTableMissing(error);
+      renderProductHistory(null);
+      return;
+    }
+    renderProductHistory(data || []);
+  } catch (e) {
+    markLogTableMissing(e);
+    renderProductHistory(null);
+  }
 }
 
 async function saveProduct() {
   if (!currentProduct) return;
   const oldEan = currentProduct.ean;
+  const before = {
+    ean: currentProduct.ean,
+    expiry: currentProduct.expiry || null,
+    signaled: !!currentProduct.signaled,
+    signaledDate: currentProduct.signaledDate || null,
+    noExpiry: !!currentProduct.noExpiry
+  };
   const eanInput = document.getElementById('detail-ean');
   const newEan = ((eanInput && eanInput.value) || '').trim().replace(/\D/g, '');
   const noExpiry = !!(document.getElementById('detail-no-expiry') && document.getElementById('detail-no-expiry').checked);
@@ -1017,6 +1170,13 @@ async function saveProduct() {
 
   if (ok) {
     showToast(newEan !== oldEan ? 'EAN aggiornato e salvato' : 'Salvato e sincronizzato', 'success');
+    await logProductChanges(before, {
+      ean: newEan,
+      expiry: expiry,
+      signaled: signaled,
+      signaledDate: signaled ? signaledDate : null,
+      noExpiry: noExpiry
+    });
   } else {
     showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
   }
@@ -3774,6 +3934,17 @@ async function init() {
 
   document.getElementById('btn-export').onclick = exportData;
   document.getElementById('btn-import').onclick = () => document.getElementById('import-file').click();
+  const btnCopyLogSql = document.getElementById('btn-copy-log-sql');
+  if (btnCopyLogSql) {
+    btnCopyLogSql.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(SCADENZE_LOG_SQL);
+        showToast('SQL copiato. Incollalo in Supabase → SQL Editor', 'success');
+      } catch (e) {
+        showToast('Copia non riuscita', 'error');
+      }
+    };
+  }
   document.getElementById('import-file').addEventListener('change', (e) => {
     if (e.target.files[0]) importData(e.target.files[0]);
   });
