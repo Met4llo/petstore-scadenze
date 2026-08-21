@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.65 - toast sync colorati
+// VERSION 1.66 - contatore prodotti da segnalare (Fuschi)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -541,7 +541,25 @@ function updateDashboard() {
       showPage('list');
     };
   });
+  updateSegnalareCount();
 }
+
+function countUnsignaled() {
+  return products.filter(p => {
+    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 120;
+  }).length;
+}
+
+function updateSegnalareCount() {
+  const el = document.getElementById('segnalare-count');
+  if (!el) return;
+  const n = countUnsignaled();
+  el.textContent = String(n);
+  el.classList.toggle('is-zero', n === 0);
+}
+window.updateSegnalareCount = updateSegnalareCount;
 
 // ---------- List / Filter ----------
 function setListFilter(filter) {

@@ -49,6 +49,9 @@
   function tick() {
     applyFuschiVisibility();
     wireButton();
+    if (typeof window.updateSegnalareCount === 'function') {
+      window.updateSegnalareCount();
+    }
   }
 
   if (document.readyState === 'loading') {

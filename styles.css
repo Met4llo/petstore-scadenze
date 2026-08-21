@@ -364,6 +364,28 @@ body {
   background: var(--bg);
 }
 
+.btn-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55em;
+  height: 1.55em;
+  padding: 0 7px;
+  margin-left: 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.82em;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.btn-count.is-zero {
+  background: var(--border);
+  color: var(--muted);
+}
+
 .btn-danger {
   background: var(--danger);
   color: #fffdf9;
