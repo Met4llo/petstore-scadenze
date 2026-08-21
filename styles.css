@@ -2308,7 +2308,7 @@ body {
 .prova-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 520px;
+  min-width: 720px;
 }
 .prova-table th, .prova-table td {
   border: 1px solid var(--border);
@@ -2342,11 +2342,12 @@ body {
 }
 .prova-table tbody th small.prova-ore.is-over { color: var(--danger); }
 .prova-cell {
-  width: 46px;
+  width: 100%;
+  min-width: 76px;
   min-height: 40px;
   height: auto;
   padding: 6px 2px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 8px;
   font-weight: 800;
   font-size: 0.68rem;
@@ -2355,6 +2356,10 @@ body {
   color: var(--muted);
   cursor: pointer;
   line-height: 1.15;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
 }
 .prova-cell.fascia-A { background: #e8f1ff; color: #1d4ed8; }
 .prova-cell.fascia-C { background: #fff4d6; color: #9a4a12; }

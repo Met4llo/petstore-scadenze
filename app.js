@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.90 - ferie contano 8 ore nel tetto settimanale
+// VERSION 1.91 - tendina per scegliere il turno in cella
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2729,6 +2729,28 @@ function cycleProvaFascia(cur) {
   return PROVA_FASCE[(i + 1) % PROVA_FASCE.length];
 }
 
+function provaCellOptions(day) {
+  if (day === 6) {
+    return [
+      ['', '—'],
+      ['DM', '09-15'],
+      ['DS', '14-20'],
+      ['B', 'Bagheria'],
+      ['R', 'Riposo'],
+      ['F', 'Ferie']
+    ];
+  }
+  return [
+    ['', '—'],
+    ['A', '09-17'],
+    ['C', '12-20'],
+    ['S', '4+4'],
+    ['B', 'Bagheria'],
+    ['R', 'Riposo'],
+    ['F', 'Ferie']
+  ];
+}
+
 function renderTurniProva() {
   const label = document.getElementById('prova-week-label');
   const grid = document.getElementById('prova-grid');
@@ -2751,7 +2773,11 @@ function renderTurniProva() {
     html += `<tr><th>${escapeHtml(op)}<small class="prova-ore${over}">${h}h · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
-      html += `<td><button type="button" class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" title="${PROVA_TITLE[v] || 'Vuoto'}">${PROVA_LABEL[v] || '·'}</button></td>`;
+      html += `<td><select class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
+      provaCellOptions(i).forEach(([val, lab]) => {
+        html += `<option value="${val}"${v === val ? ' selected' : ''}>${lab}</option>`;
+      });
+      html += '</select></td>';
     }
     html += '</tr>';
   });
@@ -2764,12 +2790,9 @@ function renderTurniProva() {
   html += '</tr>';
   html += '</tbody></table>';
   grid.innerHTML = html;
-  grid.querySelectorAll('.prova-cell').forEach(btn => {
-    btn.onclick = () => {
-      const op = btn.dataset.op;
-      const day = parseInt(btn.dataset.day, 10);
-      const next = cycleProvaFascia(provaCell(op, day));
-      setProvaCell(op, day, next);
+  grid.querySelectorAll('select.prova-cell').forEach(sel => {
+    sel.onchange = () => {
+      setProvaCell(sel.dataset.op, parseInt(sel.dataset.day, 10), sel.value);
       renderTurniProva();
     };
   });
