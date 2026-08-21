@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.68 - badge missione da fare
+// VERSION 1.69 - feedback scanner iPhone + Android
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -14,6 +14,9 @@ let supplierConditions = {};
 let currentProduct = null;
 let html5QrCode = null;
 let isScanning = false;
+let lastScanAt = 0;
+let lastScanCode = '';
+let scanAudioCtx = null;
 let supabase = null;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
@@ -1071,8 +1074,80 @@ async function deleteProduct() {
 }
 
 // ---------- Scanner ----------
+function unlockScanFeedback() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!scanAudioCtx) scanAudioCtx = new AC();
+    if (scanAudioCtx.state === 'suspended') scanAudioCtx.resume();
+  } catch (e) {}
+}
+
+function playScanBeep(ok) {
+  try {
+    unlockScanFeedback();
+    if (!scanAudioCtx) return;
+    const ctx = scanAudioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = ok ? 880 : 220;
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (ok ? 0.13 : 0.22));
+    osc.start(now);
+    osc.stop(now + (ok ? 0.15 : 0.26));
+    if (!ok) {
+      const osc2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc2.connect(g2);
+      g2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.value = 165;
+      g2.gain.setValueAtTime(0.0001, now + 0.12);
+      g2.gain.exponentialRampToValueAtTime(0.12, now + 0.14);
+      g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.34);
+    }
+  } catch (e) {}
+}
+
+function hapticScan(ok) {
+  try {
+    if (typeof navigator.vibrate === 'function') {
+      navigator.vibrate(ok ? [35, 40, 55] : [90, 50, 90, 50, 120]);
+    }
+  } catch (e) {}
+}
+
+function flashScanner(ok) {
+  const box = document.querySelector('.scanner-box') || document.getElementById('reader');
+  if (!box) return;
+  box.classList.remove('scan-flash-ok', 'scan-flash-err');
+  void box.offsetWidth;
+  box.classList.add(ok ? 'scan-flash-ok' : 'scan-flash-err');
+  setTimeout(() => box.classList.remove('scan-flash-ok', 'scan-flash-err'), 650);
+}
+
+function scanFeedback(ok, ean) {
+  hapticScan(ok);
+  playScanBeep(ok);
+  flashScanner(ok);
+  if (ok) {
+    const tail = String(ean || '').slice(-6);
+    showToast(tail ? ('Codice letto · ' + tail) : 'Codice letto', 'success');
+  } else {
+    showToast('Prodotto non trovato', 'error');
+  }
+}
+
 async function startScanner() {
   if (isScanning) return;
+  unlockScanFeedback();
   const reader = document.getElementById('reader');
   reader.innerHTML = '';
   html5QrCode = new Html5Qrcode('reader');
@@ -1089,7 +1164,7 @@ async function startScanner() {
     if (bs) bs.classList.add('hidden');
   } catch (err) {
     console.error(err);
-    showToast('Impossibile avviare la fotocamera. Controlla i permessi.');
+    showToast('Impossibile avviare la fotocamera. Controlla i permessi.', 'error');
   }
 }
 
@@ -1104,14 +1179,23 @@ async function stopScanner() {
 }
 
 function onScanSuccess(decodedText) {
-  const ean = decodedText.replace(/\D/g, '');
-  stopScanner();
+  const ean = String(decodedText || '').replace(/\D/g, '') || String(decodedText || '');
+  const now = Date.now();
+  if (!ean) return;
+  if (ean === lastScanCode && now - lastScanAt < 1600) return;
+  lastScanCode = ean;
+  lastScanAt = now;
+
   const product = products.find(p => p.ean === ean || p.ean === decodedText);
+  scanFeedback(!!product, ean);
+  stopScanner();
   if (product) {
-    openProduct(product.ean);
+    setTimeout(() => openProduct(product.ean, 'scanner'), 280);
   } else {
-    document.getElementById('scan-result').classList.remove('hidden');
-    document.getElementById('scan-result').innerHTML = `
+    const box = document.getElementById('scan-result');
+    if (!box) return;
+    box.classList.remove('hidden');
+    box.innerHTML = `
       <p><strong>Codice scansionato:</strong> ${escapeHtml(decodedText)}</p>
       <p style="color:var(--danger);margin-top:8px;">Prodotto non trovato nel database.</p>
       <button class="btn btn-secondary" style="margin-top:12px;" onclick="document.getElementById('scan-result').classList.add('hidden');startScanner();">Riprova</button>
@@ -3443,6 +3527,7 @@ async function init() {
   const btnStartScanner = document.getElementById('btn-start-scanner');
   if (btnStartScanner) {
     btnStartScanner.onclick = async () => {
+      unlockScanFeedback();
       btnStartScanner.classList.add('hidden');
       await startScanner();
     };

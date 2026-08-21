@@ -854,7 +854,16 @@ body {
   min-height: 260px;
   height: min(70vw, 380px);
   max-height: 52vh;
-  border: 1px solid var(--border);
+  border: 3px solid var(--border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.scanner-box.scan-flash-ok {
+  border-color: #1f6b45;
+  box-shadow: 0 0 0 6px rgba(31, 107, 69, 0.35);
+}
+.scanner-box.scan-flash-err {
+  border-color: #b42318;
+  box-shadow: 0 0 0 6px rgba(180, 35, 24, 0.35);
 }
 .scanner-box video,
 .scanner-box canvas,
