@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.78 - cerca nella lista filtrata
+// VERSION 1.79 - avviso modifiche non salvate
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -59,6 +59,10 @@ let missioneCompletate = [];
 const MISSIONE_COUNT = 20; // obiettivo: coprire tutti i prodotti senza data in 3-4 mesi
 const MISSIONE_HOUR = 9;
 let detailReturnPage = 'dashboard';
+let detailSnapshot = null;
+let skipDetailDirty = false;
+let pendingDetailLeave = null;
+let leaveAfterSave = null;
 let nonInNegozio = new Set(); // EANs not in store
 let consegneList = [];
 let consegneFilter = 'prossime';
@@ -550,12 +554,96 @@ function showPage(pageId) {
     pageId = 'dashboard';
   }
 
+  const detailEl = document.getElementById('page-detail');
+  const onDetail = detailEl && detailEl.classList.contains('active');
+  if (!skipDetailDirty && onDetail && pageId !== 'detail' && isDetailDirty()) {
+    pendingDetailLeave = pageId;
+    openUnsavedDialog();
+    return false;
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + pageId).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.page === pageId);
   });
   if (pageId !== 'scanner' && isScanning) stopScanner();
+  if (pageId !== 'detail') detailSnapshot = null;
+  return true;
+}
+
+function getDetailFormState() {
+  return {
+    ean: ((document.getElementById('detail-ean') || {}).value || '').trim(),
+    expiry: (document.getElementById('detail-expiry') || {}).value || '',
+    noExpiry: !!(document.getElementById('detail-no-expiry') && document.getElementById('detail-no-expiry').checked),
+    signaled: (document.getElementById('detail-signaled') || {}).value || 'false',
+    signaledDate: (document.getElementById('detail-signaled-date') || {}).value || '',
+    note: ((document.getElementById('detail-note') || {}).value || '').trim()
+  };
+}
+
+function isDetailDirty() {
+  if (!detailSnapshot) return false;
+  if (!document.getElementById('detail-ean')) return false;
+  return JSON.stringify(getDetailFormState()) !== JSON.stringify(detailSnapshot);
+}
+
+function captureDetailSnapshot() {
+  detailSnapshot = getDetailFormState();
+}
+
+function openUnsavedDialog() {
+  const el = document.getElementById('unsaved-overlay');
+  if (el) el.classList.remove('hidden');
+}
+
+function closeUnsavedDialog() {
+  const el = document.getElementById('unsaved-overlay');
+  if (el) el.classList.add('hidden');
+}
+
+function runPageEnter(page) {
+  if (page === 'list') {
+    const lf = document.getElementById('list-filter');
+    renderFilteredList(lf ? lf.value : 'all');
+  }
+  if (page === 'dashboard') {
+    updateDashboard();
+    loadBacheca();
+    updateMyTasksAlert();
+    loadTurni();
+  }
+  if (page === 'tasks') loadTasks();
+  if (page === 'turni') loadTurni();
+  if (page === 'missione') refreshMissione();
+  if (page === 'non-negozio') loadNonInNegozio().then(() => renderNonInNegozio());
+  if (page === 'consegne') loadConsegne();
+}
+
+function discardUnsavedAndLeave() {
+  const dest = pendingDetailLeave || detailReturnPage || 'dashboard';
+  pendingDetailLeave = null;
+  closeUnsavedDialog();
+  detailSnapshot = null;
+  skipDetailDirty = true;
+  showPage(dest);
+  skipDetailDirty = false;
+  detailReturnPage = 'dashboard';
+  runPageEnter(dest);
+}
+
+async function saveUnsavedAndLeave() {
+  const dest = pendingDetailLeave || 'scanner';
+  pendingDetailLeave = null;
+  closeUnsavedDialog();
+  leaveAfterSave = dest;
+  await saveProduct();
+}
+
+function cancelUnsavedLeave() {
+  pendingDetailLeave = null;
+  closeUnsavedDialog();
 }
 
 function renderProductCard(p) {
@@ -1174,6 +1262,7 @@ function openProduct(ean, returnPage) {
   const btnNonNeg = document.getElementById('btn-toggle-non-negozio');
   if (btnNonNeg) btnNonNeg.onclick = () => toggleNonInNegozio(currentProduct.ean);
   showPage('detail');
+  captureDetailSnapshot();
   loadProductHistory(currentProduct.ean);
 }
 
@@ -1330,12 +1419,14 @@ async function saveProduct() {
   const note = ((noteEl && noteEl.value) || '').trim().slice(0, 280);
 
   if (!newEan || newEan.length < 5) {
+    leaveAfterSave = null;
     showToast('Inserisci un EAN valido (solo numeri)');
     if (eanInput) eanInput.focus();
     return;
   }
 
   if (!noExpiry && signaled && !signaledDate) {
+    leaveAfterSave = null;
     showToast('Inserisci la Data di segnalazione (obbligatoria)');
     if (signaledDateInput) signaledDateInput.focus();
     return;
@@ -1345,6 +1436,7 @@ async function saveProduct() {
   if (newEan !== oldEan) {
     const exists = products.find(p => p.ean === newEan);
     if (exists) {
+      leaveAfterSave = null;
       showToast('Questo EAN è già usato da: ' + (exists.name || newEan));
       return;
     }
@@ -1465,8 +1557,14 @@ async function saveProduct() {
     showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
   }
   updateDashboard();
-  detailReturnPage = 'scanner';
-  showPage('scanner');
+  const dest = leaveAfterSave || 'scanner';
+  leaveAfterSave = null;
+  detailSnapshot = null;
+  skipDetailDirty = true;
+  showPage(dest);
+  skipDetailDirty = false;
+  if (dest === 'scanner') detailReturnPage = 'dashboard';
+  else runPageEnter(dest);
 }
 
 
@@ -1515,9 +1613,12 @@ async function deleteProduct() {
   }
 
   currentProduct = null;
+  detailSnapshot = null;
+  skipDetailDirty = true;
   showToast('Prodotto eliminato');
   updateDashboard();
   showPage('dashboard');
+  skipDetailDirty = false;
 }
 
 // ---------- Scanner ----------
@@ -4048,21 +4149,16 @@ async function init() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.onclick = () => {
       const page = btn.dataset.page;
-      showPage(page);
-      if (page === 'list') renderFilteredList(document.getElementById('list-filter').value);
-      if (page === 'scanner') { /* non avviare in automatico: usa il pulsante */ }
-      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
-      if (page === 'tasks') { loadTasks(); }
-      if (page === 'turni') { loadTurni(); }
-      if (page === 'missione') { refreshMissione(); }
+      if (!showPage(page)) return;
+      runPageEnter(page);
     };
   });
 
   document.getElementById('btn-go-scanner').onclick = () => {
-    showPage('scanner');
+    if (!showPage('scanner')) return;
   };
   const btnOrdiniDash = document.getElementById('btn-go-ordini-dash');
-  if (btnOrdiniDash) btnOrdiniDash.onclick = () => showPage('ordini');
+  if (btnOrdiniDash) btnOrdiniDash.onclick = () => { if (!showPage('ordini')) return; };
   document.getElementById('btn-stop-scanner').onclick = stopScanner;
   const btnStartScanner = document.getElementById('btn-start-scanner');
   if (btnStartScanner) {
@@ -4074,20 +4170,20 @@ async function init() {
   }
   document.getElementById('btn-back').onclick = () => {
     const dest = detailReturnPage || 'dashboard';
+    if (!showPage(dest)) return;
     detailReturnPage = 'dashboard';
-    showPage(dest);
-    if (dest === 'dashboard') updateDashboard();
-    if (dest === 'missione') { refreshMissione(); }
-    if (dest === 'list') {
-      const lf = document.getElementById('list-filter');
-      renderFilteredList(lf ? lf.value : 'all');
-    }
-    if (dest === 'non-negozio') renderNonInNegozio();
-    if (dest === 'scanner') { /* ok */ }
+    runPageEnter(dest);
   };
   const _btnSettings = document.getElementById('btn-settings');
   if (_btnSettings) _btnSettings.onclick = () => showPage('settings');
   document.getElementById('btn-sync').onclick = manualSync;
+
+  const btnUnsavedSave = document.getElementById('btn-unsaved-save');
+  if (btnUnsavedSave) btnUnsavedSave.onclick = saveUnsavedAndLeave;
+  const btnUnsavedDiscard = document.getElementById('btn-unsaved-discard');
+  if (btnUnsavedDiscard) btnUnsavedDiscard.onclick = discardUnsavedAndLeave;
+  const btnUnsavedCancel = document.getElementById('btn-unsaved-cancel');
+  if (btnUnsavedCancel) btnUnsavedCancel.onclick = cancelUnsavedLeave;
 
   const btnNewConsegna = document.getElementById('btn-new-consegna');
   if (btnNewConsegna) btnNewConsegna.onclick = () => openConsegnaForm(null);
@@ -4128,22 +4224,11 @@ async function init() {
     item.onclick = () => {
       const page = item.dataset.page;
       closeLogoMenu();
-      showPage(page);
-      if (page === 'list') {
-        const lf = document.getElementById('list-filter');
-        renderFilteredList(lf ? lf.value : 'all');
-      }
-      if (page === 'scanner') { /* camera on demand */ }
-      if (page === 'dashboard') { updateDashboard(); loadBacheca(); updateMyTasksAlert(); loadTurni(); }
-      if (page === 'tasks') loadTasks();
-      if (page === 'turni') loadTurni();
-      if (page === 'missione') refreshMissione();
-      if (page === 'non-negozio') { loadNonInNegozio().then(() => renderNonInNegozio()); }
-      if (page === 'consegne') { loadConsegne(); }
+      if (!showPage(page)) return;
+      runPageEnter(page);
       if (page === 'ordini') {
         if (!guardOrdiniPage()) return;
       }
-      // highlight bottom nav if page has a tab
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
       });
