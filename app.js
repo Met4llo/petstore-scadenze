@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.72 - filtro fornitore in lista
+// VERSION 1.73 - nota sul prodotto
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -19,7 +19,8 @@ let lastScanCode = '';
 let scanAudioCtx = null;
 let supabase = null;
 let scadenzeLogMissing = false;
-const SCADENZE_LOG_SQL = `create table if not exists scadenze_log (
+let noteTableMissing = false;
+const EXTRA_TABLES_SQL = `create table if not exists scadenze_log (
   id uuid primary key default gen_random_uuid(),
   ean text not null,
   operator text,
@@ -31,7 +32,18 @@ const SCADENZE_LOG_SQL = `create table if not exists scadenze_log (
 create index if not exists scadenze_log_ean_idx on scadenze_log (ean, changed_at desc);
 alter table scadenze_log enable row level security;
 drop policy if exists scadenze_log_all on scadenze_log;
-create policy scadenze_log_all on scadenze_log for all using (true) with check (true);`;
+create policy scadenze_log_all on scadenze_log for all using (true) with check (true);
+
+create table if not exists prodotti_note (
+  ean text primary key,
+  note text,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+alter table prodotti_note enable row level security;
+drop policy if exists prodotti_note_all on prodotti_note;
+create policy prodotti_note_all on prodotti_note for all using (true) with check (true);`;
+const SCADENZE_LOG_SQL = EXTRA_TABLES_SQL;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
@@ -242,7 +254,8 @@ async function loadCatalog() {
       signaled: false,
       signaledDate: null,
       noExpiry: false,
-      lastModified: null
+      lastModified: null,
+      note: ''
     }));
     const chunkSize = 500;
     for (let i = 0; i < products.length; i += chunkSize) {
@@ -368,6 +381,52 @@ async function loadScadenzeFromCloud() {
   } catch (err) {
     console.error(err);
     showToast('Errore di rete verso Supabase');
+  }
+}
+
+async function loadNotesFromCloud() {
+  if (!supabase || noteTableMissing) return;
+  try {
+    const { data, error } = await supabase.from('prodotti_note').select('ean,note');
+    if (error) {
+      const msg = (error.message || '') + '';
+      if (/does not exist|schema cache|42P01/i.test(msg)) noteTableMissing = true;
+      return;
+    }
+    if (!data || !data.length) return;
+    const map = {};
+    products.forEach(p => { map[p.ean] = p; });
+    data.forEach(row => {
+      if (map[row.ean]) map[row.ean].note = row.note || '';
+    });
+  } catch (e) {
+    console.warn('prodotti_note:', e);
+  }
+}
+
+async function saveNoteToCloud(ean, note, oldEan) {
+  if (!supabase || noteTableMissing || !ean) return;
+  const text = (note || '').trim().slice(0, 280);
+  try {
+    if (oldEan && oldEan !== ean) {
+      await supabase.from('prodotti_note').delete().eq('ean', oldEan);
+    }
+    if (!text) {
+      await supabase.from('prodotti_note').delete().eq('ean', ean);
+      return;
+    }
+    const { error } = await supabase.from('prodotti_note').upsert({
+      ean,
+      note: text,
+      updated_by: currentOperator || 'Sconosciuto',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'ean' });
+    if (error) {
+      const msg = (error.message || '') + '';
+      if (/does not exist|schema cache|42P01/i.test(msg)) noteTableMissing = true;
+    }
+  } catch (e) {
+    console.warn('save note:', e);
   }
 }
 
@@ -515,6 +574,7 @@ function renderProductCard(p) {
         ${by}
         <span class="product-ean">${escapeHtml(p.ean)}</span>
       </div>
+      ${p.note ? `<p class="product-note">${escapeHtml(p.note)}</p>` : ''}
     </div>
   `;
 }
@@ -752,7 +812,7 @@ function formatExportDate(iso) {
 }
 
 function buildListCsv(list) {
-  const header = ['Nome', 'EAN', 'Fornitore', 'Scadenza', 'Giorni', 'Segnalato', 'Data segnalazione', 'Senza scadenza', 'Modificato da'];
+  const header = ['Nome', 'EAN', 'Fornitore', 'Scadenza', 'Giorni', 'Segnalato', 'Data segnalazione', 'Senza scadenza', 'Nota', 'Modificato da'];
   const rows = list.map(p => {
     const days = p.noExpiry ? '' : (p.expiry ? daysRemaining(p.expiry) : '');
     return [
@@ -764,6 +824,7 @@ function buildListCsv(list) {
       csvCell(p.signaled ? 'sì' : 'no'),
       csvCell(formatExportDate(p.signaledDate)),
       csvCell(p.noExpiry ? 'sì' : 'no'),
+      csvCell(p.note || ''),
       csvCell(p.updatedBy || '')
     ].join(';');
   });
@@ -940,6 +1001,11 @@ function openProduct(ean, returnPage) {
         <div class="supplier-value">${escapeHtml(currentProduct.supplier) || 'Non specificato'}</div>
         ${condition ? `<div class="conditions-text"><strong>Condizioni reso</strong><br>${escapeHtml(condition)}</div>` : '<div class="conditions-text">Condizioni non trovate nel database fornitori</div>'}
       </div>
+      <div class="detail-row">
+        <label>Nota</label>
+        <textarea id="detail-note" rows="3" maxlength="280" placeholder="Es. seconda fila, solo 2 pezzi, da spostare…">${escapeHtml(currentProduct.note || '')}</textarea>
+        <p class="field-hint">Visibile a tutti gli operatori. Max 280 caratteri.</p>
+      </div>
     </div>
 
     <div class="detail-block">
@@ -1040,6 +1106,7 @@ function openProduct(ean, returnPage) {
 function formatLogValue(val) {
   if (val === null || val === undefined || val === '') return '—';
   const s = String(val);
+  if (s.length > 48) return s.slice(0, 46) + '…';
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
     const [y, m, d] = s.slice(0, 10).split('-');
     return d + '/' + m + '/' + y;
@@ -1053,7 +1120,8 @@ function formatLogField(field) {
     expiry: 'Scadenza',
     signaled: 'Segnalato',
     signaled_date: 'Data segnalazione',
-    no_expiry: 'Senza scadenza'
+    no_expiry: 'Senza scadenza',
+    note: 'Nota'
   };
   return map[field] || field;
 }
@@ -1092,6 +1160,7 @@ async function writeProductLog(before, after) {
   push('no_expiry', before.noExpiry ? 'sì' : 'no', after.noExpiry ? 'sì' : 'no');
   push('signaled', before.signaled ? 'sì' : 'no', after.signaled ? 'sì' : 'no');
   push('signaled_date', before.signaledDate, after.signaledDate);
+  push('note', before.note, after.note);
   if (!rows.length) return;
   try {
     if (before.ean && after.ean && before.ean !== after.ean) {
@@ -1171,7 +1240,8 @@ async function saveProduct() {
     expiry: currentProduct.expiry || null,
     signaled: !!currentProduct.signaled,
     signaledDate: currentProduct.signaledDate || null,
-    noExpiry: !!currentProduct.noExpiry
+    noExpiry: !!currentProduct.noExpiry,
+    note: (currentProduct.note || '').trim()
   };
   const eanInput = document.getElementById('detail-ean');
   const newEan = ((eanInput && eanInput.value) || '').trim().replace(/\D/g, '');
@@ -1182,6 +1252,8 @@ async function saveProduct() {
   const signaled = noExpiry ? false : (sigEl && sigEl.value === 'true');
   const signaledDateInput = document.getElementById('detail-signaled-date');
   const signaledDate = noExpiry ? null : (signaledDateInput ? (signaledDateInput.value || null) : null);
+  const noteEl = document.getElementById('detail-note');
+  const note = ((noteEl && noteEl.value) || '').trim().slice(0, 280);
 
   if (!newEan || newEan.length < 5) {
     showToast('Inserisci un EAN valido (solo numeri)');
@@ -1208,6 +1280,7 @@ async function saveProduct() {
   currentProduct.expiry = expiry;
   currentProduct.signaled = signaled;
   currentProduct.signaledDate = signaled ? signaledDate : null;
+  currentProduct.note = note;
   currentProduct.lastModified = Date.now();
   currentProduct.updatedBy = currentOperator || 'Sconosciuto';
   currentProduct.ean = newEan;
@@ -1310,8 +1383,10 @@ async function saveProduct() {
       expiry: expiry,
       signaled: signaled,
       signaledDate: signaled ? signaledDate : null,
-      noExpiry: noExpiry
+      noExpiry: noExpiry,
+      note: note
     });
+    await saveNoteToCloud(newEan, note, oldEan);
   } else {
     showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
   }
@@ -1350,6 +1425,9 @@ async function deleteProduct() {
     } catch (e) {
       console.error(e);
     }
+    try {
+      await supabase.from('prodotti_note').delete().eq('ean', ean);
+    } catch (e) {}
   }
 
   // Remove from local array
@@ -1551,6 +1629,7 @@ async function runSync(silent) {
     await loadEanRinomin();
     await loadCustomProducts();
     await loadScadenzeFromCloud();
+    await loadNotesFromCloud();
     applyAccessoriesNoExpiry();
     await loadBacheca();
     await loadTasks();
@@ -3794,6 +3873,7 @@ async function init() {
   try { await loadCustomProducts(); } catch (e) { console.error(e); }
   try { applyAccessoriesNoExpiry(); } catch (e) { console.error(e); }
   try { await loadScadenzeFromCloud(); } catch (e) { console.error(e); }
+  try { await loadNotesFromCloud(); } catch (e) { console.error(e); }
   try { applyAccessoriesNoExpiry(); } catch (e) { console.error(e); }
 
   const pc = document.getElementById('products-count');
