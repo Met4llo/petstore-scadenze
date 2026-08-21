@@ -591,6 +591,11 @@ body {
   padding: 12px !important;
   font-size: 0.92rem !important;
 }
+#btn-torch.is-on {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
 .detail-row textarea {
   display: block;
   width: 100%;

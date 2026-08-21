@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.80">
-  <link rel="stylesheet" href="sheet-overlay.css?v=1.80">
+  <link rel="stylesheet" href="styles.css?v=1.81">
+  <link rel="stylesheet" href="sheet-overlay.css?v=1.81">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -354,6 +354,7 @@
           <p class="scanner-hint">Inquadra il codice a barre</p>
           <button id="btn-start-scanner" class="btn btn-primary btn-large">Avvia fotocamera</button>
           <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
+          <button type="button" id="btn-torch" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Torcia</button>
           <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
         </div>
         <div class="search-panel">
@@ -474,7 +475,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 1.80 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 1.81 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -495,7 +496,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.80"></script>
-  <script src="fuschi-home.js?v=1.80"></script>
+  <script src="app.js?v=1.81"></script>
+  <script src="fuschi-home.js?v=1.81"></script>
 </body>
 </html>

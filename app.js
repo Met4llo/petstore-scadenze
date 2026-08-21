@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.80 - segnala dalla lista
+// VERSION 1.81 - torcia scanner
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -17,6 +17,7 @@ let isScanning = false;
 let lastScanAt = 0;
 let lastScanCode = '';
 let scanAudioCtx = null;
+let torchOn = false;
 let supabase = null;
 let scadenzeLogMissing = false;
 let noteTableMissing = false;
@@ -1780,6 +1781,9 @@ async function startScanner() {
     document.getElementById('btn-stop-scanner').classList.remove('hidden');
     const bs = document.getElementById('btn-start-scanner');
     if (bs) bs.classList.add('hidden');
+    torchOn = false;
+    const hasTorch = await detectTorch();
+    updateTorchButton(hasTorch);
   } catch (err) {
     console.error(err);
     showToast('Impossibile avviare la fotocamera. Controlla i permessi.', 'error');
@@ -1788,12 +1792,90 @@ async function startScanner() {
 
 async function stopScanner() {
   if (html5QrCode && isScanning) {
+    if (torchOn) {
+      try { await setTorch(false); } catch (e) {}
+    }
     try { await html5QrCode.stop(); } catch (e) {}
     isScanning = false;
     document.getElementById('btn-stop-scanner').classList.add('hidden');
     const btnStart = document.getElementById('btn-start-scanner');
     if (btnStart) btnStart.classList.remove('hidden');
+    updateTorchButton(false);
+    torchOn = false;
   }
+}
+
+async function detectTorch() {
+  try {
+    if (html5QrCode && typeof html5QrCode.getRunningTrackCapabilities === 'function') {
+      const cap = html5QrCode.getRunningTrackCapabilities();
+      if (cap && cap.torch) return true;
+    }
+  } catch (e) {}
+  try {
+    const video = document.querySelector('#reader video');
+    const track = video && video.srcObject && video.srcObject.getVideoTracks()[0];
+    const cap = track && track.getCapabilities && track.getCapabilities();
+    if (cap && cap.torch) return true;
+  } catch (e) {}
+  return false;
+}
+
+function getScanVideoTrack() {
+  try {
+    const video = document.querySelector('#reader video');
+    return video && video.srcObject ? video.srcObject.getVideoTracks()[0] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function setTorch(on) {
+  try {
+    if (html5QrCode && typeof html5QrCode.applyVideoConstraints === 'function') {
+      await html5QrCode.applyVideoConstraints({ advanced: [{ torch: !!on }] });
+      return true;
+    }
+  } catch (e) {
+    console.warn('torch html5', e);
+  }
+  try {
+    const track = getScanVideoTrack();
+    if (track) {
+      await track.applyConstraints({ advanced: [{ torch: !!on }] });
+      return true;
+    }
+  } catch (e) {
+    console.warn('torch track', e);
+  }
+  return false;
+}
+
+function updateTorchButton(available) {
+  const b = document.getElementById('btn-torch');
+  if (!b) return;
+  if (!available || !isScanning) {
+    b.classList.add('hidden');
+    b.classList.remove('is-on');
+    b.textContent = 'Torcia';
+    return;
+  }
+  b.classList.remove('hidden');
+  b.classList.toggle('is-on', torchOn);
+  b.textContent = torchOn ? 'Torcia accesa' : 'Torcia';
+}
+
+async function toggleTorch() {
+  if (!isScanning) return;
+  const next = !torchOn;
+  const ok = await setTorch(next);
+  if (!ok) {
+    showToast('Torcia non disponibile su questo telefono', 'warn');
+    updateTorchButton(false);
+    return;
+  }
+  torchOn = next;
+  updateTorchButton(true);
 }
 
 function onScanSuccess(decodedText) {
@@ -4237,6 +4319,8 @@ async function init() {
       await startScanner();
     };
   }
+  const btnTorch = document.getElementById('btn-torch');
+  if (btnTorch) btnTorch.onclick = toggleTorch;
   document.getElementById('btn-back').onclick = () => {
     const dest = detailReturnPage || 'dashboard';
     if (!showPage(dest)) return;
