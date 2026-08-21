@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.71 - export lista scadenze CSV
+// VERSION 1.72 - filtro fornitore in lista
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -639,6 +639,10 @@ function handleEmptyAction(action) {
   } else if (action === 'list-unsignaled') {
     setListFilter('unsignaled');
     showPage('list');
+  } else if (action === 'list-supplier-all') {
+    const sel = document.getElementById('list-supplier');
+    if (sel) sel.value = '';
+    renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
   } else if (action === 'new-task') {
     const b = document.getElementById('btn-new-task');
     if (b) b.click();
@@ -696,12 +700,39 @@ function getListForFilter(filter) {
     list = products.filter(p => !p.expiry && !p.noExpiry);
   }
 
+  const wanted = getSelectedListSupplier();
+  if (wanted) list = list.filter(p => supplierMatches(p, wanted));
+
   if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
     list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
   } else {
     list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
   }
   return list;
+}
+
+function getSelectedListSupplier() {
+  const sel = document.getElementById('list-supplier');
+  return sel ? (sel.value || '') : '';
+}
+
+function supplierMatches(p, wanted) {
+  if (!wanted) return true;
+  const s = (p.supplier || '').trim();
+  if (wanted === '__none__') return !s;
+  return s === wanted;
+}
+
+function fillListSupplierSelect() {
+  const sel = document.getElementById('list-supplier');
+  if (!sel) return;
+  const prev = sel.value;
+  const names = [...new Set(products.map(p => (p.supplier || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'it'));
+  sel.innerHTML = '<option value="">Tutti i fornitori</option>' +
+    '<option value="__none__">Senza fornitore</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
 function csvCell(v) {
@@ -760,7 +791,11 @@ async function exportCurrentList() {
   };
   const today = new Date();
   const stamp = String(today.getDate()).padStart(2, '0') + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + today.getFullYear();
-  const filename = 'scadenze-' + (slugs[filter] || filter) + '-' + stamp + '.csv';
+  const wanted = getSelectedListSupplier();
+  let extra = '';
+  if (wanted === '__none__') extra = '-senza-fornitore';
+  else if (wanted) extra = '-' + wanted.toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 24);
+  const filename = 'scadenze-' + (slugs[filter] || filter) + extra + '-' + stamp + '.csv';
   const blob = new Blob(['\uFEFF' + buildListCsv(list)], { type: 'text/csv;charset=utf-8;' });
   const file = new File([blob], filename, { type: 'text/csv' });
   if (navigator.share && navigator.canShare) {
@@ -786,6 +821,7 @@ async function exportCurrentList() {
 }
 
 function renderFilteredList(filter) {
+  fillListSupplierSelect();
   const list = getListForFilter(filter);
   const titles = {
     expired: 'Prodotti scaduti',
@@ -799,7 +835,11 @@ function renderFilteredList(filter) {
     'no-date': 'Senza data di scadenza',
     all: 'Senza data di scadenza'
   };
-  document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
+  let title = titles[filter] || 'Lista prodotti';
+  const wanted = getSelectedListSupplier();
+  if (wanted === '__none__') title += ' · senza fornitore';
+  else if (wanted) title += ' · ' + wanted;
+  document.getElementById('list-title').textContent = title;
 
   const lf = document.getElementById('list-filter');
   if (lf && lf.value !== filter) lf.value = filter;
@@ -809,6 +849,16 @@ function renderFilteredList(filter) {
 
   const container = document.getElementById('filtered-list');
   if (list.length === 0) {
+    if (wanted) {
+      const label = wanted === '__none__' ? 'prodotti senza fornitore' : wanted;
+      container.innerHTML = emptyStateHtml(
+        'Nessun prodotto di questo fornitore',
+        'In questa fascia non ci sono articoli di ' + label + '.',
+        'list-supplier-all',
+        'Togli filtro fornitore'
+      );
+      wireEmptyActions(container);
+    } else {
     const emptyByFilter = {
       all: ['Nessun prodotto senza data', 'Tutti i prodotti hanno una scadenza oppure sono esclusi dal controllo.', 'scanner', 'Vai allo scanner'],
       'no-date': ['Nessun prodotto senza data', 'Tutti i prodotti hanno una scadenza oppure sono esclusi dal controllo.', 'scanner', 'Vai allo scanner'],
@@ -824,6 +874,7 @@ function renderFilteredList(filter) {
     const cfg = emptyByFilter[filter] || ['Lista vuota', 'Nessun prodotto in questa vista.', 'home', 'Torna in Home'];
     container.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2], cfg[3]);
     wireEmptyActions(container);
+    }
   } else {
     container.innerHTML = list.slice(0, 300).map(renderProductCard).join('') +
       (list.length > 300 ? `<p style="text-align:center;color:#64748b;">... e altri ${list.length - 300}</p>` : '');
@@ -3987,6 +4038,12 @@ async function init() {
   });
   const btnExportList = document.getElementById('btn-export-list');
   if (btnExportList) btnExportList.onclick = exportCurrentList;
+  const listSupplier = document.getElementById('list-supplier');
+  if (listSupplier) {
+    listSupplier.onchange = () => {
+      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+    };
+  }
 
   // Settings
   document.getElementById('btn-change-password').onclick = async () => {

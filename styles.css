@@ -1007,6 +1007,22 @@ body {
   transform: scale(0.97);
 }
 
+.list-supplier {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .quick-actions {
   margin-bottom: 22px;
 }
