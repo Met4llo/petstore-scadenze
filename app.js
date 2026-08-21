@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.61 - empty state più chiari
+// VERSION 1.62 - cards sezione ordini
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -599,12 +599,7 @@ function handleEmptyAction(action) {
     const b = document.getElementById('btn-new-settimana');
     if (b) b.click();
   } else if (action === 'ordine-tutti') {
-    const sel = document.getElementById('ordine-filter');
-    if (sel) {
-      sel.value = 'tutti';
-      renderOrdineTable();
-    }
-  }
+    setOrdineFilter('tutti');
 }
 
 function renderFilteredList(filter) {
@@ -3096,6 +3091,15 @@ async function handleParseOrdine() {
   }
 }
 
+function setOrdineFilter(filter) {
+  const sel = document.getElementById('ordine-filter');
+  if (sel) sel.value = filter;
+  document.querySelectorAll('[data-ofilter]').forEach(ch => {
+    ch.classList.toggle('active', ch.dataset.ofilter === filter);
+  });
+  renderOrdineTable();
+}
+
 function filteredOrdineRows() {
   const f = (document.getElementById('ordine-filter') || {}).value || 'da-ordinare';
   let list = [...ordineRows];
@@ -3105,19 +3109,41 @@ function filteredOrdineRows() {
   return list;
 }
 
-function renderOrdineTable() {
-  const wrap = document.getElementById('ordine-table-wrap');
+function updateOrdineSummary() {
   const summary = document.getElementById('ordine-summary');
   const title = document.getElementById('ordine-result-title');
-  if (!wrap) return;
-  const list = filteredOrdineRows();
   const daOrd = ordineRows.filter(r => (r.ordineQty || 0) > 0);
   const totPezzi = daOrd.reduce((s, r) => s + (r.unita === 'cartoni' ? (r.ordineQty * r.pzCartone) : r.ordineQty), 0);
-  if (title) title.textContent = 'Ordine ' + ordineMeta.fornitore;
+  if (title) title.textContent = 'Ordine ' + (ordineMeta.fornitore || '');
   if (summary) {
     summary.textContent = (ordineMeta.periodo ? ordineMeta.periodo + ' · ' : '') +
       daOrd.length + ' riferimenti da ordinare · ~' + totPezzi + ' pezzi totali';
   }
+}
+
+function applyOrdineQty(idx, qty) {
+  const r = ordineRows[idx];
+  if (!r) return;
+  r.ordineQty = Math.max(0, parseInt(qty, 10) || 0);
+  if (r.unita === 'cartoni') {
+    r.ordineCartoni = r.ordineQty;
+    r.ordinePezzi = r.ordineQty * r.pzCartone;
+  } else {
+    r.ordinePezzi = r.ordineQty;
+    r.ordineCartoni = r.ordineQty;
+  }
+  updateOrdineSummary();
+}
+
+function renderOrdineTable() {
+  const wrap = document.getElementById('ordine-table-wrap');
+  if (!wrap) return;
+  const f = (document.getElementById('ordine-filter') || {}).value || 'da-ordinare';
+  document.querySelectorAll('[data-ofilter]').forEach(ch => {
+    ch.classList.toggle('active', ch.dataset.ofilter === f);
+  });
+  updateOrdineSummary();
+  const list = filteredOrdineRows();
   if (!list.length) {
     wrap.innerHTML = emptyStateHtml(
       'Nessuna riga in questo filtro',
@@ -3128,58 +3154,44 @@ function renderOrdineTable() {
     wireEmptyActions(wrap);
     return;
   }
-  wrap.innerHTML = `<table class="ordine-table">
-    <thead>
-      <tr>
-        <th>Prodotto</th>
-        <th>Cod.</th>
-        <th>Pz/Ct</th>
-        <th>Vend.</th>
-        <th>Giac.</th>
-        <th>Ordine</th>
-        <th>UdM</th>
-        <th>Prio</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${list.map((r, idx) => {
-        const realIdx = ordineRows.indexOf(r);
-        const prioCls = r.priorita === 'ALTA' ? 'prio-alta' : r.priorita === 'MEDIA' ? 'prio-media' : 'prio-bassa';
-        return `<tr data-idx="${realIdx}">
-          <td>${escapeHtml(r.nome)}</td>
-          <td>${escapeHtml(r.codice)}</td>
-          <td>${r.pzCartone}</td>
-          <td>${r.venduti !== null && r.venduti !== undefined ? r.venduti : '—'}</td>
-          <td>${r.giacenza !== null && r.giacenza !== undefined ? r.giacenza : '—'}</td>
-          <td><input class="ordine-qty" type="number" min="0" step="1" value="${r.ordineQty || 0}" data-idx="${realIdx}"></td>
-          <td><span class="ordine-unit">${r.unita === 'cartoni' ? 'cartoni' : 'pz'}</span></td>
-          <td class="${prioCls}">${escapeHtml(r.priorita || '')}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>`;
+  wrap.innerHTML = list.map(r => {
+    const realIdx = ordineRows.indexOf(r);
+    const prio = r.priorita || '';
+    const prioCls = prio === 'ALTA' ? 'prio-alta' : prio === 'MEDIA' ? 'prio-media' : (prio ? 'prio-bassa' : '');
+    const zero = !(r.ordineQty > 0);
+    const unit = r.unita === 'cartoni' ? 'cartoni' : 'pz';
+    const vend = (r.venduti !== null && r.venduti !== undefined) ? r.venduti : '—';
+    const giac = (r.giacenza !== null && r.giacenza !== undefined) ? r.giacenza : '—';
+    return `<article class="ordine-card${zero ? ' is-ok' : ''}" data-idx="${realIdx}">
+      <div class="ordine-card-top">
+        <div>
+          <div class="ordine-card-name">${escapeHtml(r.nome || '')}</div>
+          <div class="ordine-card-code">${escapeHtml(r.codice || '')}</div>
+        </div>
+        ${prio ? `<span class="ordine-prio ${prioCls}">${escapeHtml(prio)}</span>` : ''}
+      </div>
+      <div class="ordine-card-stats">
+        <span><strong>${vend}</strong> venduti</span>
+        <span><strong>${giac}</strong> giacenza</span>
+        <span><strong>${r.pzCartone || '—'}</strong> pz/ct</span>
+      </div>
+      <div class="ordine-card-qty">
+        <label>Da ordinare</label>
+        <input class="ordine-qty" type="number" min="0" step="1" inputmode="numeric" value="${r.ordineQty || 0}" data-idx="${realIdx}">
+        <span class="ordine-unit">${unit}</span>
+      </div>
+    </article>`;
+  }).join('');
 
   wrap.querySelectorAll('input.ordine-qty').forEach(inp => {
-    inp.onchange = () => {
+    const sync = () => {
       const i = parseInt(inp.dataset.idx, 10);
-      if (ordineRows[i]) {
-        ordineRows[i].ordineQty = Math.max(0, parseInt(inp.value, 10) || 0);
-        if (ordineRows[i].unita === 'cartoni') {
-          ordineRows[i].ordineCartoni = ordineRows[i].ordineQty;
-          ordineRows[i].ordinePezzi = ordineRows[i].ordineQty * ordineRows[i].pzCartone;
-        } else {
-          ordineRows[i].ordinePezzi = ordineRows[i].ordineQty;
-          ordineRows[i].ordineCartoni = ordineRows[i].ordineQty;
-        }
-      }
-      const summaryEl = document.getElementById('ordine-summary');
-      if (summaryEl) {
-        const da = ordineRows.filter(r => (r.ordineQty || 0) > 0);
-        const tot = da.reduce((s, r) => s + (r.unita === 'cartoni' ? r.ordineQty * r.pzCartone : r.ordineQty), 0);
-        summaryEl.textContent = (ordineMeta.periodo ? ordineMeta.periodo + ' · ' : '') +
-          da.length + ' riferimenti da ordinare · ~' + tot + ' pezzi totali';
-      }
+      applyOrdineQty(i, inp.value);
+      const card = inp.closest('.ordine-card');
+      if (card) card.classList.toggle('is-ok', !(ordineRows[i] && ordineRows[i].ordineQty > 0));
     };
+    inp.onchange = sync;
+    inp.oninput = sync;
   });
 }
 
@@ -3471,6 +3483,9 @@ async function init() {
   if (btnClearOrdine) btnClearOrdine.onclick = clearOrdine;
   const ordineFilter = document.getElementById('ordine-filter');
   if (ordineFilter) ordineFilter.onchange = renderOrdineTable;
+  document.querySelectorAll('[data-ofilter]').forEach(ch => {
+    ch.onclick = () => setOrdineFilter(ch.dataset.ofilter);
+  });
 
 
   const btnThemeLight = document.getElementById('btn-theme-light');

@@ -2151,9 +2151,11 @@ body {
   margin-bottom: 12px;
 }
 .ordine-table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .ordine-table {
   width: 100%;
@@ -2177,23 +2179,131 @@ body {
 }
 .ordine-table tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
 [data-theme="dark"] .ordine-table tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
-.ordine-table input.ordine-qty {
-  width: 56px;
-  padding: 6px;
-  text-align: center;
-  font-weight: 700;
+.ordine-card {
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+.ordine-card.is-ok {
+  opacity: 0.72;
+}
+.ordine-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ordine-card-name {
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.ordine-card-code {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.ordine-prio {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+}
+.ordine-prio.prio-alta {
+  background: #fde8e6;
+  color: #b42318;
+}
+.ordine-prio.prio-media {
+  background: #f8eadc;
+  color: #9a4a12;
+}
+.ordine-prio.prio-bassa {
+  background: var(--bg);
+  color: var(--muted);
+}
+.ordine-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.ordine-card-stats span {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 8px 8px 7px;
+  text-align: center;
+  line-height: 1.25;
+}
+.ordine-card-stats strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 750;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ordine-card-qty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ordine-card-qty label {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted);
+  margin: 0;
+  flex: 1;
+}
+.ordine-table input.ordine-qty,
+.ordine-card-qty .ordine-qty {
+  width: 72px;
+  min-height: 44px;
+  padding: 8px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 750;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   background: var(--bg);
   color: var(--text);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.ordine-card-qty .ordine-qty:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(196, 90, 42, 0.12);
 }
 .prio-alta { color: #b91c1c; font-weight: 700; }
 .prio-media { color: #c2410c; font-weight: 650; }
 .prio-bassa { color: var(--muted); }
 .ordine-unit {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 650;
+  min-width: 52px;
+}
+
+[data-theme="dark"] .ordine-prio.prio-alta {
+  background: rgba(180, 35, 24, 0.22);
+  color: #ffb4ab;
+}
+[data-theme="dark"] .ordine-prio.prio-media {
+  background: var(--primary-soft);
+  color: #f0c9a8;
+}
+[data-theme="dark"] .ordine-card-stats span {
+  background: var(--bg);
 }
 
 [data-theme="dark"] .home-alert {
