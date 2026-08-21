@@ -600,6 +600,7 @@ function handleEmptyAction(action) {
     if (b) b.click();
   } else if (action === 'ordine-tutti') {
     setOrdineFilter('tutti');
+  }
 }
 
 function renderFilteredList(filter) {
