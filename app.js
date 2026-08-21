@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.59 - restore completo (login, scadenze, missioni, fuschi)
+// VERSION 1.60 - filtri lista a chip
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -520,14 +520,20 @@ function updateDashboard() {
 
   document.querySelectorAll('.stat-card').forEach(card => {
     card.onclick = () => {
-      document.getElementById('list-filter').value = card.dataset.filter;
+      setListFilter(card.dataset.filter);
       showPage('list');
-      renderFilteredList(card.dataset.filter);
     };
   });
 }
 
 // ---------- List / Filter ----------
+function setListFilter(filter) {
+  const lf = document.getElementById('list-filter');
+  if (lf) lf.value = filter;
+  renderFilteredList(filter);
+}
+window.setListFilter = setListFilter;
+
 function renderFilteredList(filter) {
   let list;
   if (filter === 'all' || filter === 'no-date') {
@@ -588,6 +594,12 @@ function renderFilteredList(filter) {
     all: 'Senza data di scadenza'
   };
   document.getElementById('list-title').textContent = titles[filter] || 'Lista prodotti';
+
+  const lf = document.getElementById('list-filter');
+  if (lf && lf.value !== filter) lf.value = filter;
+  document.querySelectorAll('.list-chip').forEach(ch => {
+    ch.classList.toggle('active', ch.dataset.filter === filter);
+  });
 
   const container = document.getElementById('filtered-list');
   if (list.length === 0) {
@@ -3427,9 +3439,15 @@ async function init() {
     searchTimeout = setTimeout(() => doSearch(e.target.value), 250);
   });
 
-  // List filter
-  document.getElementById('list-filter').addEventListener('change', (e) => {
-    renderFilteredList(e.target.value);
+  // List filter (select nascosto + chip visibili)
+  const lfEl = document.getElementById('list-filter');
+  if (lfEl) {
+    lfEl.addEventListener('change', (e) => {
+      renderFilteredList(e.target.value);
+    });
+  }
+  document.querySelectorAll('.list-chip').forEach(ch => {
+    ch.onclick = () => setListFilter(ch.dataset.filter);
   });
 
   // Settings

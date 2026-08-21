@@ -897,6 +897,50 @@ body {
   font-size: 0.9rem;
 }
 
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.list-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.list-chip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.list-chip.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.list-chip:active {
+  transform: scale(0.97);
+}
+
 .quick-actions {
   margin-bottom: 22px;
 }
@@ -1693,6 +1737,18 @@ body {
 }
 
 [data-theme="dark"] .task-filter-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+[data-theme="dark"] .list-chip {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+[data-theme="dark"] .list-chip.active {
   background: var(--primary);
   color: #fff;
   border-color: transparent;
