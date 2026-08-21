@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.87 - vincoli pre-generazione + riga Bagheria
+// VERSION 1.88 - generatore turni: tetto 40 ore obbligatorio
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2937,17 +2937,8 @@ function generateTurniProva() {
     else setProvaCell(op, 6, 'R');
   });
 
-  const sundayWork = (op) => {
-    const c = provaCell(op, 6);
-    return c === 'DM' || c === 'DS' || c === 'B';
-  };
-  const restLeft = {};
-  ops.forEach(op => { restLeft[op] = sundayWork(op) ? 2 : 1; });
-  for (let day = 0; day < 6; day++) {
-    ops.forEach(op => {
-      if (vFor(op, day) === 'R') restLeft[op] = Math.max(0, restLeft[op] - 1);
-    });
-  }
+  const hours = {};
+  ops.forEach(op => { hours[op] = PROVA_HOURS[provaCell(op, 6)] || 0; });
 
   const counts = {};
   ops.forEach(op => { counts[op] = { A: 0, S: 0, C: 0 }; });
@@ -2962,26 +2953,31 @@ function generateTurniProva() {
 
   for (let day = 0; day < 6; day++) {
     const forcedRest = ops.filter(op => vFor(op, day) === 'R');
-    const atBag = ops.filter(op => vFor(op, day) === 'B');
+    const atBag = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 <= 40);
+    const bagOver = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 > 40);
     const locked = {};
     ops.forEach(op => {
       const v = vFor(op, day);
-      if (v === 'A' || v === 'C' || v === 'S') locked[op] = v;
+      if ((v === 'A' || v === 'C' || v === 'S') && hours[op] + 8 <= 40) locked[op] = v;
     });
 
-    const pool = ops.filter(op => forcedRest.indexOf(op) < 0 && atBag.indexOf(op) < 0);
-    let extraRest = [];
-    if (pool.length > 3) {
-      const cands = pool.filter(op => !locked[op] && restLeft[op] > 0);
-      cands.sort((a, b) => {
-        if (restLeft[b] !== restLeft[a]) return restLeft[b] - restLeft[a];
+    const pool = ops.filter(op => forcedRest.indexOf(op) < 0 && atBag.indexOf(op) < 0 && bagOver.indexOf(op) < 0);
+    const capRest = pool.filter(op => !locked[op] && hours[op] + 8 > 40);
+    let available = pool.filter(op => capRest.indexOf(op) < 0);
+    const extraRest = capRest.slice();
+    if (available.length > 3) {
+      const cands = available.filter(op => !locked[op]).sort((a, b) => {
+        if (hours[b] !== hours[a]) return hours[b] - hours[a];
         return ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4);
       });
-      if (cands[0]) extraRest = [cands[0]];
+      while (available.length > 3 && cands.length) {
+        const r = cands.shift();
+        extraRest.push(r);
+        available = available.filter(op => op !== r);
+      }
     }
-    extraRest.forEach(op => { restLeft[op] = Math.max(0, restLeft[op] - 1); });
 
-    const working = pool.filter(op => extraRest.indexOf(op) < 0);
+    const working = available;
     const n = working.length;
     const tpls = n >= 4 ? templates4 : n === 2 ? templates2 : templates3;
 
@@ -3007,25 +3003,57 @@ function generateTurniProva() {
     });
 
     ops.forEach(op => setProvaCell(op, day, 'R'));
-    atBag.forEach(op => setProvaCell(op, day, 'B'));
+    atBag.forEach(op => {
+      setProvaCell(op, day, 'B');
+      hours[op] += 8;
+    });
     if (bestRoles) {
       working.forEach((op, i) => {
         const role = bestRoles[i];
         setProvaCell(op, day, role);
-        counts[op][role] += 1;
+        hours[op] += PROVA_HOURS[role] || 8;
+        if (role === 'A' || role === 'S' || role === 'C') counts[op][role] += 1;
       });
     } else {
       working.forEach((op, i) => {
         const role = locked[op] || (n === 2 ? (i === 0 ? 'S' : 'C') : (i === 0 ? 'A' : 'C'));
         setProvaCell(op, day, role);
+        hours[op] += PROVA_HOURS[role] || 8;
         if (role === 'A' || role === 'S' || role === 'C') counts[op][role] += 1;
       });
     }
   }
+  provaRepairHours();
   renderTurniProva();
-  const issues = provaValidate();
-  if (issues.length) showToast('Generata con avvisi: controlla il riquadro giallo', 'warn');
-  else showToast('Settimana generata con i vincoli. Controlla e Salva.', 'success');
+  const over = OPERATORS.filter(op => provaHours(op) > 40);
+  if (over.length) showToast(over[0] + ' supera ancora 40h: togli un turno a mano', 'warn');
+  else if (provaValidate().length) showToast('Generata con avvisi: controlla il riquadro giallo', 'warn');
+  else showToast('Settimana entro 40h. Controlla e Salva.', 'success');
+}
+
+function provaRepairHours() {
+  const vFor = (op, day) => (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
+  OPERATORS.forEach(op => {
+    let guard = 0;
+    while (provaHours(op) > 40 && guard++ < 6) {
+      let done = false;
+      for (let day = 5; day >= 0; day--) {
+        if (vFor(op, day)) continue;
+        const code = provaCell(op, day);
+        if (!code || code === 'R') continue;
+        setProvaCell(op, day, 'R');
+        const atClose = OPERATORS.filter(o => provaPresent(provaCell(o, day), 19)).length;
+        const atOpen = OPERATORS.filter(o => provaPresent(provaCell(o, day), 9)).length;
+        let hole = false;
+        for (let h = 9; h < 20; h++) {
+          if (!OPERATORS.some(o => provaPresent(provaCell(o, day), h))) { hole = true; break; }
+        }
+        if (atClose >= 2 && atOpen >= 1 && !hole) { done = true; break; }
+        setProvaCell(op, day, code);
+      }
+      if (!done) break;
+    }
+  });
 }
 
 function provaVincoloOptions(day) {
