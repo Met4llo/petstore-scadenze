@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.64 - fix upload excel ordini
+// VERSION 1.65 - toast sync colorati
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -367,7 +367,7 @@ async function loadSupplierConditions() {
 async function saveToCloud(product) {
   if (!supabase) {
     console.error('supabase client is null');
-    showToast('Cloud non disponibile - libreria non caricata');
+    showToast('Cloud non disponibile — salvato solo su questo telefono', 'warn');
     return false;
   }
   try {
@@ -387,14 +387,14 @@ async function saveToCloud(product) {
       .select();
     if (error) {
       console.error('Supabase save error:', error);
-      showToast('Errore cloud: ' + (error.message || JSON.stringify(error)));
+      showToast('Errore cloud: ' + (error.message || JSON.stringify(error)), 'error');
       return false;
     }
     console.log('Save success:', data);
     return true;
   } catch (err) {
     console.error('Save exception:', err);
-    showToast('Errore di rete: ' + err.message);
+    showToast('Errore di rete: ' + err.message, 'error');
     return false;
   }
 }
@@ -444,11 +444,28 @@ function findCondition(supplierName) {
 }
 
 // ---------- UI Helpers ----------
-function showToast(msg, duration = 2800) {
+let toastTimer = null;
+function inferToastType(msg) {
+  const m = String(msg || '').toLowerCase();
+  if (/in corso/.test(m)) return 'info';
+  if (/errore|impossibile|non valido|non trovato|obbligatoria|non inizializzato/.test(m)) return 'error';
+  if (/locale|cloud non|non disponibile|attenzione|avviso|non caricat|libreria excel/.test(m)) return 'warn';
+  if (/salvato|sincronizzat|completata|completato|pubblicato|archiviato|eliminat|aggiunto|creato|caricata|copiato|aggiornato|consegn/.test(m)) return 'success';
+  return 'info';
+}
+function showToast(msg, duration, type) {
+  if (typeof duration === 'string') {
+    type = duration;
+    duration = 2800;
+  }
+  duration = duration || 2800;
+  type = type || inferToastType(msg);
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
-  t.classList.remove('hidden');
-  setTimeout(() => t.classList.add('hidden'), duration);
+  t.className = 'toast toast-' + type;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), duration);
 }
 
 function showPage(pageId) {
@@ -896,12 +913,12 @@ async function saveProduct() {
   }
 
   if (!supabase) {
-    showToast('ERRORE: Client Supabase non inizializzato. Ricarica la pagina.');
+    showToast('Cloud non disponibile — salvato solo su questo telefono', 'warn');
     updateDashboard();
     return;
   }
 
-  showToast('Salvataggio su cloud in corso...');
+  showToast('Salvataggio su cloud in corso...', 'info');
   let ok = true;
 
   if (newEan !== oldEan) {
@@ -977,7 +994,9 @@ async function saveProduct() {
   }
 
   if (ok) {
-    showToast(newEan !== oldEan ? 'EAN aggiornato e salvato!' : 'Salvato e sincronizzato!');
+    showToast(newEan !== oldEan ? 'EAN aggiornato e salvato' : 'Salvato e sincronizzato', 'success');
+  } else {
+    showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
   }
   updateDashboard();
   detailReturnPage = 'scanner';
@@ -1130,7 +1149,7 @@ async function runSync(silent) {
   if (!supabase || !currentOperator) return;
   autoSyncRunning = true;
   try {
-    if (!silent) showToast('Sincronizzazione in corso...');
+    if (!silent) showToast('Sincronizzazione in corso...', 'info');
     await loadEanRinomin();
     await loadCustomProducts();
     await loadScadenzeFromCloud();
@@ -1143,10 +1162,10 @@ async function runSync(silent) {
     await loadConsegne();
     updateDashboard();
     updateMyTasksAlert();
-    if (!silent) showToast('Sincronizzazione completata');
+    if (!silent) showToast('Sincronizzazione completata', 'success');
   } catch (e) {
     console.error('Sync error:', e);
-    if (!silent) showToast('Errore sincronizzazione');
+    if (!silent) showToast('Errore sincronizzazione', 'error');
   } finally {
     autoSyncRunning = false;
   }
