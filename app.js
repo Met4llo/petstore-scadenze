@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.83 - turni solo Santoemma (in prova)
+// VERSION 1.84 - Turni prova (griglia, solo Santoemma)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -43,7 +43,17 @@ create table if not exists prodotti_note (
 );
 alter table prodotti_note enable row level security;
 drop policy if exists prodotti_note_all on prodotti_note;
-create policy prodotti_note_all on prodotti_note for all using (true) with check (true);`;
+create policy prodotti_note_all on prodotti_note for all using (true) with check (true);
+
+create table if not exists turni_prova (
+  settimana_inizio date primary key,
+  celle jsonb not null default '{}'::jsonb,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+alter table turni_prova enable row level security;
+drop policy if exists turni_prova_all on turni_prova;
+create policy turni_prova_all on turni_prova for all using (true) with check (true);`;
 const SCADENZE_LOG_SQL = EXTRA_TABLES_SQL;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
@@ -550,7 +560,7 @@ function showToast(msg, duration, type) {
 }
 
 function showPage(pageId) {
-  if ((pageId === 'ordini' || pageId === 'turni') && currentOperator !== 'Santoemma') {
+  if ((pageId === 'ordini' || pageId === 'turni-prova') && currentOperator !== 'Santoemma') {
     showToast('Sezione riservata a Santoemma');
     pageId = 'dashboard';
   }
@@ -617,6 +627,7 @@ function runPageEnter(page) {
   }
   if (page === 'tasks') loadTasks();
   if (page === 'turni') loadTurni();
+  if (page === 'turni-prova') loadTurniProva();
   if (page === 'missione') refreshMissione();
   if (page === 'non-negozio') loadNonInNegozio().then(() => renderNonInNegozio());
   if (page === 'consegne') loadConsegne();
@@ -2654,6 +2665,144 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
+const PROVA_FASCE = ['', 'M', 'P', 'I', 'R'];
+const PROVA_LABEL = { '': '·', M: 'M', P: 'P', I: 'I', R: 'R' };
+const PROVA_TITLE = { '': 'Vuoto', M: 'Mattina', P: 'Pomeriggio', I: 'Intero', R: 'Riposo' };
+const PROVA_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+let provaWeekStart = null;
+let provaCelle = {};
+let provaTableMissing = false;
+
+function provaMondayStr(d) {
+  return toDateStr(mondayOf(d || new Date()));
+}
+
+function shiftProvaWeek(days) {
+  const cur = parseDate(provaWeekStart || provaMondayStr());
+  cur.setDate(cur.getDate() + days);
+  provaWeekStart = toDateStr(mondayOf(cur));
+  loadTurniProva();
+}
+
+function provaCell(op, dayIdx) {
+  const row = provaCelle[op] || {};
+  return row[String(dayIdx)] || '';
+}
+
+function setProvaCell(op, dayIdx, val) {
+  if (!provaCelle[op]) provaCelle[op] = {};
+  if (!val) delete provaCelle[op][String(dayIdx)];
+  else provaCelle[op][String(dayIdx)] = val;
+}
+
+function cycleProvaFascia(cur) {
+  const i = PROVA_FASCE.indexOf(cur);
+  return PROVA_FASCE[(i + 1) % PROVA_FASCE.length];
+}
+
+function renderTurniProva() {
+  const label = document.getElementById('prova-week-label');
+  const grid = document.getElementById('prova-grid');
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const start = parseDate(provaWeekStart);
+  const end = sundayOf(start);
+  if (label) label.textContent = formatRange(provaWeekStart, toDateStr(end));
+  if (!grid) return;
+  let html = '<table class="prova-table"><thead><tr><th></th>';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    html += `<th>${PROVA_DAYS[i]}<small>${d.getDate()}</small></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  OPERATORS.forEach(op => {
+    html += `<tr><th>${escapeHtml(op)}</th>`;
+    for (let i = 0; i < 7; i++) {
+      const v = provaCell(op, i);
+      html += `<td><button type="button" class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" title="${PROVA_TITLE[v] || 'Vuoto'}">${PROVA_LABEL[v] || '·'}</button></td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  grid.innerHTML = html;
+  grid.querySelectorAll('.prova-cell').forEach(btn => {
+    btn.onclick = () => {
+      const op = btn.dataset.op;
+      const day = parseInt(btn.dataset.day, 10);
+      const next = cycleProvaFascia(provaCell(op, day));
+      setProvaCell(op, day, next);
+      renderTurniProva();
+    };
+  });
+}
+
+async function loadTurniProva() {
+  if (!isSantoemma()) return;
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  renderTurniProva();
+  const st = document.getElementById('prova-status');
+  if (!supabase) {
+    if (st) st.textContent = 'Cloud non disponibile — solo su questo telefono.';
+    return;
+  }
+  if (provaTableMissing) {
+    if (st) st.textContent = 'Tabella mancante: premi Copia SQL tabella e avviala su Supabase.';
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('turni_prova')
+      .select('celle,updated_by,updated_at')
+      .eq('settimana_inizio', provaWeekStart)
+      .limit(1);
+    if (error) {
+      const msg = (error.message || '') + '';
+      if (/does not exist|schema cache|42P01/i.test(msg)) provaTableMissing = true;
+      if (st) st.textContent = provaTableMissing
+        ? 'Tabella mancante: premi Copia SQL tabella e avviala su Supabase.'
+        : ('Errore: ' + error.message);
+      return;
+    }
+    const row = data && data[0];
+    provaCelle = (row && row.celle && typeof row.celle === 'object') ? row.celle : {};
+    renderTurniProva();
+    if (st) {
+      st.textContent = row && row.updated_by
+        ? ('Ultimo salvataggio: ' + row.updated_by + (row.updated_at ? ' · ' + new Date(row.updated_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''))
+        : 'Settimana vuota. Tocca le celle e poi Salva.';
+    }
+  } catch (e) {
+    if (st) st.textContent = 'Errore di rete';
+  }
+}
+
+async function saveTurniProva() {
+  if (!isSantoemma()) return;
+  if (!supabase) {
+    showToast('Cloud non disponibile', 'warn');
+    return;
+  }
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const { error } = await supabase.from('turni_prova').upsert({
+    settimana_inizio: provaWeekStart,
+    celle: provaCelle,
+    updated_by: currentOperator,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'settimana_inizio' });
+  if (error) {
+    const msg = (error.message || '') + '';
+    if (/does not exist|schema cache|42P01/i.test(msg)) {
+      provaTableMissing = true;
+      showToast('Crea la tabella: Copia SQL tabella', 'warn');
+    } else {
+      showToast('Errore: ' + error.message, 'error');
+    }
+    return;
+  }
+  showToast('Settimana salvata', 'success');
+  loadTurniProva();
+}
+
 // Zoom/pan state for turno viewer
 let viewerScale = 1;
 let viewerX = 0;
@@ -4233,7 +4382,7 @@ function guardOrdiniPage() {
   return true;
 }
 
-function guardTurniPage() {
+function guardTurniProvaPage() {
   return guardOrdiniPage();
 }
 
@@ -4426,7 +4575,7 @@ async function init() {
       closeLogoMenu();
       if (!showPage(page)) return;
       if (page === 'ordini' && !guardOrdiniPage()) return;
-      if (page === 'turni' && !guardTurniPage()) return;
+      if (page === 'turni-prova' && !guardTurniProvaPage()) return;
       runPageEnter(page);
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
@@ -4469,6 +4618,34 @@ async function init() {
 
   const btnNewSettimana = document.getElementById('btn-new-settimana');
   if (btnNewSettimana) btnNewSettimana.onclick = openNewSettimanaForm;
+  const btnProvaPrev = document.getElementById('btn-prova-prev');
+  if (btnProvaPrev) btnProvaPrev.onclick = () => shiftProvaWeek(-7);
+  const btnProvaNext = document.getElementById('btn-prova-next');
+  if (btnProvaNext) btnProvaNext.onclick = () => shiftProvaWeek(7);
+  const btnProvaOggi = document.getElementById('btn-prova-oggi');
+  if (btnProvaOggi) btnProvaOggi.onclick = () => { provaWeekStart = provaMondayStr(); loadTurniProva(); };
+  const btnProvaSave = document.getElementById('btn-prova-save');
+  if (btnProvaSave) btnProvaSave.onclick = saveTurniProva;
+  const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');
+  if (btnCopyProvaSql) {
+    btnCopyProvaSql.onclick = async () => {
+      const sql = `create table if not exists turni_prova (
+  settimana_inizio date primary key,
+  celle jsonb not null default '{}'::jsonb,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+alter table turni_prova enable row level security;
+drop policy if exists turni_prova_all on turni_prova;
+create policy turni_prova_all on turni_prova for all using (true) with check (true);`;
+      try {
+        await navigator.clipboard.writeText(sql);
+        showToast('SQL copiato. Incollalo in Supabase → SQL Editor', 'success');
+      } catch (e) {
+        showToast('Copia non riuscita', 'error');
+      }
+    };
+  }
   const btnSaveTurno = document.getElementById('btn-save-turno');
   if (btnSaveTurno) btnSaveTurno.onclick = saveTurno;
   const btnCancelTurno = document.getElementById('btn-cancel-turno');
