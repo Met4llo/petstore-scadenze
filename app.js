@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.84 - Turni prova (griglia, solo Santoemma)
+// VERSION 1.85 - generatore turni prova (8h / 40h / chiusura 2)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,9 +2665,33 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'M', 'P', 'I', 'R'];
-const PROVA_LABEL = { '': '·', M: 'M', P: 'P', I: 'I', R: 'R' };
-const PROVA_TITLE = { '': 'Vuoto', M: 'Mattina', P: 'Pomeriggio', I: 'Intero', R: 'Riposo' };
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'DM', 'DS', 'R'];
+const PROVA_LABEL = {
+  '': '·',
+  A: '9-17',
+  C: '12-20',
+  S: '4+4',
+  DM: '9-15',
+  DS: '14-20',
+  R: 'R'
+};
+const PROVA_TITLE = {
+  '': 'Vuoto',
+  A: 'Intero 09:00–17:00 (8h, pausa inclusa)',
+  C: 'Intero 12:00–20:00 (8h, pausa inclusa)',
+  S: 'Spezzato 09:00–13:00 e 16:00–20:00 (8h)',
+  DM: 'Domenica 09:00–15:00 (6h)',
+  DS: 'Domenica 14:00–20:00 (6h)',
+  R: 'Riposo'
+};
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, DM: 6, DS: 6, R: 0 };
+const PROVA_SPANS = {
+  A: [[9, 17]],
+  C: [[12, 20]],
+  S: [[9, 13], [16, 20]],
+  DM: [[9, 15]],
+  DS: [[14, 20]]
+};
 const PROVA_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 let provaWeekStart = null;
 let provaCelle = {};
@@ -2708,7 +2732,7 @@ function renderTurniProva() {
   const end = sundayOf(start);
   if (label) label.textContent = formatRange(provaWeekStart, toDateStr(end));
   if (!grid) return;
-  let html = '<table class="prova-table"><thead><tr><th></th>';
+  let html = '<table class="prova-table"><thead><tr><th>Ore</th>';
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -2716,7 +2740,9 @@ function renderTurniProva() {
   }
   html += '</tr></thead><tbody>';
   OPERATORS.forEach(op => {
-    html += `<tr><th>${escapeHtml(op)}</th>`;
+    const h = provaHours(op);
+    const over = h > 40 ? ' is-over' : '';
+    html += `<tr><th>${escapeHtml(op)}<small class="prova-ore${over}">${h}h</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
       html += `<td><button type="button" class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" title="${PROVA_TITLE[v] || 'Vuoto'}">${PROVA_LABEL[v] || '·'}</button></td>`;
@@ -2734,6 +2760,127 @@ function renderTurniProva() {
       renderTurniProva();
     };
   });
+  renderProvaCheck();
+}
+
+function provaHours(op) {
+  let h = 0;
+  for (let i = 0; i < 7; i++) h += PROVA_HOURS[provaCell(op, i)] || 0;
+  return h;
+}
+
+function provaPresent(code, hour) {
+  const spans = PROVA_SPANS[code];
+  if (!spans) return false;
+  return spans.some(([a, b]) => hour >= a && hour < b);
+}
+
+function provaValidate() {
+  const issues = [];
+  OPERATORS.forEach(op => {
+    const h = provaHours(op);
+    if (h > 40) issues.push(op + ': ' + h + ' ore (max 40)');
+  });
+  for (let day = 0; day < 7; day++) {
+    const name = PROVA_DAYS[day];
+    const codes = OPERATORS.map(op => provaCell(op, day));
+    if (day === 6) {
+      const dm = codes.filter(c => c === 'DM').length;
+      const ds = codes.filter(c => c === 'DS').length;
+      const work = codes.filter(c => c && c !== 'R').length;
+      if (dm !== 1 || ds !== 1 || work !== 2) {
+        issues.push('Domenica: 2 persone, una 09-15 e una 14-20');
+      }
+    } else {
+      const atOpen = OPERATORS.filter(op => provaPresent(provaCell(op, day), 9)).length;
+      const atClose = OPERATORS.filter(op => provaPresent(provaCell(op, day), 19)).length;
+      if (atOpen < 1) issues.push(name + ': nessuno in apertura (09:00)');
+      if (atClose < 2) issues.push(name + ': in chiusura ' + atClose + ' persone (min 2)');
+      for (let h = 9; h < 20; h++) {
+        const n = OPERATORS.filter(op => provaPresent(provaCell(op, day), h)).length;
+        if (n < 1) {
+          issues.push(name + ': scoperto alle ' + String(h).padStart(2, '0') + ':00');
+          break;
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function renderProvaCheck() {
+  const el = document.getElementById('prova-check');
+  if (!el) return;
+  const issues = provaValidate();
+  const empty = OPERATORS.every(op => {
+    for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
+    return true;
+  });
+  if (empty) {
+    el.className = 'prova-check is-empty';
+    el.innerHTML = 'Settimana vuota. Premi <strong>Genera settimana</strong>.';
+    return;
+  }
+  if (!issues.length) {
+    el.className = 'prova-check is-ok';
+    el.innerHTML = 'Regole ok: chiusura ≥2, max 8h/turno, max 40h, domenica 2 persone.';
+    return;
+  }
+  el.className = 'prova-check is-warn';
+  el.innerHTML = issues.map(x => '<div>' + escapeHtml(x) + '</div>').join('');
+}
+
+function provaWeekNumber(mondayStr) {
+  const t = parseDate(mondayStr || provaMondayStr()).getTime();
+  const e = parseDate('2020-01-06').getTime();
+  return Math.floor((t - e) / 604800000);
+}
+
+function generateTurniProva() {
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const ops = OPERATORS.slice();
+  const w = provaWeekNumber(provaWeekStart);
+  const pairs = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+  const pair = pairs[((w % 6) + 6) % 6];
+  let dm = ops[pair[0]];
+  let ds = ops[pair[1]];
+  if (w % 2) { const t = dm; dm = ds; ds = t; }
+
+  provaCelle = {};
+  ops.forEach(op => { provaCelle[op] = {}; });
+  ops.forEach(op => setProvaCell(op, 6, 'R'));
+  setProvaCell(dm, 6, 'DM');
+  setProvaCell(ds, 6, 'DS');
+
+  const sundayWorkers = new Set([dm, ds]);
+  const restLeft = {};
+  ops.forEach(op => { restLeft[op] = sundayWorkers.has(op) ? 2 : 1; });
+
+  for (let day = 0; day < 6; day++) {
+    const candidates = ops.filter(op => restLeft[op] > 0);
+    candidates.sort((a, b) => {
+      if (restLeft[b] !== restLeft[a]) return restLeft[b] - restLeft[a];
+      return ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4);
+    });
+    const rest = candidates[0];
+    restLeft[rest]--;
+    const working = ops.filter(op => op !== rest);
+    const rot = (w + day) % working.length;
+    const opener = working[rot];
+    const others = working.filter(o => o !== opener);
+    ops.forEach(op => setProvaCell(op, day, 'R'));
+    if (day % 2 === 0) {
+      setProvaCell(opener, day, 'A');
+      if (others[0]) setProvaCell(others[0], day, 'C');
+      if (others[1]) setProvaCell(others[1], day, 'C');
+    } else {
+      setProvaCell(opener, day, 'S');
+      if (others[0]) setProvaCell(others[0], day, 'A');
+      if (others[1]) setProvaCell(others[1], day, 'C');
+    }
+  }
+  renderTurniProva();
+  showToast('Settimana generata. Controlla e premi Salva.', 'success');
 }
 
 async function loadTurniProva() {
@@ -4624,6 +4771,8 @@ async function init() {
   if (btnProvaNext) btnProvaNext.onclick = () => shiftProvaWeek(7);
   const btnProvaOggi = document.getElementById('btn-prova-oggi');
   if (btnProvaOggi) btnProvaOggi.onclick = () => { provaWeekStart = provaMondayStr(); loadTurniProva(); };
+  const btnProvaGen = document.getElementById('btn-prova-generate');
+  if (btnProvaGen) btnProvaGen.onclick = generateTurniProva;
   const btnProvaSave = document.getElementById('btn-prova-save');
   if (btnProvaSave) btnProvaSave.onclick = saveTurniProva;
   const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');

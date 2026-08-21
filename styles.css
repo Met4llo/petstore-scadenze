@@ -2334,22 +2334,45 @@ body {
   white-space: nowrap;
   font-weight: 700;
 }
+.prova-table tbody th small.prova-ore {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.prova-table tbody th small.prova-ore.is-over { color: var(--danger); }
 .prova-cell {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  min-height: 40px;
+  height: auto;
+  padding: 6px 2px;
   border: 0;
   border-radius: 8px;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.68rem;
   font-family: inherit;
   background: var(--bg);
   color: var(--muted);
   cursor: pointer;
+  line-height: 1.15;
 }
-.prova-cell.fascia-M { background: #e8f1ff; color: #1d4ed8; }
-.prova-cell.fascia-P { background: #fff4d6; color: #9a4a12; }
-.prova-cell.fascia-I { background: #e4f0e8; color: #1f6b45; }
+.prova-cell.fascia-A { background: #e8f1ff; color: #1d4ed8; }
+.prova-cell.fascia-C { background: #fff4d6; color: #9a4a12; }
+.prova-cell.fascia-S { background: #f3e8ff; color: #6b21a8; }
+.prova-cell.fascia-DM { background: #e4f0e8; color: #1f6b45; }
+.prova-cell.fascia-DS { background: #fce8e6; color: #9a3412; }
 .prova-cell.fascia-R { background: #f4efe6; color: #6f645b; }
+.prova-check {
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.prova-check.is-empty { background: var(--bg); color: var(--muted); }
+.prova-check.is-ok { background: #e4f0e8; color: #1f6b45; font-weight: 650; }
+.prova-check.is-warn { background: #fff4d6; color: #9a4a12; }
+.prova-check.is-warn div + div { margin-top: 4px; }
 
 .consegne-dash {
   background: var(--card);
