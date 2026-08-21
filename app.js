@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.70 - storico modifiche prodotto
+// VERSION 1.71 - export lista scadenze CSV
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -656,10 +656,9 @@ function handleEmptyAction(action) {
   }
 }
 
-function renderFilteredList(filter) {
+function getListForFilter(filter) {
   let list;
   if (filter === 'all' || filter === 'no-date') {
-    // Prodotti ancora senza data di scadenza (da completare) — esclusi i "senza scadenza" definitivi
     list = products.filter(p => !p.expiry && !p.noExpiry);
   } else if (filter === 'with-date') {
     list = products.filter(p => p.expiry && !p.noExpiry);
@@ -702,7 +701,92 @@ function renderFilteredList(filter) {
   } else {
     list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
   }
+  return list;
+}
 
+function csvCell(v) {
+  const s = v == null ? '' : String(v);
+  if (/[;"\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function formatExportDate(iso) {
+  if (!iso) return '';
+  const s = String(iso);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, d] = s.slice(0, 10).split('-');
+    return d + '/' + m + '/' + y;
+  }
+  return s;
+}
+
+function buildListCsv(list) {
+  const header = ['Nome', 'EAN', 'Fornitore', 'Scadenza', 'Giorni', 'Segnalato', 'Data segnalazione', 'Senza scadenza', 'Modificato da'];
+  const rows = list.map(p => {
+    const days = p.noExpiry ? '' : (p.expiry ? daysRemaining(p.expiry) : '');
+    return [
+      csvCell(p.name || ''),
+      csvCell(p.ean || ''),
+      csvCell(p.supplier || ''),
+      csvCell(p.noExpiry ? '' : formatExportDate(p.expiry)),
+      csvCell(days === '' || days === null ? '' : days),
+      csvCell(p.signaled ? 'sì' : 'no'),
+      csvCell(formatExportDate(p.signaledDate)),
+      csvCell(p.noExpiry ? 'sì' : 'no'),
+      csvCell(p.updatedBy || '')
+    ].join(';');
+  });
+  return header.join(';') + '\n' + rows.join('\n');
+}
+
+async function exportCurrentList() {
+  const filter = (document.getElementById('list-filter') || {}).value || 'all';
+  const list = getListForFilter(filter);
+  if (!list.length) {
+    showToast('Lista vuota, niente da esportare', 'warn');
+    return;
+  }
+  const slugs = {
+    all: 'senza-data',
+    'no-date': 'senza-data',
+    expired: 'scaduti',
+    urgent: '7giorni',
+    attention: '30giorni',
+    monitor: '120giorni',
+    unsignaled: 'da-segnalare',
+    signaled: 'segnalati',
+    'no-expiry': 'esclusi',
+    'with-date': 'con-data'
+  };
+  const today = new Date();
+  const stamp = String(today.getDate()).padStart(2, '0') + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + today.getFullYear();
+  const filename = 'scadenze-' + (slugs[filter] || filter) + '-' + stamp + '.csv';
+  const blob = new Blob(['\uFEFF' + buildListCsv(list)], { type: 'text/csv;charset=utf-8;' });
+  const file = new File([blob], filename, { type: 'text/csv' });
+  if (navigator.share && navigator.canShare) {
+    try {
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename, text: list.length + ' prodotti' });
+        showToast('Lista condivisa (' + list.length + ')', 'success');
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('Esportati ' + list.length + ' prodotti', 'success');
+}
+
+function renderFilteredList(filter) {
+  const list = getListForFilter(filter);
   const titles = {
     expired: 'Prodotti scaduti',
     urgent: 'Urgenti (≤7 giorni)',
@@ -3901,6 +3985,8 @@ async function init() {
   document.querySelectorAll('.list-chip').forEach(ch => {
     ch.onclick = () => setListFilter(ch.dataset.filter);
   });
+  const btnExportList = document.getElementById('btn-export-list');
+  if (btnExportList) btnExportList.onclick = exportCurrentList;
 
   // Settings
   document.getElementById('btn-change-password').onclick = async () => {

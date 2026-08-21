@@ -1,11 +1,11 @@
-const CACHE_NAME = 'petstore-scadenze-v170';
+const CACHE_NAME = 'petstore-scadenze-v171';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=1.70',
-  './sheet-overlay.css?v=1.70',
-  './app.js?v=1.70',
-  './fuschi-home.js?v=1.70',
+  './styles.css?v=1.71',
+  './sheet-overlay.css?v=1.71',
+  './app.js?v=1.71',
+  './fuschi-home.js?v=1.71',
   './styles.css',
   './app.js',
   './manifest.json',
