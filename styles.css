@@ -682,6 +682,7 @@ body {
 
 .detail-row input[type=date],
 .detail-row input[type=text],
+.detail-row input[type=file],
 .detail-row select,
 .search-input,
 #list-filter,
