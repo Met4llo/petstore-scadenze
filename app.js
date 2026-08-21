@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.73 - nota sul prodotto
+// VERSION 1.74 - ora ultima sync in Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -620,6 +620,7 @@ function updateDashboard() {
   });
   updateSegnalareCount();
   if (typeof updateMissioneDash === 'function') updateMissioneDash();
+  renderSyncStatus();
 }
 
 function countUnsignaled() {
@@ -638,6 +639,49 @@ function updateSegnalareCount() {
   el.classList.toggle('is-zero', n === 0);
 }
 window.updateSegnalareCount = updateSegnalareCount;
+
+let lastSyncAt = 0;
+let lastSyncOk = true;
+try {
+  lastSyncAt = parseInt(localStorage.getItem('petstore_last_sync') || '0', 10) || 0;
+  lastSyncOk = localStorage.getItem('petstore_last_sync_ok') !== '0';
+} catch (e) {}
+
+function formatSyncTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return time;
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) + ' · ' + time;
+}
+
+function markSync(ok) {
+  lastSyncAt = Date.now();
+  lastSyncOk = !!ok;
+  try {
+    localStorage.setItem('petstore_last_sync', String(lastSyncAt));
+    localStorage.setItem('petstore_last_sync_ok', lastSyncOk ? '1' : '0');
+  } catch (e) {}
+  renderSyncStatus();
+}
+
+function renderSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.classList.remove('is-warn', 'is-ok');
+  if (!lastSyncAt) {
+    el.textContent = 'Mai sincronizzato · tocca per aggiornare';
+    el.classList.add('is-warn');
+  } else if (lastSyncOk) {
+    el.textContent = 'Sincronizzato alle ' + formatSyncTime(lastSyncAt) + ' · tocca per aggiornare';
+    el.classList.add('is-ok');
+  } else {
+    el.textContent = 'Solo locale · ' + formatSyncTime(lastSyncAt) + ' · tocca per riprovare';
+    el.classList.add('is-warn');
+  }
+  el.onclick = () => { if (typeof manualSync === 'function') manualSync(); };
+}
 
 // ---------- List / Filter ----------
 function setListFilter(filter) {
@@ -1639,9 +1683,11 @@ async function runSync(silent) {
     await loadConsegne();
     updateDashboard();
     updateMyTasksAlert();
+    markSync(true);
     if (!silent) showToast('Sincronizzazione completata', 'success');
   } catch (e) {
     console.error('Sync error:', e);
+    markSync(false);
     if (!silent) showToast('Errore sincronizzazione', 'error');
   } finally {
     autoSyncRunning = false;
@@ -3875,6 +3921,8 @@ async function init() {
   try { await loadScadenzeFromCloud(); } catch (e) { console.error(e); }
   try { await loadNotesFromCloud(); } catch (e) { console.error(e); }
   try { applyAccessoriesNoExpiry(); } catch (e) { console.error(e); }
+  if (supabase) markSync(true);
+  else markSync(false);
 
   const pc = document.getElementById('products-count');
   if (pc) pc.textContent = products.length;

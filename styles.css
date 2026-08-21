@@ -1048,6 +1048,20 @@ body {
   font-weight: 600;
 }
 
+.sync-status {
+  margin: 4px 0 16px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.sync-status.is-ok { color: #1f6b45; }
+.sync-status.is-warn { color: #9a4a12; }
+[data-theme="dark"] .sync-status.is-ok { color: #86efac; }
+[data-theme="dark"] .sync-status.is-warn { color: #fdba74; }
+
 .quick-actions {
   margin-bottom: 22px;
 }
