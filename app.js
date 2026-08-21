@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.77 - disattiva beep scanner
+// VERSION 1.78 - cerca nella lista filtrata
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -747,6 +747,10 @@ function handleEmptyAction(action) {
     const sel = document.getElementById('list-supplier');
     if (sel) sel.value = '';
     renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+  } else if (action === 'list-search-clear') {
+    const inp = document.getElementById('list-search');
+    if (inp) inp.value = '';
+    renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
   } else if (action === 'new-task') {
     const b = document.getElementById('btn-new-task');
     if (b) b.click();
@@ -807,6 +811,11 @@ function getListForFilter(filter) {
   const wanted = getSelectedListSupplier();
   if (wanted) list = list.filter(p => supplierMatches(p, wanted));
 
+  const q = getListSearchQuery();
+  if (q.length >= 2) {
+    list = list.filter(p => productMatchesListSearch(p, q));
+  }
+
   if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
     list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
   } else {
@@ -818,6 +827,18 @@ function getListForFilter(filter) {
 function getSelectedListSupplier() {
   const sel = document.getElementById('list-supplier');
   return sel ? (sel.value || '') : '';
+}
+
+function getListSearchQuery() {
+  return ((document.getElementById('list-search') || {}).value || '').trim().toLowerCase();
+}
+
+function productMatchesListSearch(p, q) {
+  if (!q) return true;
+  const name = (p.name || '').toLowerCase();
+  const ean = String(p.ean || '').toLowerCase();
+  const note = (p.note || '').toLowerCase();
+  return name.includes(q) || ean.includes(q) || note.includes(q);
 }
 
 function supplierMatches(p, wanted) {
@@ -953,8 +974,17 @@ function renderFilteredList(filter) {
   });
 
   const container = document.getElementById('filtered-list');
+  const searchQ = getListSearchQuery();
   if (list.length === 0) {
-    if (wanted) {
+    if (searchQ.length >= 2) {
+      container.innerHTML = emptyStateHtml(
+        'Nessun risultato in questa fascia',
+        'Nessun prodotto corrisponde a “' + searchQ + '” con i filtri attivi.',
+        'list-search-clear',
+        'Cancella ricerca'
+      );
+      wireEmptyActions(container);
+    } else if (wanted) {
       const label = wanted === '__none__' ? 'prodotti senza fornitore' : wanted;
       container.innerHTML = emptyStateHtml(
         'Nessun prodotto di questo fornitore',
@@ -4262,6 +4292,12 @@ async function init() {
     listSupplier.onchange = () => {
       renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
     };
+  }
+  const listSearch = document.getElementById('list-search');
+  if (listSearch) {
+    listSearch.addEventListener('input', () => {
+      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+    });
   }
 
   // Settings

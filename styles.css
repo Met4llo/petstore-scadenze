@@ -1047,6 +1047,21 @@ body {
   font-size: 0.95rem;
   font-weight: 600;
 }
+.list-search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+}
 
 .sync-status {
   margin: 4px 0 16px;
