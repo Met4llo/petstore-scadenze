@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.76 - sostituisci prodotto in missione
+// VERSION 1.77 - disattiva beep scanner
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1501,6 +1501,7 @@ function unlockScanFeedback() {
 }
 
 function playScanBeep(ok) {
+  if (!isScanBeepOn()) return;
   try {
     unlockScanFeedback();
     if (!scanAudioCtx) return;
@@ -2626,8 +2627,25 @@ function applyTheme(theme) {
   if (btnD) btnD.classList.toggle('active', t === 'dark');
 }
 
+function isScanBeepOn() {
+  return localStorage.getItem('petstore_scan_beep') !== '0';
+}
+
+function setScanBeep(on) {
+  localStorage.setItem('petstore_scan_beep', on ? '1' : '0');
+  const btnOn = document.getElementById('btn-beep-on');
+  const btnOff = document.getElementById('btn-beep-off');
+  if (btnOn) btnOn.classList.toggle('active', on);
+  if (btnOff) btnOff.classList.toggle('active', !on);
+}
+
+function initScanBeep() {
+  setScanBeep(isScanBeepOn());
+}
+
 function initTheme() {
   applyTheme(getTheme());
+  initScanBeep();
 }
 
 
@@ -4124,6 +4142,10 @@ async function init() {
   if (btnThemeLight) btnThemeLight.onclick = () => { applyTheme('light'); showToast('Modalità chiara'); };
   const btnThemeDark = document.getElementById('btn-theme-dark');
   if (btnThemeDark) btnThemeDark.onclick = () => { applyTheme('dark'); showToast('Modalità scura'); };
+  const btnBeepOn = document.getElementById('btn-beep-on');
+  const btnBeepOff = document.getElementById('btn-beep-off');
+  if (btnBeepOn) btnBeepOn.onclick = () => { setScanBeep(true); showToast('Suono scanner acceso', 'success'); };
+  if (btnBeepOff) btnBeepOff.onclick = () => { setScanBeep(false); showToast('Suono scanner spento', 'info'); };
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentOperator) {
