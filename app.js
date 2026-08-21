@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.85 - generatore turni prova (8h / 40h / chiusura 2)
+// VERSION 1.86 - turni prova: aperture/spezzati/chiusure equilibrati
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2742,7 +2742,8 @@ function renderTurniProva() {
   OPERATORS.forEach(op => {
     const h = provaHours(op);
     const over = h > 40 ? ' is-over' : '';
-    html += `<tr><th>${escapeHtml(op)}<small class="prova-ore${over}">${h}h</small></th>`;
+    const rc = provaRoleCounts(op);
+    html += `<tr><th>${escapeHtml(op)}<small class="prova-ore${over}">${h}h · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
       html += `<td><button type="button" class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" title="${PROVA_TITLE[v] || 'Vuoto'}">${PROVA_LABEL[v] || '·'}</button></td>`;
@@ -2823,7 +2824,7 @@ function renderProvaCheck() {
   }
   if (!issues.length) {
     el.className = 'prova-check is-ok';
-    el.innerHTML = 'Regole ok: chiusura ≥2, max 8h/turno, max 40h, domenica 2 persone.';
+    el.innerHTML = 'Regole ok: chiusura ≥2, max 8h/turno, max 40h, domenica 2. Turni spalmati su aperture / spezzati / chiusure.';
     return;
   }
   el.className = 'prova-check is-warn';
@@ -2834,6 +2835,49 @@ function provaWeekNumber(mondayStr) {
   const t = parseDate(mondayStr || provaMondayStr()).getTime();
   const e = parseDate('2020-01-06').getTime();
   return Math.floor((t - e) / 604800000);
+}
+
+function provaRoleOf(code) {
+  if (code === 'A' || code === 'DM') return 'A';
+  if (code === 'C' || code === 'DS') return 'C';
+  if (code === 'S') return 'S';
+  return null;
+}
+
+function provaRoleCounts(op) {
+  const c = { A: 0, S: 0, C: 0 };
+  for (let i = 0; i < 7; i++) {
+    const r = provaRoleOf(provaCell(op, i));
+    if (r) c[r]++;
+  }
+  return c;
+}
+
+function provaUniquePerms(arr) {
+  const out = [];
+  function rec(path, rest) {
+    if (!rest.length) { out.push(path); return; }
+    const seen = {};
+    rest.forEach((v, i) => {
+      if (seen[v]) return;
+      seen[v] = true;
+      rec(path.concat(v), rest.slice(0, i).concat(rest.slice(i + 1)));
+    });
+  }
+  rec([], arr);
+  return out;
+}
+
+function provaFairScore(counts) {
+  let s = 0;
+  ['A', 'S', 'C'].forEach(t => {
+    const vals = OPERATORS.map(op => counts[op][t]);
+    const max = Math.max.apply(null, vals);
+    const min = Math.min.apply(null, vals);
+    s += (max - min) * 20;
+    vals.forEach(v => { s += v * v; });
+  });
+  return s;
 }
 
 function generateTurniProva() {
@@ -2856,6 +2900,17 @@ function generateTurniProva() {
   const restLeft = {};
   ops.forEach(op => { restLeft[op] = sundayWorkers.has(op) ? 2 : 1; });
 
+  const counts = {};
+  ops.forEach(op => { counts[op] = { A: 0, S: 0, C: 0 }; });
+  counts[dm].A += 1;
+  counts[ds].C += 1;
+
+  const templates = [
+    ['A', 'C', 'C'],
+    ['S', 'A', 'C'],
+    ['S', 'C', 'C']
+  ];
+
   for (let day = 0; day < 6; day++) {
     const candidates = ops.filter(op => restLeft[op] > 0);
     candidates.sort((a, b) => {
@@ -2865,22 +2920,31 @@ function generateTurniProva() {
     const rest = candidates[0];
     restLeft[rest]--;
     const working = ops.filter(op => op !== rest);
-    const rot = (w + day) % working.length;
-    const opener = working[rot];
-    const others = working.filter(o => o !== opener);
+
+    let bestScore = Infinity;
+    let bestRoles = null;
+    templates.forEach(tpl => {
+      provaUniquePerms(tpl).forEach(roles => {
+        const next = {};
+        ops.forEach(op => { next[op] = { A: counts[op].A, S: counts[op].S, C: counts[op].C }; });
+        working.forEach((op, i) => { next[op][roles[i]] += 1; });
+        const sc = provaFairScore(next);
+        if (sc < bestScore) {
+          bestScore = sc;
+          bestRoles = roles.slice();
+        }
+      });
+    });
+
     ops.forEach(op => setProvaCell(op, day, 'R'));
-    if (day % 2 === 0) {
-      setProvaCell(opener, day, 'A');
-      if (others[0]) setProvaCell(others[0], day, 'C');
-      if (others[1]) setProvaCell(others[1], day, 'C');
-    } else {
-      setProvaCell(opener, day, 'S');
-      if (others[0]) setProvaCell(others[0], day, 'A');
-      if (others[1]) setProvaCell(others[1], day, 'C');
-    }
+    working.forEach((op, i) => {
+      const role = bestRoles[i];
+      setProvaCell(op, day, role);
+      counts[op][role] += 1;
+    });
   }
   renderTurniProva();
-  showToast('Settimana generata. Controlla e premi Salva.', 'success');
+  showToast('Settimana generata, turni equilibrati. Controlla e Salva.', 'success');
 }
 
 async function loadTurniProva() {

@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.85">
-  <link rel="stylesheet" href="sheet-overlay.css?v=1.85">
+  <link rel="stylesheet" href="styles.css?v=1.86">
+  <link rel="stylesheet" href="sheet-overlay.css?v=1.86">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -257,7 +257,7 @@
 
       <section id="page-turni-prova" class="page">
         <p class="dash-kicker">Turni prova</p>
-        <p class="turni-hint">Solo tu. Genera la settimana (max 8h, max 40h, 2 in chiusura, domenica 2 persone). Poi tocca le celle per ritoccare e Salva.</p>
+        <p class="turni-hint">Solo tu. Genera spalma aperture (9-17 / dom 9-15), spezzati (4+4) e chiusure (12-20 / dom 14-20). Poi ritocca e Salva.</p>
         <div class="prova-week-bar">
           <button type="button" id="btn-prova-prev" class="turno-zoom-btn">‹</button>
           <div id="prova-week-label" class="prova-week-label">Settimana</div>
@@ -500,7 +500,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 1.85 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 1.86 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -521,7 +521,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.85"></script>
-  <script src="fuschi-home.js?v=1.85"></script>
+  <script src="app.js?v=1.86"></script>
+  <script src="fuschi-home.js?v=1.86"></script>
 </body>
 </html>
