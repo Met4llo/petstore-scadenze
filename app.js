@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.74 - ora ultima sync in Home
+// VERSION 1.75 - consegne di domani in Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3260,23 +3260,31 @@ function updateConsegneDash() {
   const el = document.getElementById('consegne-dash');
   if (!el) return;
   const oggi = todayStr();
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const domani = toDateStr(d);
   const oggiList = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi);
-  if (!oggiList.length) {
+  const domaniList = consegneList.filter(c => normalizeConsegnaDate(c.data) === domani && c.stato !== 'consegnato');
+  if (!oggiList.length && !domaniList.length) {
     el.classList.add('hidden');
     return;
   }
   const pending = oggiList.filter(c => c.stato !== 'consegnato');
   const done = oggiList.filter(c => c.stato === 'consegnato');
   el.classList.remove('hidden');
+  let html = '';
   if (pending.length) {
-    const names = pending.map(c => c.fornitore).join(', ');
-    el.innerHTML = 'Oggi in arrivo: <strong>' + escapeHtml(names) + '</strong>' +
-      (done.length ? ' · ' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') : '');
-  } else {
-    el.innerHTML = 'Consegne di oggi: tutte segnate come consegnate';
+    html += '<div>Oggi in arrivo: <strong>' + escapeHtml(pending.map(c => c.fornitore).join(', ')) + '</strong>' +
+      (done.length ? ' · ' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') : '') + '</div>';
+  } else if (oggiList.length) {
+    html += '<div>Consegne di oggi: tutte segnate come consegnate</div>';
   }
+  if (domaniList.length) {
+    html += '<div class="consegne-dash-sub">Domani: <strong>' + escapeHtml(domaniList.map(c => c.fornitore).join(', ')) + '</strong></div>';
+  }
+  el.innerHTML = html;
   el.onclick = () => {
-    setConsegneFilter('oggi');
+    setConsegneFilter(pending.length || oggiList.length ? 'oggi' : 'prossime');
     showPage('consegne');
     renderConsegne();
   };
