@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.79 - avviso modifiche non salvate
+// VERSION 1.80 - segnala dalla lista
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -646,6 +646,12 @@ function cancelUnsavedLeave() {
   closeUnsavedDialog();
 }
 
+function needsQuickSignal(p) {
+  if (!p || p.noExpiry || p.signaled || !p.expiry) return false;
+  const d = daysRemaining(p.expiry);
+  return d !== null && d <= 120;
+}
+
 function renderProductCard(p) {
   const days = p.noExpiry ? null : daysRemaining(p.expiry);
   const cls = p.noExpiry ? 'ok' : getStatusClass(days);
@@ -663,6 +669,7 @@ function renderProductCard(p) {
         <span class="product-ean">${escapeHtml(p.ean)}</span>
       </div>
       ${p.note ? `<p class="product-note">${escapeHtml(p.note)}</p>` : ''}
+      ${needsQuickSignal(p) ? `<button type="button" class="btn btn-primary btn-signal-list" data-ean="${escapeHtml(p.ean)}">Segnala</button>` : ''}
     </div>
   `;
 }
@@ -1105,6 +1112,67 @@ function renderFilteredList(filter) {
   container.querySelectorAll('.product-card').forEach(card => {
     card.onclick = () => openProduct(card.dataset.ean, 'list');
   });
+  wireSignalButtons(container);
+}
+
+async function quickSignalProduct(ean) {
+  const p = products.find(x => x.ean === ean);
+  if (!p) return;
+  if (!needsQuickSignal(p)) {
+    showToast('Già segnalato o senza data in scadenza', 'info');
+    return;
+  }
+  const today = todayStr();
+  const before = {
+    ean: p.ean,
+    expiry: p.expiry || null,
+    signaled: !!p.signaled,
+    signaledDate: p.signaledDate || null,
+    noExpiry: !!p.noExpiry,
+    note: (p.note || '').trim()
+  };
+  p.signaled = true;
+  p.signaledDate = today;
+  p.lastModified = Date.now();
+  p.updatedBy = currentOperator || 'Sconosciuto';
+  showToast('Segnalazione in corso...', 'info');
+  const ok = await saveToCloud(p);
+  try { await idbPut(STORE_PRODUCTS, p); } catch (e) {}
+  if (ok) {
+    await logProductChanges(before, {
+      ean: p.ean,
+      expiry: p.expiry || null,
+      signaled: true,
+      signaledDate: today,
+      noExpiry: !!p.noExpiry,
+      note: (p.note || '').trim()
+    });
+    showToast('Segnalato', 'success');
+  } else {
+    showToast('Segnalato in locale — il collega non lo vede ancora', 'warn');
+  }
+  updateDashboard();
+  const listPage = document.getElementById('page-list');
+  if (listPage && listPage.classList.contains('active')) {
+    const lf = document.getElementById('list-filter');
+    renderFilteredList(lf ? lf.value : 'all');
+  }
+  const scanPage = document.getElementById('page-scanner');
+  if (scanPage && scanPage.classList.contains('active')) {
+    const q = (document.getElementById('search-input') || {}).value || '';
+    if (q.trim().length >= 2) doSearch(q);
+  }
+}
+
+function wireSignalButtons(container) {
+  if (!container) return;
+  container.querySelectorAll('.btn-signal-list').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      quickSignalProduct(btn.dataset.ean);
+    };
+  });
 }
 
 // ---------- Search ----------
@@ -1134,6 +1202,7 @@ function doSearch(query) {
   container.querySelectorAll('.product-card').forEach(card => {
     card.onclick = () => openProduct(card.dataset.ean, 'scanner');
   });
+  wireSignalButtons(container);
 }
 
 // ---------- Product Detail ----------
