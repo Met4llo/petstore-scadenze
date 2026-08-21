@@ -2223,6 +2223,15 @@ body {
   padding: 12px !important;
   font-size: 0.92rem !important;
 }
+.mission-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.mission-card-actions .mission-check-btn {
+  margin-top: 0;
+}
 .mission-done-fold {
   margin-top: 16px;
 }

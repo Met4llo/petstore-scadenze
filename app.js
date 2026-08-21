@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.75 - consegne di domani in Home
+// VERSION 1.76 - sostituisci prodotto in missione
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2954,7 +2954,10 @@ function renderMissione() {
       </div>
       ${checked
         ? `<button class="btn btn-secondary mission-check-btn" disabled>Fatto</button>`
-        : `<button class="btn btn-primary mission-check-btn btn-check-mission" data-ean="${ean}">Segna controllato</button>`
+        : `<div class="mission-card-actions">
+            <button class="btn btn-primary mission-check-btn btn-check-mission" data-ean="${ean}">Segna controllato</button>
+            <button type="button" class="btn btn-secondary mission-check-btn btn-replace-mission" data-ean="${ean}">Sostituisci</button>
+          </div>`
       }
     </div>`;
   }
@@ -2966,7 +2969,7 @@ function renderMissione() {
   wireEmptyActions(listEl);
   listEl.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.btn-check-mission')) return;
+      if (e.target.closest('.btn-check-mission') || e.target.closest('.btn-replace-mission')) return;
       openProduct(card.dataset.ean, 'missione');
     });
   });
@@ -2976,6 +2979,64 @@ function renderMissione() {
       markProductChecked(btn.dataset.ean);
     };
   });
+  listEl.querySelectorAll('.btn-replace-mission').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      replaceMissionProduct(btn.dataset.ean);
+    };
+  });
+}
+
+async function replaceMissionProduct(oldEan) {
+  if (!missioneOggi || !currentOperator || !oldEan) return;
+  if (isProductCheckedByMe(oldEan)) {
+    showToast('Già controllato, non si sostituisce', 'info');
+    return;
+  }
+  const list = Array.isArray(missioneOggi.prodotti) ? [...missioneOggi.prodotti] : [];
+  const idx = list.indexOf(oldEan);
+  if (idx < 0) return;
+
+  const exclude = new Set(list);
+  try {
+    if (supabase) {
+      const { data: others } = await supabase.from('missioni').select('prodotti').eq('data', todayStr());
+      (others || []).forEach(m => {
+        const arr = Array.isArray(m.prodotti) ? m.prodotti : [];
+        arr.forEach(e => exclude.add(e));
+      });
+    }
+  } catch (e) {}
+
+  let next = pickRandomProducts(1, exclude);
+  if (!next.length) next = pickRandomProducts(1, new Set(list));
+  if (!next.length) {
+    showToast('Nessun altro prodotto senza data disponibile', 'warn');
+    return;
+  }
+  const newEan = next[0];
+  list[idx] = newEan;
+  missioneOggi.prodotti = list;
+
+  if (supabase && !missioneOggi._localOnly) {
+    try {
+      let q = supabase.from('missioni').update({ prodotti: list }).eq('data', missioneOggi.data);
+      if (currentOperator) q = q.eq('operator', currentOperator);
+      const { error } = await q;
+      if (error) {
+        console.warn('replace mission:', error);
+        showToast('Sostituito solo su questo telefono', 'warn');
+      } else {
+        showToast('Prodotto sostituito', 'success');
+      }
+    } catch (e) {
+      showToast('Sostituito solo su questo telefono', 'warn');
+    }
+  } else {
+    showToast('Prodotto sostituito', 'success');
+  }
+  renderMissione();
+  updateMissioneDash();
 }
 
 function updateMissioneMenuBadge(remaining) {
