@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.86 - turni prova: aperture/spezzati/chiusure equilibrati
+// VERSION 1.87 - vincoli pre-generazione + riga Bagheria
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,12 +2665,13 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'DM', 'DS', 'R'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'B', 'DM', 'DS', 'R'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
   C: '12-20',
   S: '4+4',
+  B: 'Bagh.',
   DM: '9-15',
   DS: '14-20',
   R: 'R'
@@ -2680,11 +2681,12 @@ const PROVA_TITLE = {
   A: 'Intero 09:00–17:00 (8h, pausa inclusa)',
   C: 'Intero 12:00–20:00 (8h, pausa inclusa)',
   S: 'Spezzato 09:00–13:00 e 16:00–20:00 (8h)',
+  B: 'Bagheria — sostituzione (8h, non in negozio)',
   DM: 'Domenica 09:00–15:00 (6h)',
   DS: 'Domenica 14:00–20:00 (6h)',
   R: 'Riposo'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, DM: 6, DS: 6, R: 0 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -2695,6 +2697,7 @@ const PROVA_SPANS = {
 const PROVA_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 let provaWeekStart = null;
 let provaCelle = {};
+let provaVincoli = {};
 let provaTableMissing = false;
 
 function provaMondayStr(d) {
@@ -2750,6 +2753,13 @@ function renderTurniProva() {
     }
     html += '</tr>';
   });
+  html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">punto vendita</small></th>';
+  for (let i = 0; i < 7; i++) {
+    const who = OPERATORS.filter(op => provaCell(op, i) === 'B');
+    const txt = who.length ? who.map(n => n.slice(0, 3)).join(' ') : '·';
+    html += `<td><span class="prova-bagheria-cell">${escapeHtml(txt)}</span></td>`;
+  }
+  html += '</tr>';
   html += '</tbody></table>';
   grid.innerHTML = html;
   grid.querySelectorAll('.prova-cell').forEach(btn => {
@@ -2884,47 +2894,107 @@ function generateTurniProva() {
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   const ops = OPERATORS.slice();
   const w = provaWeekNumber(provaWeekStart);
-  const pairs = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
-  const pair = pairs[((w % 6) + 6) % 6];
-  let dm = ops[pair[0]];
-  let ds = ops[pair[1]];
-  if (w % 2) { const t = dm; dm = ds; ds = t; }
+  const vFor = (op, day) => (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
 
   provaCelle = {};
   ops.forEach(op => { provaCelle[op] = {}; });
-  ops.forEach(op => setProvaCell(op, 6, 'R'));
-  setProvaCell(dm, 6, 'DM');
-  setProvaCell(ds, 6, 'DS');
 
-  const sundayWorkers = new Set([dm, ds]);
+  let dm = null;
+  let ds = null;
+  const sunBusy = new Set();
+  ops.forEach(op => {
+    const v = vFor(op, 6);
+    if (v === 'DM' || v === 'A') dm = op;
+    if (v === 'DS' || v === 'C') ds = op;
+    if (v === 'B') {
+      setProvaCell(op, 6, 'B');
+      sunBusy.add(op);
+    }
+    if (v === 'R') {
+      setProvaCell(op, 6, 'R');
+      sunBusy.add(op);
+    }
+  });
+  const availableSun = ops.filter(op => !sunBusy.has(op) && op !== dm && op !== ds);
+  const pairs = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+  const pair = pairs[((w % 6) + 6) % 6];
+  if (!dm) {
+    const cand = availableSun.filter(op => op !== ds);
+    dm = cand.find(op => op === ops[pair[0]]) || cand[0] || null;
+  }
+  if (!ds) {
+    const cand = availableSun.filter(op => op !== dm);
+    ds = cand.find(op => op === ops[pair[1]]) || cand[0] || null;
+  }
+  if (dm === ds) ds = ops.find(op => op !== dm && !sunBusy.has(op)) || ds;
+  if (w % 2 && dm && ds && !vFor(dm, 6) && !vFor(ds, 6)) {
+    const t = dm; dm = ds; ds = t;
+  }
+  ops.forEach(op => {
+    if (provaCell(op, 6)) return;
+    if (op === dm) setProvaCell(op, 6, 'DM');
+    else if (op === ds) setProvaCell(op, 6, 'DS');
+    else setProvaCell(op, 6, 'R');
+  });
+
+  const sundayWork = (op) => {
+    const c = provaCell(op, 6);
+    return c === 'DM' || c === 'DS' || c === 'B';
+  };
   const restLeft = {};
-  ops.forEach(op => { restLeft[op] = sundayWorkers.has(op) ? 2 : 1; });
+  ops.forEach(op => { restLeft[op] = sundayWork(op) ? 2 : 1; });
+  for (let day = 0; day < 6; day++) {
+    ops.forEach(op => {
+      if (vFor(op, day) === 'R') restLeft[op] = Math.max(0, restLeft[op] - 1);
+    });
+  }
 
   const counts = {};
   ops.forEach(op => { counts[op] = { A: 0, S: 0, C: 0 }; });
-  counts[dm].A += 1;
-  counts[ds].C += 1;
+  const r0 = dm ? provaRoleOf(provaCell(dm, 6)) : null;
+  const r1 = ds ? provaRoleOf(provaCell(ds, 6)) : null;
+  if (dm && r0) counts[dm][r0] += 1;
+  if (ds && r1) counts[ds][r1] += 1;
 
-  const templates = [
-    ['A', 'C', 'C'],
-    ['S', 'A', 'C'],
-    ['S', 'C', 'C']
-  ];
+  const templates3 = [['A', 'C', 'C'], ['S', 'A', 'C'], ['S', 'C', 'C']];
+  const templates2 = [['S', 'C']];
+  const templates4 = [['A', 'C', 'C', 'S']];
 
   for (let day = 0; day < 6; day++) {
-    const candidates = ops.filter(op => restLeft[op] > 0);
-    candidates.sort((a, b) => {
-      if (restLeft[b] !== restLeft[a]) return restLeft[b] - restLeft[a];
-      return ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4);
+    const forcedRest = ops.filter(op => vFor(op, day) === 'R');
+    const atBag = ops.filter(op => vFor(op, day) === 'B');
+    const locked = {};
+    ops.forEach(op => {
+      const v = vFor(op, day);
+      if (v === 'A' || v === 'C' || v === 'S') locked[op] = v;
     });
-    const rest = candidates[0];
-    restLeft[rest]--;
-    const working = ops.filter(op => op !== rest);
+
+    const pool = ops.filter(op => forcedRest.indexOf(op) < 0 && atBag.indexOf(op) < 0);
+    let extraRest = [];
+    if (pool.length > 3) {
+      const cands = pool.filter(op => !locked[op] && restLeft[op] > 0);
+      cands.sort((a, b) => {
+        if (restLeft[b] !== restLeft[a]) return restLeft[b] - restLeft[a];
+        return ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4);
+      });
+      if (cands[0]) extraRest = [cands[0]];
+    }
+    extraRest.forEach(op => { restLeft[op] = Math.max(0, restLeft[op] - 1); });
+
+    const working = pool.filter(op => extraRest.indexOf(op) < 0);
+    const n = working.length;
+    const tpls = n >= 4 ? templates4 : n === 2 ? templates2 : templates3;
 
     let bestScore = Infinity;
     let bestRoles = null;
-    templates.forEach(tpl => {
+    tpls.forEach(tpl => {
+      if (tpl.length !== n) return;
       provaUniquePerms(tpl).forEach(roles => {
+        let ok = true;
+        working.forEach((op, i) => {
+          if (locked[op] && locked[op] !== roles[i]) ok = false;
+        });
+        if (!ok) return;
         const next = {};
         ops.forEach(op => { next[op] = { A: counts[op].A, S: counts[op].S, C: counts[op].C }; });
         working.forEach((op, i) => { next[op][roles[i]] += 1; });
@@ -2937,14 +3007,95 @@ function generateTurniProva() {
     });
 
     ops.forEach(op => setProvaCell(op, day, 'R'));
-    working.forEach((op, i) => {
-      const role = bestRoles[i];
-      setProvaCell(op, day, role);
-      counts[op][role] += 1;
-    });
+    atBag.forEach(op => setProvaCell(op, day, 'B'));
+    if (bestRoles) {
+      working.forEach((op, i) => {
+        const role = bestRoles[i];
+        setProvaCell(op, day, role);
+        counts[op][role] += 1;
+      });
+    } else {
+      working.forEach((op, i) => {
+        const role = locked[op] || (n === 2 ? (i === 0 ? 'S' : 'C') : (i === 0 ? 'A' : 'C'));
+        setProvaCell(op, day, role);
+        if (role === 'A' || role === 'S' || role === 'C') counts[op][role] += 1;
+      });
+    }
   }
   renderTurniProva();
-  showToast('Settimana generata, turni equilibrati. Controlla e Salva.', 'success');
+  const issues = provaValidate();
+  if (issues.length) showToast('Generata con avvisi: controlla il riquadro giallo', 'warn');
+  else showToast('Settimana generata con i vincoli. Controlla e Salva.', 'success');
+}
+
+function provaVincoloOptions(day) {
+  if (day === 6) {
+    return [
+      ['', 'Libero'],
+      ['R', 'Riposo'],
+      ['DM', 'Dom 09-15'],
+      ['DS', 'Dom 14-20'],
+      ['B', 'Bagheria']
+    ];
+  }
+  return [
+    ['', 'Libero'],
+    ['R', 'Riposo'],
+    ['A', 'Apertura 9-17'],
+    ['C', 'Chiusura 12-20'],
+    ['S', 'Spezzato 4+4'],
+    ['B', 'Bagheria']
+  ];
+}
+
+function renderProvaVincoliForm() {
+  const box = document.getElementById('prova-vincoli-form');
+  if (!box) return;
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  let html = '<div class="prova-vincoli-table-wrap"><table class="prova-vincoli-table"><thead><tr><th></th>';
+  PROVA_DAYS.forEach((d, i) => { html += '<th>' + d + '</th>'; });
+  html += '</tr></thead><tbody>';
+  OPERATORS.forEach(op => {
+    html += '<tr><th>' + escapeHtml(op) + '</th>';
+    for (let i = 0; i < 7; i++) {
+      const cur = (provaVincoli[op] && provaVincoli[op][String(i)]) || '';
+      html += '<td><select data-op="' + escapeHtml(op) + '" data-day="' + i + '">';
+      provaVincoloOptions(i).forEach(([val, lab]) => {
+        html += '<option value="' + val + '"' + (cur === val ? ' selected' : '') + '>' + lab + '</option>';
+      });
+      html += '</select></td>';
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  box.innerHTML = html;
+}
+
+function collectProvaVincoli() {
+  provaVincoli = {};
+  document.querySelectorAll('#prova-vincoli-form select').forEach(sel => {
+    if (!sel.value) return;
+    const op = sel.dataset.op;
+    if (!provaVincoli[op]) provaVincoli[op] = {};
+    provaVincoli[op][sel.dataset.day] = sel.value;
+  });
+}
+
+function openProvaVincoli() {
+  renderProvaVincoliForm();
+  const el = document.getElementById('prova-vincoli-overlay');
+  if (el) el.classList.remove('hidden');
+}
+
+function closeProvaVincoli() {
+  const el = document.getElementById('prova-vincoli-overlay');
+  if (el) el.classList.add('hidden');
+}
+
+function confirmProvaVincoli() {
+  collectProvaVincoli();
+  closeProvaVincoli();
+  generateTurniProva();
 }
 
 async function loadTurniProva() {
@@ -4836,7 +4987,13 @@ async function init() {
   const btnProvaOggi = document.getElementById('btn-prova-oggi');
   if (btnProvaOggi) btnProvaOggi.onclick = () => { provaWeekStart = provaMondayStr(); loadTurniProva(); };
   const btnProvaGen = document.getElementById('btn-prova-generate');
-  if (btnProvaGen) btnProvaGen.onclick = generateTurniProva;
+  if (btnProvaGen) btnProvaGen.onclick = openProvaVincoli;
+  const btnVincoliOk = document.getElementById('btn-prova-vincoli-ok');
+  if (btnVincoliOk) btnVincoliOk.onclick = confirmProvaVincoli;
+  const btnVincoliSkip = document.getElementById('btn-prova-vincoli-skip');
+  if (btnVincoliSkip) btnVincoliSkip.onclick = () => { provaVincoli = {}; closeProvaVincoli(); generateTurniProva(); };
+  const btnVincoliCancel = document.getElementById('btn-prova-vincoli-cancel');
+  if (btnVincoliCancel) btnVincoliCancel.onclick = closeProvaVincoli;
   const btnProvaSave = document.getElementById('btn-prova-save');
   if (btnProvaSave) btnProvaSave.onclick = saveTurniProva;
   const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');

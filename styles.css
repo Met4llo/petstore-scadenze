@@ -2361,7 +2361,49 @@ body {
 .prova-cell.fascia-S { background: #f3e8ff; color: #6b21a8; }
 .prova-cell.fascia-DM { background: #e4f0e8; color: #1f6b45; }
 .prova-cell.fascia-DS { background: #fce8e6; color: #9a3412; }
-.prova-cell.fascia-R { background: #f4efe6; color: #6f645b; }
+.prova-cell.fascia-B { background: #e0f2fe; color: #075985; }
+.prova-bagheria-row th, .prova-bagheria-row td {
+  background: #f0f9ff;
+}
+.prova-bagheria-cell {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #075985;
+  padding: 8px 2px;
+}
+.prova-vincoli-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 10px;
+}
+.prova-vincoli-table {
+  border-collapse: collapse;
+  min-width: 640px;
+  width: 100%;
+  font-size: 0.75rem;
+}
+.prova-vincoli-table th, .prova-vincoli-table td {
+  border: 1px solid var(--border);
+  padding: 4px;
+  text-align: center;
+}
+.prova-vincoli-table tbody th {
+  text-align: left;
+  white-space: nowrap;
+  padding: 6px 8px;
+}
+.prova-vincoli-table select {
+  width: 100%;
+  min-width: 72px;
+  font-size: 0.72rem;
+  padding: 6px 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
 .prova-check {
   border-radius: 12px;
   padding: 10px 12px;
