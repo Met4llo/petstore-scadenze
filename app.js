@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.88 - generatore turni: tetto 40 ore obbligatorio
+// VERSION 1.89 - ferie nei vincoli e in griglia
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,7 +2665,7 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'B', 'DM', 'DS', 'R'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'B', 'DM', 'DS', 'R', 'F'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
@@ -2674,7 +2674,8 @@ const PROVA_LABEL = {
   B: 'Bagh.',
   DM: '9-15',
   DS: '14-20',
-  R: 'R'
+  R: 'R',
+  F: 'Ferie'
 };
 const PROVA_TITLE = {
   '': 'Vuoto',
@@ -2684,9 +2685,10 @@ const PROVA_TITLE = {
   B: 'Bagheria — sostituzione (8h, non in negozio)',
   DM: 'Domenica 09:00–15:00 (6h)',
   DS: 'Domenica 14:00–20:00 (6h)',
-  R: 'Riposo'
+  R: 'Riposo',
+  F: 'Ferie (non in turno, 0h)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0, F: 0 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -2910,8 +2912,8 @@ function generateTurniProva() {
       setProvaCell(op, 6, 'B');
       sunBusy.add(op);
     }
-    if (v === 'R') {
-      setProvaCell(op, 6, 'R');
+    if (v === 'R' || v === 'F') {
+      setProvaCell(op, 6, v === 'F' ? 'F' : 'R');
       sunBusy.add(op);
     }
   });
@@ -2952,7 +2954,7 @@ function generateTurniProva() {
   const templates4 = [['A', 'C', 'C', 'S']];
 
   for (let day = 0; day < 6; day++) {
-    const forcedRest = ops.filter(op => vFor(op, day) === 'R');
+    const forcedRest = ops.filter(op => vFor(op, day) === 'R' || vFor(op, day) === 'F');
     const atBag = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 <= 40);
     const bagOver = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 > 40);
     const locked = {};
@@ -3003,6 +3005,9 @@ function generateTurniProva() {
     });
 
     ops.forEach(op => setProvaCell(op, day, 'R'));
+    ops.forEach(op => {
+      if (vFor(op, day) === 'F') setProvaCell(op, day, 'F');
+    });
     atBag.forEach(op => {
       setProvaCell(op, day, 'B');
       hours[op] += 8;
@@ -3040,7 +3045,7 @@ function provaRepairHours() {
       for (let day = 5; day >= 0; day--) {
         if (vFor(op, day)) continue;
         const code = provaCell(op, day);
-        if (!code || code === 'R') continue;
+        if (!code || code === 'R' || code === 'F') continue;
         setProvaCell(op, day, 'R');
         const atClose = OPERATORS.filter(o => provaPresent(provaCell(o, day), 19)).length;
         const atOpen = OPERATORS.filter(o => provaPresent(provaCell(o, day), 9)).length;
@@ -3061,6 +3066,7 @@ function provaVincoloOptions(day) {
     return [
       ['', 'Libero'],
       ['R', 'Riposo'],
+      ['F', 'Ferie'],
       ['DM', 'Dom 09-15'],
       ['DS', 'Dom 14-20'],
       ['B', 'Bagheria']
@@ -3069,6 +3075,7 @@ function provaVincoloOptions(day) {
   return [
     ['', 'Libero'],
     ['R', 'Riposo'],
+    ['F', 'Ferie'],
     ['A', 'Apertura 9-17'],
     ['C', 'Chiusura 12-20'],
     ['S', 'Spezzato 4+4'],
