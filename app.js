@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.60 - filtri lista a chip
+// VERSION 1.61 - empty state più chiari
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -534,6 +534,79 @@ function setListFilter(filter) {
 }
 window.setListFilter = setListFilter;
 
+function emptyStateHtml(title, text, action, actionLabel) {
+  const btn = action
+    ? `<button type="button" class="btn btn-primary empty-action" data-empty-action="${action}">${escapeHtml(actionLabel || 'Ok')}</button>`
+    : '';
+  return `<div class="empty-state">
+    <p class="empty-title">${escapeHtml(title)}</p>
+    <p class="empty-text">${escapeHtml(text)}</p>
+    ${btn}
+  </div>`;
+}
+
+function wireEmptyActions(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-empty-action]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleEmptyAction(btn.dataset.emptyAction);
+    };
+  });
+}
+
+function handleEmptyAction(action) {
+  if (action === 'scanner') {
+    showPage('scanner');
+  } else if (action === 'add' || action === 'add-from-search') {
+    const q = ((document.getElementById('search-input') || {}).value || '').trim();
+    showPage('add');
+    if (action === 'add-from-search' && q) {
+      if (/^\d{8,14}$/.test(q)) {
+        const ean = document.getElementById('add-ean');
+        if (ean) ean.value = q;
+      } else {
+        const name = document.getElementById('add-name');
+        if (name) name.value = q;
+      }
+    }
+  } else if (action === 'home') {
+    showPage('dashboard');
+    updateDashboard();
+  } else if (action === 'list-attention') {
+    setListFilter('attention');
+    showPage('list');
+  } else if (action === 'list-monitor') {
+    setListFilter('monitor');
+    showPage('list');
+  } else if (action === 'list-signaled') {
+    setListFilter('signaled');
+    showPage('list');
+  } else if (action === 'list-unsignaled') {
+    setListFilter('unsignaled');
+    showPage('list');
+  } else if (action === 'new-task') {
+    const b = document.getElementById('btn-new-task');
+    if (b) b.click();
+  } else if (action === 'new-consegna') {
+    const b = document.getElementById('btn-new-consegna');
+    if (b) b.click();
+  } else if (action === 'new-bacheca') {
+    const b = document.getElementById('btn-new-bacheca');
+    if (b) b.click();
+  } else if (action === 'new-settimana') {
+    const b = document.getElementById('btn-new-settimana');
+    if (b) b.click();
+  } else if (action === 'ordine-tutti') {
+    const sel = document.getElementById('ordine-filter');
+    if (sel) {
+      sel.value = 'tutti';
+      renderOrdineTable();
+    }
+  }
+}
+
 function renderFilteredList(filter) {
   let list;
   if (filter === 'all' || filter === 'no-date') {
@@ -603,7 +676,21 @@ function renderFilteredList(filter) {
 
   const container = document.getElementById('filtered-list');
   if (list.length === 0) {
-    container.innerHTML = '<p style="color:#64748b;text-align:center;padding:20px;">Nessun prodotto in questa categoria</p>';
+    const emptyByFilter = {
+      all: ['Nessun prodotto senza data', 'Tutti i prodotti hanno una scadenza oppure sono esclusi dal controllo.', 'scanner', 'Vai allo scanner'],
+      'no-date': ['Nessun prodotto senza data', 'Tutti i prodotti hanno una scadenza oppure sono esclusi dal controllo.', 'scanner', 'Vai allo scanner'],
+      expired: ['Nessun prodotto scaduto', 'In questo momento non ci sono articoli oltre la data.', 'home', 'Torna in Home'],
+      urgent: ['Nessun prodotto a 7 giorni', 'Niente di urgente in questa fascia. Controlla i 30 giorni se serve.', 'list-attention', 'Vedi 30 giorni'],
+      attention: ['Nessun prodotto a 30 giorni', 'Nessun articolo in questa fascia. Puoi passare ai 120 giorni.', 'list-monitor', 'Vedi 120 giorni'],
+      monitor: ['Nessun prodotto a 120 giorni', 'Nessun articolo da monitorare in questa fascia.', 'home', 'Torna in Home'],
+      unsignaled: ['Tutto già segnalato', 'I prodotti in scadenza risultano già segnalati.', 'list-signaled', 'Vedi segnalati'],
+      signaled: ['Nessun prodotto segnalato', 'Non ci sono ancora segnalazioni registrate.', 'list-unsignaled', 'Vedi da segnalare'],
+      'no-expiry': ['Nessun prodotto escluso', 'Nessun articolo è stato segnato come senza scadenza.', 'scanner', 'Vai allo scanner'],
+      'with-date': ['Nessun prodotto con data', 'Non risultano ancora scadenze inserite.', 'scanner', 'Vai allo scanner']
+    };
+    const cfg = emptyByFilter[filter] || ['Lista vuota', 'Nessun prodotto in questa vista.', 'home', 'Torna in Home'];
+    container.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2], cfg[3]);
+    wireEmptyActions(container);
   } else {
     container.innerHTML = list.slice(0, 300).map(renderProductCard).join('') +
       (list.length > 300 ? `<p style="text-align:center;color:#64748b;">... e altri ${list.length - 300}</p>` : '');
@@ -625,9 +712,18 @@ function doSearch(query) {
   ).slice(0, 50);
 
   const container = document.getElementById('search-results');
-  container.innerHTML = results.length
-    ? results.map(renderProductCard).join('')
-    : '<p style="color:#64748b;text-align:center;">Nessun risultato</p>';
+  if (results.length) {
+    container.innerHTML = results.map(renderProductCard).join('');
+  } else {
+    container.innerHTML = emptyStateHtml(
+      'Nessun risultato',
+      'Nessun prodotto trovato per “' + query + '”. Controlla l’EAN o aggiungilo al catalogo.',
+      'add-from-search',
+      'Aggiungi prodotto'
+    );
+    wireEmptyActions(container);
+    return;
+  }
   container.querySelectorAll('.product-card').forEach(card => {
     card.onclick = () => openProduct(card.dataset.ean, 'scanner');
   });
@@ -1298,7 +1394,13 @@ function renderBacheca() {
   const el = document.getElementById('bacheca-list');
   if (!el) return;
   if (!bachecaMessages.length) {
-    el.innerHTML = '<p class="muted-center">Nessun messaggio in bacheca</p>';
+    el.innerHTML = emptyStateHtml(
+      'Bacheca vuota',
+      'Nessun messaggio per il team. Scrivi il primo avviso.',
+      'new-bacheca',
+      'Scrivi un messaggio'
+    );
+    wireEmptyActions(el);
     return;
   }
   const shown = bachecaMessages.slice(0, 2);
@@ -1448,7 +1550,15 @@ function renderTasks() {
   });
 
   if (!list.length) {
-    el.innerHTML = '<p class="muted-center">Nessun task in questa vista</p>';
+    const emptyTask = {
+      miei: ['Nessun task per te', 'Non hai task aperti assegnati. Puoi crearne uno nuovo per il reparto.', 'new-task', 'Nuovo task'],
+      aperti: ['Nessun task aperto', 'Tutti i task risultano completati, oppure non ne è stato creato nessuno.', 'new-task', 'Nuovo task'],
+      fatti: ['Nessun task completato', 'Quando un task viene chiuso, resta visibile qui.', '', ''],
+      tutti: ['Nessun task', 'Crea il primo task e assegnalo a uno o più operatori.', 'new-task', 'Nuovo task']
+    };
+    const cfg = emptyTask[taskFilter] || emptyTask.tutti;
+    el.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2] || null, cfg[3]);
+    wireEmptyActions(el);
     return;
   }
 
@@ -1647,7 +1757,13 @@ function renderTurni() {
   if (!el) return;
 
   if (!turniList.length) {
-    el.innerHTML = '<p class="muted-center">Nessuna settimana in archivio.<br>Carica la foto del foglio turni.</p>';
+    el.innerHTML = emptyStateHtml(
+      'Nessuna settimana in archivio',
+      'Carica la foto del foglio turni. Resta salvata e si può rivedere nello storico.',
+      'new-settimana',
+      'Carica settimana'
+    );
+    wireEmptyActions(el);
     if (corrente) corrente.classList.add('hidden');
     return;
   }
@@ -1673,7 +1789,13 @@ function renderTurni() {
 
   const past = turniList.filter(t => !isCurrentWeek(t.settimana_inizio, t.settimana_fine));
   if (!past.length) {
-    el.innerHTML = '<p class="muted-center">Nessuna settimana precedente in archivio.</p>';
+    el.innerHTML = emptyStateHtml(
+      'Nessuna settimana precedente',
+      'Quando carichi un nuovo foglio, le settimane passate restano qui nello storico.',
+      'new-settimana',
+      'Carica settimana'
+    );
+    wireEmptyActions(el);
     return;
   }
   el.innerHTML = past.map(t => {
@@ -2300,9 +2422,10 @@ function renderMissione() {
   }
 
   listEl.innerHTML =
-    (todo.length ? todo.map(ean => missionCard(ean, false)).join('') : (completed ? '<p class="muted-center">Niente da fare: missione completa.</p>' : '')) +
+    (todo.length ? todo.map(ean => missionCard(ean, false)).join('') : (completed ? emptyStateHtml('Missione completa', 'Hai controllato tutti i prodotti della missione di oggi.', 'home', 'Torna in Home') : '')) +
     (doneEans.length ? `<details class="mission-done-fold"><summary>Già fatti (${doneEans.length})</summary>${doneEans.map(ean => missionCard(ean, true)).join('')}</details>` : '');
 
+  wireEmptyActions(listEl);
   listEl.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.btn-check-mission')) return;
@@ -2405,7 +2528,13 @@ function renderNonInNegozio() {
   if (!el) return;
   const list = products.filter(p => nonInNegozio.has(p.ean));
   if (!list.length) {
-    el.innerHTML = '<p class="muted-center">Nessun prodotto segnato come non in negozio.<br>Apri un prodotto e usa il pulsante «Segna come non in negozio».</p>';
+    el.innerHTML = emptyStateHtml(
+      'Nessun prodotto fuori assortimento',
+      'Quando un articolo è in catalogo ma non è a scaffale, aprilo e usa «Segna come non in negozio».',
+      'scanner',
+      'Vai allo scanner'
+    );
+    wireEmptyActions(el);
     return;
   }
   list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
@@ -2527,12 +2656,14 @@ function renderConsegne() {
 
   if (!list.length) {
     const emptyMsg = {
-      prossime: 'Nessuna consegna prevista in arrivo',
-      oggi: 'Nessuna consegna per oggi',
-      storico: 'Nessuna consegna nello storico',
-      tutte: 'Nessuna consegna registrata'
+      prossime: ['Nessuna consegna in arrivo', 'Non ci sono consegne previste. Aggiungine una per farla comparire in Home il giorno giusto.', 'new-consegna', 'Nuova consegna'],
+      oggi: ['Nessuna consegna per oggi', 'Oggi non è prevista nessuna azienda. Puoi registrare una consegna se serve.', 'new-consegna', 'Nuova consegna'],
+      storico: ['Storico vuoto', 'Le consegne passate e quelle già ritirate restano qui.', '', ''],
+      tutte: ['Nessuna consegna registrata', 'Tutti gli operatori possono inserire una consegna: data, fornitore e stato.', 'new-consegna', 'Nuova consegna']
     };
-    el.innerHTML = '<p class="muted-center">' + (emptyMsg[consegneFilter] || 'Nessuna consegna') + '</p>';
+    const cfg = emptyMsg[consegneFilter] || emptyMsg.tutte;
+    el.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2] || null, cfg[3]);
+    wireEmptyActions(el);
     return;
   }
 
@@ -2988,7 +3119,13 @@ function renderOrdineTable() {
       daOrd.length + ' riferimenti da ordinare · ~' + totPezzi + ' pezzi totali';
   }
   if (!list.length) {
-    wrap.innerHTML = '<p class="muted-center">Nessuna riga in questo filtro</p>';
+    wrap.innerHTML = emptyStateHtml(
+      'Nessuna riga in questo filtro',
+      'Prova “Tutti i prodotti” per vedere l’elenco completo dell’analisi.',
+      'ordine-tutti',
+      'Mostra tutti'
+    );
+    wireEmptyActions(wrap);
     return;
   }
   wrap.innerHTML = `<table class="ordine-table">
