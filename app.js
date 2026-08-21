@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.81 - torcia scanner
+// VERSION 1.82 - consegna da Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3635,8 +3635,16 @@ function updateConsegneDash() {
   el.classList.remove('hidden');
   let html = '';
   if (pending.length) {
-    html += '<div>Oggi in arrivo: <strong>' + escapeHtml(pending.map(c => c.fornitore).join(', ')) + '</strong>' +
-      (done.length ? ' · ' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') : '') + '</div>';
+    html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
+    html += pending.map(c => {
+      return `<div class="consegne-dash-row">
+        <span class="consegne-dash-name">${escapeHtml(c.fornitore || '')}${c.ora ? ' · ' + escapeHtml(String(c.ora).slice(0, 5)) : ''}</span>
+        <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
+      </div>`;
+    }).join('');
+    if (done.length) {
+      html += '<div class="consegne-dash-sub">' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') + '</div>';
+    }
   } else if (oggiList.length) {
     html += '<div>Consegne di oggi: tutte segnate come consegnate</div>';
   }
@@ -3644,11 +3652,46 @@ function updateConsegneDash() {
     html += '<div class="consegne-dash-sub">Domani: <strong>' + escapeHtml(domaniList.map(c => c.fornitore).join(', ')) + '</strong></div>';
   }
   el.innerHTML = html;
-  el.onclick = () => {
+  el.querySelectorAll('.btn-consegna-ok').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      markConsegnaDone(btn.dataset.id);
+    };
+  });
+  el.onclick = (e) => {
+    if (e.target.closest('.btn-consegna-ok')) return;
     setConsegneFilter(pending.length || oggiList.length ? 'oggi' : 'prossime');
     showPage('consegne');
     renderConsegne();
   };
+}
+
+async function markConsegnaDone(id) {
+  if (!id) {
+    showToast('Consegna senza id, aprila da Consegne', 'warn');
+    return;
+  }
+  if (!supabase) {
+    showToast('Cloud non disponibile', 'warn');
+    return;
+  }
+  const c = consegneList.find(x => String(x.id) === String(id));
+  if (!c) return;
+  const { error } = await supabase.from('consegne').update({
+    stato: 'consegnato',
+    updated_by: currentOperator || 'Sconosciuto',
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) {
+    showToast('Errore: ' + error.message, 'error');
+    return;
+  }
+  c.stato = 'consegnato';
+  showToast('Consegnato · ' + (c.fornitore || ''), 'success');
+  updateConsegneDash();
+  const page = document.getElementById('page-consegne');
+  if (page && page.classList.contains('active')) renderConsegne();
 }
 
 function openConsegnaForm(id) {
