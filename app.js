@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.82 - consegna da Home
+// VERSION 1.83 - turni solo Santoemma (in prova)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -550,7 +550,7 @@ function showToast(msg, duration, type) {
 }
 
 function showPage(pageId) {
-  if (pageId === 'ordini' && currentOperator !== 'Santoemma') {
+  if ((pageId === 'ordini' || pageId === 'turni') && currentOperator !== 'Santoemma') {
     showToast('Sezione riservata a Santoemma');
     pageId = 'dashboard';
   }
@@ -4233,6 +4233,10 @@ function guardOrdiniPage() {
   return true;
 }
 
+function guardTurniPage() {
+  return guardOrdiniPage();
+}
+
 // ---------- Init ----------
 async function init() {
   initTheme();
@@ -4421,10 +4425,9 @@ async function init() {
       const page = item.dataset.page;
       closeLogoMenu();
       if (!showPage(page)) return;
+      if (page === 'ordini' && !guardOrdiniPage()) return;
+      if (page === 'turni' && !guardTurniPage()) return;
       runPageEnter(page);
-      if (page === 'ordini') {
-        if (!guardOrdiniPage()) return;
-      }
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.page === page);
       });
