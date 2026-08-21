@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.89 - ferie nei vincoli e in griglia
+// VERSION 1.90 - ferie contano 8 ore nel tetto settimanale
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2686,9 +2686,9 @@ const PROVA_TITLE = {
   DM: 'Domenica 09:00–15:00 (6h)',
   DS: 'Domenica 14:00–20:00 (6h)',
   R: 'Riposo',
-  F: 'Ferie (non in turno, 0h)'
+  F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0, F: 0 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -2940,7 +2940,12 @@ function generateTurniProva() {
   });
 
   const hours = {};
-  ops.forEach(op => { hours[op] = PROVA_HOURS[provaCell(op, 6)] || 0; });
+  ops.forEach(op => {
+    hours[op] = PROVA_HOURS[provaCell(op, 6)] || 0;
+    for (let d = 0; d < 6; d++) {
+      if (vFor(op, d) === 'F') hours[op] += 8;
+    }
+  });
 
   const counts = {};
   ops.forEach(op => { counts[op] = { A: 0, S: 0, C: 0 }; });
