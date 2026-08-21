@@ -1955,7 +1955,10 @@ body {
   display: none !important;
 }
 .logo-dropdown-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
   text-align: left;
   background: none;
@@ -1996,6 +1999,49 @@ body {
   color: #166534;
 }
 .missione-dash:active { transform: scale(0.98); }
+
+.missione-dash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.missione-dash-label {
+  font-weight: 750;
+  display: block;
+}
+.missione-dash-sub {
+  font-size: 0.82rem;
+  font-weight: 550;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.missione-dash-ok {
+  font-weight: 800;
+  margin-left: 8px;
+}
+.missione-remain {
+  flex-shrink: 0;
+  min-width: 64px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 16px;
+  padding: 8px 10px 6px;
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.missione-remain small {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
 
 .missione-status {
   background: transparent;

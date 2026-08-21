@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.67 - turni: scegli file, non fotocamera
+// VERSION 1.68 - badge missione da fare
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -542,6 +542,7 @@ function updateDashboard() {
     };
   });
   updateSegnalareCount();
+  if (typeof updateMissioneDash === 'function') updateMissioneDash();
 }
 
 function countUnsignaled() {
@@ -2473,31 +2474,47 @@ function renderMissione() {
   });
 }
 
+function updateMissioneMenuBadge(remaining) {
+  const b = document.getElementById('missione-menu-count');
+  if (!b) return;
+  if (!remaining || remaining <= 0) {
+    b.classList.add('hidden');
+    return;
+  }
+  b.textContent = String(remaining);
+  b.classList.remove('hidden', 'is-zero');
+}
+
 function updateMissioneDash() {
   const el = document.getElementById('missione-dash');
   if (!el) return;
 
   if (!isAfterMissionHour()) {
     el.classList.remove('hidden', 'done');
-    el.innerHTML = `Missione dalle ${MISSIONE_HOUR}:00`;
+    el.innerHTML = 'Missione dalle ' + MISSIONE_HOUR + ':00';
     el.onclick = () => showPage('missione');
+    updateMissioneMenuBadge(0);
     return;
   }
 
   if (!missioneOggi || !missioneOggi.prodotti) {
     el.classList.add('hidden');
+    updateMissioneMenuBadge(0);
     return;
   }
 
   const { done, total } = myMissionProgress();
-  const completed = myMissionDone();
+  const remaining = Math.max(0, total - done);
+  const completed = myMissionDone() || (total > 0 && remaining === 0);
   el.classList.remove('hidden');
   if (completed) {
     el.classList.add('done');
-    el.innerHTML = `Missione di oggi completata (${total}/${total})`;
+    el.innerHTML = '<span class="missione-dash-label">Missione di oggi</span><span class="missione-dash-ok">Completata</span>';
+    updateMissioneMenuBadge(0);
   } else {
     el.classList.remove('done');
-    el.innerHTML = `Missione di oggi: <strong>${done}/${total}</strong> — tocca per aprire`;
+    el.innerHTML = '<div class="missione-dash-row"><div><div class="missione-dash-label">Missione di oggi</div><div class="missione-dash-sub">' + done + ' di ' + total + ' controllati</div></div><span class="missione-remain">' + remaining + '<small>da fare</small></span></div>';
+    updateMissioneMenuBadge(remaining);
   }
   el.onclick = () => { showPage('missione'); renderMissione(); };
 }
