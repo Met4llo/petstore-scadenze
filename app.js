@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.95 - 40h e equità aperture / chiusure / spezzati
+// VERSION 1.96 - vincoli Bagheria (libero / mezza giornata) → Sorrentino
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2718,6 +2718,7 @@ const PROVA_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 let provaWeekStart = null;
 let provaCelle = {};
 let provaVincoli = {};
+let provaVincoliBagheria = {};
 let provaTableMissing = false;
 
 function provaMondayStr(d) {
@@ -2776,6 +2777,18 @@ function applyBagheriaDay(day, val) {
     return;
   }
   setProvaCell(op, day, val);
+}
+
+function applyBagheriaVincoliDays() {
+  const op = PROVA_BAGHERIA_OP;
+  for (let day = 0; day < 7; day++) {
+    const bv = provaVincoliBagheria[String(day)] || '';
+    if (!bv || bv === 'L') continue;
+    const ov = (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
+    if (ov === 'F' || ov === 'R') continue;
+    if (provaCell(op, day) === 'F') continue;
+    setProvaCell(op, day, bv === 'B' ? 'B44' : bv);
+  }
 }
 
 function provaCellOptions(day) {
@@ -3138,6 +3151,7 @@ function generateTurniProva() {
     else if (op === ds) setProvaCell(op, 6, '6C');
     else setProvaCell(op, 6, 'R');
   });
+  applyBagheriaVincoliDays();
 
   const LOCK_CODES = ['A', 'C', 'S', '6A', '6C', '4A', '4C'];
   for (let day = 0; day < 6; day++) {
@@ -3149,6 +3163,7 @@ function generateTurniProva() {
       else if (LOCK_CODES.indexOf(v) >= 0) setProvaCell(op, day, v);
     });
   }
+  applyBagheriaVincoliDays();
 
   const hours = {};
   ops.forEach(op => {
@@ -3307,8 +3322,7 @@ function provaVincoloOptions(day) {
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
-    ['4C', '16-20 (4h)'],
-    ['B', 'Bagheria']
+    ['4C', '16-20 (4h)']
   ];
 }
 
@@ -3331,15 +3345,31 @@ function renderProvaVincoliForm() {
     }
     html += '</tr>';
   });
+  html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">Sorrentino</small></th>';
+  for (let i = 0; i < 7; i++) {
+    const cur = provaVincoliBagheria[String(i)] || 'L';
+    html += '<td><select data-bag="1" data-day="' + i + '">';
+    provaBagheriaOptions().forEach(([val, lab]) => {
+      html += '<option value="' + val + '"' + (cur === val ? ' selected' : '') + '>' + lab + '</option>';
+    });
+    html += '</select></td>';
+  }
+  html += '</tr>';
   html += '</tbody></table></div>';
   box.innerHTML = html;
 }
 
 function collectProvaVincoli() {
   provaVincoli = {};
+  provaVincoliBagheria = {};
   document.querySelectorAll('#prova-vincoli-form select').forEach(sel => {
+    if (sel.dataset.bag) {
+      provaVincoliBagheria[sel.dataset.day] = sel.value || 'L';
+      return;
+    }
     if (!sel.value) return;
     const op = sel.dataset.op;
+    if (!op) return;
     if (!provaVincoli[op]) provaVincoli[op] = {};
     provaVincoli[op][sel.dataset.day] = sel.value;
   });
@@ -5255,7 +5285,7 @@ async function init() {
   const btnVincoliOk = document.getElementById('btn-prova-vincoli-ok');
   if (btnVincoliOk) btnVincoliOk.onclick = confirmProvaVincoli;
   const btnVincoliSkip = document.getElementById('btn-prova-vincoli-skip');
-  if (btnVincoliSkip) btnVincoliSkip.onclick = () => { provaVincoli = {}; closeProvaVincoli(); generateTurniProva(); };
+  if (btnVincoliSkip) btnVincoliSkip.onclick = () => { provaVincoli = {}; provaVincoliBagheria = {}; closeProvaVincoli(); generateTurniProva(); };
   const btnVincoliCancel = document.getElementById('btn-prova-vincoli-cancel');
   if (btnVincoliCancel) btnVincoliCancel.onclick = closeProvaVincoli;
   const btnProvaSave = document.getElementById('btn-prova-save');
