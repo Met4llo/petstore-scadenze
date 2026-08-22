@@ -920,9 +920,9 @@ body {
   border-radius: 20px;
   overflow: hidden;
   background: #1c1917;
-  min-height: 260px;
-  height: min(70vw, 380px);
-  max-height: 52vh;
+  min-height: 280px;
+  height: min(88vw, 460px);
+  max-height: 58vh;
   border: 3px solid var(--border);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -939,7 +939,8 @@ body {
 .scanner-box img {
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover;
+  object-fit: contain;
+  background: #1c1917;
 }
 .scanner-hint {
   text-align: center;

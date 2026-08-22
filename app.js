@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.07 - griglia turni tutta visibile, senza scorrimento
+// VERSION 2.08 - scanner iPhone: HD, più fps, EAN più veloce
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1775,30 +1775,126 @@ function scanFeedback(ok, ean) {
   }
 }
 
+function scanQrboxSize(vw, vh) {
+  const width = Math.max(240, Math.floor(vw * 0.92));
+  const height = Math.max(80, Math.min(Math.floor(vh * 0.28), 160));
+  return { width: width, height: height };
+}
+
+function scanFormats() {
+  if (typeof Html5QrcodeSupportedFormats === 'undefined') return null;
+  const F = Html5QrcodeSupportedFormats;
+  return [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128];
+}
+
+async function pickBackCameraId() {
+  try {
+    const cams = await Html5Qrcode.getCameras();
+    if (!cams || !cams.length) return null;
+    const back = cams.find(c => /back|rear|environment|dietro|indietro|trasera/i.test(c.label || ''));
+    return (back || cams[cams.length - 1] || cams[0]).id;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function boostScanTrack() {
+  const track = getScanVideoTrack();
+  if (!track || typeof track.getCapabilities !== 'function') return;
+  let cap = {};
+  try { cap = track.getCapabilities() || {}; } catch (e) { return; }
+  const cons = {};
+  if (cap.width) cons.width = { ideal: Math.min(1920, cap.width.max || 1920) };
+  if (cap.height) cons.height = { ideal: Math.min(1080, cap.height.max || 1080) };
+  if (cap.frameRate) cons.frameRate = { ideal: Math.min(30, cap.frameRate.max || 30) };
+  const advanced = [];
+  if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) advanced.push({ focusMode: 'continuous' });
+  if (cap.zoom) {
+    const min = cap.zoom.min || 1;
+    const max = cap.zoom.max || 1;
+    advanced.push({ zoom: Math.min(max, Math.max(min, 1.5)) });
+  }
+  if (advanced.length) cons.advanced = advanced;
+  if (!Object.keys(cons).length) return;
+  try { await track.applyConstraints(cons); } catch (e) {}
+}
+
 async function startScanner() {
   if (isScanning) return;
   unlockScanFeedback();
   const reader = document.getElementById('reader');
   reader.innerHTML = '';
-  html5QrCode = new Html5Qrcode('reader');
-  try {
-    await html5QrCode.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 150 } },
-      onScanSuccess,
-      () => {}
-    );
-    isScanning = true;
-    document.getElementById('btn-stop-scanner').classList.remove('hidden');
-    const bs = document.getElementById('btn-start-scanner');
-    if (bs) bs.classList.add('hidden');
-    torchOn = false;
-    const hasTorch = await detectTorch();
-    updateTorchButton(hasTorch);
-  } catch (err) {
-    console.error(err);
-    showToast('Impossibile avviare la fotocamera. Controlla i permessi.', 'error');
+  const ctorOpts = {
+    verbose: false,
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  };
+  const formats = scanFormats();
+  if (formats) ctorOpts.formatsToSupport = formats;
+
+  const qrbox = scanQrboxSize;
+  const cameraId = await pickBackCameraId();
+  const attempts = [];
+  if (cameraId) {
+    attempts.push({
+      cam: cameraId,
+      cfg: {
+        fps: 18,
+        qrbox: qrbox,
+        disableFlip: true,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          deviceId: { exact: cameraId },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        }
+      }
+    });
+    attempts.push({ cam: cameraId, cfg: { fps: 16, qrbox: qrbox, disableFlip: true } });
   }
+  attempts.push({
+    cam: { facingMode: 'environment' },
+    cfg: {
+      fps: 18,
+      qrbox: qrbox,
+      disableFlip: true,
+      videoConstraints: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    }
+  });
+  attempts.push({
+    cam: { facingMode: 'environment' },
+    cfg: { fps: 12, qrbox: { width: 280, height: 120 }, disableFlip: true }
+  });
+
+  let lastErr = null;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      html5QrCode = new Html5Qrcode('reader', ctorOpts);
+      await html5QrCode.start(attempts[i].cam, attempts[i].cfg, onScanSuccess, () => {});
+      isScanning = true;
+      document.getElementById('btn-stop-scanner').classList.remove('hidden');
+      const bs = document.getElementById('btn-start-scanner');
+      if (bs) bs.classList.add('hidden');
+      torchOn = false;
+      setTimeout(async () => {
+        await boostScanTrack();
+        const hasTorch = await detectTorch();
+        updateTorchButton(hasTorch);
+      }, 500);
+      return;
+    } catch (err) {
+      lastErr = err;
+      try { if (html5QrCode) await html5QrCode.stop(); } catch (e) {}
+      html5QrCode = null;
+      reader.innerHTML = '';
+    }
+  }
+  console.error(lastErr);
+  showToast('Impossibile avviare la fotocamera. Controlla i permessi.', 'error');
 }
 
 async function stopScanner() {
