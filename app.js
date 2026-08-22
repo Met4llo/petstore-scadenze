@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.00 - scelta settimana da generare
+// VERSION 2.01 - calendario visibile + due orari/negozi nello stesso giorno
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2728,6 +2728,8 @@ let provaNegozi = {};
 let provaVincoli = {};
 let provaVincoliNegozi = {};
 let provaVincoliBagheria = {};
+let provaSlot2 = {};
+let provaVincoliSlot2 = {};
 let provaTableMissing = false;
 
 function provaMondayStr(d) {
@@ -2770,7 +2772,8 @@ function setProvaCell(op, dayIdx, val) {
 
 function provaNegozio(op, dayIdx) {
   const n = provaNegozi[op] && provaNegozi[op][String(dayIdx)];
-  if (n) return n;
+  if (n && typeof n === 'object') return n.a || n.b || '';
+  if (typeof n === 'string' && n) return n;
   const c = provaCell(op, dayIdx);
   if (isBagheriaCode(c)) return 'Bagheria';
   if (!c || c === 'R' || c === 'F') return '';
@@ -2784,7 +2787,36 @@ function setProvaNegozio(op, dayIdx, val) {
 }
 
 function vNegozio(op, day) {
-  return (provaVincoliNegozi[op] && provaVincoliNegozi[op][String(day)]) || '';
+  const n = provaVincoliNegozi[op] && provaVincoliNegozi[op][String(day)];
+  if (n && typeof n === 'object') return n.a || '';
+  return n || '';
+}
+
+function provaSecond(op, day) {
+  return (provaSlot2[op] && provaSlot2[op][String(day)]) || null;
+}
+
+function setProvaSecond(op, day, code, shop) {
+  if (!provaSlot2[op]) provaSlot2[op] = {};
+  if (!code) {
+    delete provaSlot2[op][String(day)];
+    return;
+  }
+  provaSlot2[op][String(day)] = { code: code, shop: shop || 'La Malfa' };
+}
+
+function provaSlot2Options() {
+  return [
+    ['', '— 2° orario'],
+    ['4A', '09-13 (4h)'],
+    ['4C', '16-20 (4h)'],
+    ['6A', '09-15 (6h)'],
+    ['6C', '14-20 (6h)']
+  ];
+}
+
+function provaDayHours(op, day) {
+  return (PROVA_HOURS[provaCell(op, day)] || 0) + (PROVA_HOURS[(provaSecond(op, day) || {}).code] || 0);
 }
 
 function provaIsWorkCode(c) {
@@ -2793,9 +2825,26 @@ function provaIsWorkCode(c) {
 
 function provaAtMain(op, day, code) {
   const c = code !== undefined ? code : provaCell(op, day);
-  if (!provaIsWorkCode(c) || isBagheriaCode(c)) return false;
-  const n = (provaNegozi[op] && provaNegozi[op][String(day)]) || vNegozio(op, day) || 'La Malfa';
-  return n === 'La Malfa';
+  if (provaIsWorkCode(c) && !isBagheriaCode(c)) {
+    const n = (typeof (provaNegozi[op] && provaNegozi[op][String(day)]) === 'string'
+      ? provaNegozi[op][String(day)]
+      : vNegozio(op, day)) || 'La Malfa';
+    if (n === 'La Malfa') return true;
+  }
+  const s2 = provaSecond(op, day);
+  return !!(s2 && s2.shop === 'La Malfa' && provaIsWorkCode(s2.code));
+}
+
+function provaAtMainHour(op, day, hour, codeOverride) {
+  const c = codeOverride !== undefined ? codeOverride : provaCell(op, day);
+  if (provaIsWorkCode(c) && !isBagheriaCode(c) && provaPresent(c, hour)) {
+    const n = (provaNegozi[op] && provaNegozi[op][String(day)]) || vNegozio(op, day) || 'La Malfa';
+    const shop = typeof n === 'string' ? n : (n && n.a) || 'La Malfa';
+    if (shop === 'La Malfa') return true;
+  }
+  const s2 = provaSecond(op, day);
+  if (s2 && s2.shop === 'La Malfa' && provaPresent(s2.code, hour)) return true;
+  return false;
 }
 
 function provaPvClass(op, day) {
@@ -2809,14 +2858,17 @@ function provaPackCelle() {
   const out = {};
   OPERATORS.forEach(op => { out[op] = provaCelle[op] || {}; });
   out._negozi = provaNegozi;
+  out._slot2 = provaSlot2;
   return out;
 }
 
 function provaUnpackCelle(data) {
   provaCelle = {};
   provaNegozi = {};
+  provaSlot2 = {};
   if (!data || typeof data !== 'object') return;
   if (data._negozi && typeof data._negozi === 'object') provaNegozi = data._negozi;
+  if (data._slot2 && typeof data._slot2 === 'object') provaSlot2 = data._slot2;
   OPERATORS.forEach(op => { provaCelle[op] = data[op] && typeof data[op] === 'object' ? data[op] : {}; });
 }
 
@@ -2939,6 +2991,7 @@ function renderTurniProva() {
       const pv = provaPvClass(op, i);
       const shop = provaNegozio(op, i);
       const work = provaIsWorkCode(v) && !isBagheriaCode(v);
+      const s2 = provaSecond(op, i);
       html += `<td class="prova-td"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
       provaCellOptions(i).forEach(([val, lab]) => {
         html += `<option value="${val}"${provaOptionSelected(v, val) ? ' selected' : ''}>${lab}</option>`;
@@ -2948,7 +3001,21 @@ function renderTurniProva() {
       PUNTI_VENDITA.forEach(n => {
         html += `<option value="${escapeHtml(n)}"${shop === n ? ' selected' : ''}>${escapeHtml(n)}</option>`;
       });
-      html += '</select></td>';
+      html += '</select>';
+      if (work) {
+        const pv2 = s2 ? (NEGOZIO_CLASS[s2.shop] || 'pv-malfa') : 'pv-riposo';
+        html += `<select class="prova-cell2 ${pv2}" data-s2-op="${escapeHtml(op)}" data-day="${i}">`;
+        provaSlot2Options().forEach(([val, lab]) => {
+          html += `<option value="${val}"${s2 && s2.code === val ? ' selected' : ''}>${lab}</option>`;
+        });
+        html += '</select>';
+        html += `<select class="prova-neg-cell ${pv2}${s2 && s2.code ? '' : ' hidden'}" data-s2neg-op="${escapeHtml(op)}" data-day="${i}">`;
+        PUNTI_VENDITA.forEach(n => {
+          html += `<option value="${escapeHtml(n)}"${s2 && s2.shop === n ? ' selected' : ''}>${escapeHtml(n)}</option>`;
+        });
+        html += '</select>';
+      }
+      html += '</td>';
     }
     html += '</tr>';
   });
@@ -2969,15 +3036,38 @@ function renderTurniProva() {
       const op = sel.dataset.op;
       const day = parseInt(sel.dataset.day, 10);
       setProvaCell(op, day, sel.value);
-      if (!provaIsWorkCode(sel.value)) setProvaNegozio(op, day, '');
-      else if (isBagheriaCode(sel.value)) setProvaNegozio(op, day, 'Bagheria');
+      if (!provaIsWorkCode(sel.value)) {
+        setProvaNegozio(op, day, '');
+        setProvaSecond(op, day, '');
+      } else if (isBagheriaCode(sel.value)) setProvaNegozio(op, day, 'Bagheria');
       else if (!provaNegozi[op] || !provaNegozi[op][String(day)]) setProvaNegozio(op, day, 'La Malfa');
+      if (sel.value === 'A' || sel.value === 'C' || sel.value === 'S' || sel.value === 'B44') setProvaSecond(op, day, '');
       renderTurniProva();
     };
   });
-  grid.querySelectorAll('select.prova-neg-cell').forEach(sel => {
+  grid.querySelectorAll('select.prova-neg-cell[data-neg-op]').forEach(sel => {
     sel.onchange = () => {
       setProvaNegozio(sel.dataset.negOp, parseInt(sel.dataset.day, 10), sel.value);
+      renderTurniProva();
+    };
+  });
+  grid.querySelectorAll('select[data-s2-op]').forEach(sel => {
+    sel.onchange = () => {
+      const op = sel.dataset.s2Op;
+      const day = parseInt(sel.dataset.day, 10);
+      const shopSel = grid.querySelector('select[data-s2neg-op="' + op + '"][data-day="' + day + '"]');
+      const shop = (shopSel && shopSel.value) || 'La Malfa';
+      setProvaSecond(op, day, sel.value, shop);
+      renderTurniProva();
+    };
+  });
+  grid.querySelectorAll('select[data-s2neg-op]').forEach(sel => {
+    sel.onchange = () => {
+      const op = sel.dataset.s2negOp;
+      const day = parseInt(sel.dataset.day, 10);
+      const cur = provaSecond(op, day);
+      if (!cur) return;
+      setProvaSecond(op, day, cur.code, sel.value);
       renderTurniProva();
     };
   });
@@ -2992,7 +3082,7 @@ function renderTurniProva() {
 
 function provaHours(op) {
   let h = 0;
-  for (let i = 0; i < 7; i++) h += PROVA_HOURS[provaCell(op, i)] || 0;
+  for (let i = 0; i < 7; i++) h += provaDayHours(op, i);
   return h;
 }
 
@@ -3008,6 +3098,10 @@ function provaValidate() {
     const h = provaHours(op);
     if (h > 40) issues.push(op + ': ' + h + ' ore (max 40)');
     if (h < 40 && h > 0) issues.push(op + ': ' + h + ' ore (serve 40)');
+    for (let d = 0; d < 7; d++) {
+      const dh = provaDayHours(op, d);
+      if (dh > 8) issues.push(op + ' ' + PROVA_DAYS[d] + ': ' + dh + 'h in un giorno (max 8)');
+    }
   });
   for (let day = 0; day < 7; day++) {
     const name = PROVA_DAYS[day];
@@ -3020,12 +3114,12 @@ function provaValidate() {
         issues.push('Domenica La Malfa: 2 persone, una 09-15 e una 14-20');
       }
     } else {
-      const atOpen = OPERATORS.filter(op => provaAtMain(op, day) && provaPresent(provaCell(op, day), 9)).length;
-      const atClose = OPERATORS.filter(op => provaAtMain(op, day) && provaPresent(provaCell(op, day), 19)).length;
+      const atOpen = OPERATORS.filter(op => provaAtMainHour(op, day, 9)).length;
+      const atClose = OPERATORS.filter(op => provaAtMainHour(op, day, 19)).length;
       if (atOpen < 1) issues.push(name + ' (La Malfa): nessuno in apertura (09:00)');
       if (atClose < 2) issues.push(name + ' (La Malfa): in chiusura ' + atClose + ' persone (min 2)');
       for (let h = 9; h < 20; h++) {
-        const n = OPERATORS.filter(op => provaAtMain(op, day) && provaPresent(provaCell(op, day), h)).length;
+        const n = OPERATORS.filter(op => provaAtMainHour(op, day, h)).length;
         if (n < 1) {
           issues.push(name + ': scoperto alle ' + String(h).padStart(2, '0') + ':00');
           break;
@@ -3171,7 +3265,7 @@ const PROVA_CODES_BY_H = {
 
 function provaCodesCover(codes, day) {
   function pres(hour) {
-    return OPERATORS.some(op => provaAtMain(op, day, codes[op]) && provaPresent(codes[op], hour));
+    return OPERATORS.some(op => provaAtMainHour(op, day, hour, codes[op]));
   }
   if (!pres(9)) return false;
   let close = 0;
@@ -3229,6 +3323,7 @@ function generateTurniProva() {
 
   provaCelle = {};
   provaNegozi = {};
+  provaSlot2 = {};
   ops.forEach(op => { provaCelle[op] = {}; });
 
   let dm = null;
@@ -3287,11 +3382,17 @@ function generateTurniProva() {
     });
   }
   applyBagheriaVincoliDays();
+  ops.forEach(op => {
+    for (let day = 0; day < 7; day++) {
+      const s = provaVincoliSlot2[op] && provaVincoliSlot2[op][String(day)];
+      if (s && s.code) setProvaSecond(op, day, s.code, s.shop || 'La Malfa');
+    }
+  });
 
   const hours = {};
   ops.forEach(op => {
     hours[op] = 0;
-    for (let d = 0; d < 7; d++) hours[op] += PROVA_HOURS[provaCell(op, d)] || 0;
+    for (let d = 0; d < 7; d++) hours[op] += provaDayHours(op, d);
   });
 
   const flexDays = {};
@@ -3459,8 +3560,10 @@ function renderProvaVincoliForm() {
     html += '<tr><th>' + escapeHtml(op) + '</th>';
     for (let i = 0; i < 7; i++) {
       const cur = (provaVincoli[op] && provaVincoli[op][String(i)]) || '';
-      const shop = (provaVincoliNegozi[op] && provaVincoliNegozi[op][String(i)]) || 'La Malfa';
+      const shopRaw = provaVincoliNegozi[op] && provaVincoliNegozi[op][String(i)];
+      const shop = typeof shopRaw === 'string' ? shopRaw : 'La Malfa';
       const work = provaIsWorkCode(cur) && !isBagheriaCode(cur);
+      const s2 = (provaVincoliSlot2[op] && provaVincoliSlot2[op][String(i)]) || {};
       html += '<td class="vincolo-td">';
       html += '<select class="vincolo-orario" data-op="' + escapeHtml(op) + '" data-day="' + i + '">';
       provaVincoloOptions(i).forEach(([val, lab]) => {
@@ -3470,6 +3573,16 @@ function renderProvaVincoliForm() {
       html += '<select class="vincolo-negozio ' + (NEGOZIO_CLASS[shop] || 'pv-malfa') + (work ? '' : ' hidden') + '" data-neg-op="' + escapeHtml(op) + '" data-day="' + i + '">';
       PUNTI_VENDITA.forEach(n => {
         html += '<option value="' + escapeHtml(n) + '"' + (shop === n ? ' selected' : '') + '>' + escapeHtml(n) + '</option>';
+      });
+      html += '</select>';
+      html += '<select class="vincolo-orario2' + (work ? '' : ' hidden') + '" data-s2-op="' + escapeHtml(op) + '" data-day="' + i + '">';
+      provaSlot2Options().forEach(([val, lab]) => {
+        html += '<option value="' + val + '"' + (s2.code === val ? ' selected' : '') + '>' + lab + '</option>';
+      });
+      html += '</select>';
+      html += '<select class="vincolo-negozio2 ' + (NEGOZIO_CLASS[s2.shop] || 'pv-malfa') + (s2.code ? '' : ' hidden') + '" data-s2neg-op="' + escapeHtml(op) + '" data-day="' + i + '">';
+      PUNTI_VENDITA.forEach(n => {
+        html += '<option value="' + escapeHtml(n) + '"' + (s2.shop === n ? ' selected' : '') + '>' + escapeHtml(n) + '</option>';
       });
       html += '</select></td>';
     }
@@ -3489,10 +3602,21 @@ function renderProvaVincoliForm() {
   box.innerHTML = html;
   box.querySelectorAll('select.vincolo-orario').forEach(sel => {
     sel.onchange = () => {
-      const shop = sel.parentElement.querySelector('select.vincolo-negozio');
+      const td = sel.parentElement;
+      const shop = td.querySelector('select.vincolo-negozio');
+      const o2 = td.querySelector('select.vincolo-orario2');
+      const n2 = td.querySelector('select.vincolo-negozio2');
       const v = sel.value;
       const work = provaIsWorkCode(v) && !isBagheriaCode(v);
       if (shop) shop.classList.toggle('hidden', !work);
+      if (o2) o2.classList.toggle('hidden', !work);
+      if (n2 && o2) n2.classList.toggle('hidden', !work || !o2.value);
+    };
+  });
+  box.querySelectorAll('select.vincolo-orario2').forEach(sel => {
+    sel.onchange = () => {
+      const n2 = sel.parentElement.querySelector('select.vincolo-negozio2');
+      if (n2) n2.classList.toggle('hidden', !sel.value);
     };
   });
   box.querySelectorAll('select.vincolo-negozio').forEach(sel => {
@@ -3507,11 +3631,20 @@ function collectProvaVincoli() {
   provaVincoli = {};
   provaVincoliNegozi = {};
   provaVincoliBagheria = {};
+  provaVincoliSlot2 = {};
   document.querySelectorAll('#prova-vincoli-form select').forEach(sel => {
     if (sel.dataset.bag) {
       provaVincoliBagheria[sel.dataset.day] = sel.value || 'L';
       return;
     }
+    if (sel.dataset.s2Op) {
+      const op = sel.dataset.s2Op;
+      if (!provaVincoliSlot2[op]) provaVincoliSlot2[op] = {};
+      const shopSel = document.querySelector('#prova-vincoli-form select[data-s2neg-op="' + op + '"][data-day="' + sel.dataset.day + '"]');
+      if (sel.value) provaVincoliSlot2[op][sel.dataset.day] = { code: sel.value, shop: (shopSel && shopSel.value) || 'La Malfa' };
+      return;
+    }
+    if (sel.dataset.s2negOp) return;
     if (sel.dataset.negOp) {
       const op = sel.dataset.negOp;
       if (!provaVincoliNegozi[op]) provaVincoliNegozi[op] = {};
@@ -3625,7 +3758,7 @@ function drawTurniProvaCanvas() {
   const nameW = 150;
   const dayW = 92;
   const headH = 46;
-  const rowH = 72;
+  const rowH = 86;
   const titleH = 52;
   const subH = 28;
   const legendH = 44;
@@ -3682,12 +3815,19 @@ function drawTurniProvaCanvas() {
       ctx.fill();
       ctx.fillStyle = col.fg;
       ctx.textAlign = 'center';
-      ctx.font = '800 12px "DM Sans", system-ui, sans-serif';
-      ctx.fillText(PROVA_LABEL[code] || '·', x + (dayW - 8) / 2, y + 32);
+      ctx.font = '800 11px "DM Sans", system-ui, sans-serif';
+      ctx.fillText(PROVA_LABEL[code] || '·', x + (dayW - 8) / 2, y + 28);
       const shop = provaIsWorkCode(code) ? provaShopShort(provaNegozio(op, i)) : '';
       if (shop) {
-        ctx.font = '600 10px "DM Sans", system-ui, sans-serif';
-        ctx.fillText(shop, x + (dayW - 8) / 2, y + 48);
+        ctx.font = '600 9px "DM Sans", system-ui, sans-serif';
+        ctx.fillText(shop, x + (dayW - 8) / 2, y + 42);
+      }
+      const s2 = provaSecond(op, i);
+      if (s2 && s2.code) {
+        ctx.font = '800 10px "DM Sans", system-ui, sans-serif';
+        ctx.fillText(PROVA_LABEL[s2.code] || s2.code, x + (dayW - 8) / 2, y + 56);
+        ctx.font = '600 9px "DM Sans", system-ui, sans-serif';
+        ctx.fillText(provaShopShort(s2.shop), x + (dayW - 8) / 2, y + 68);
       }
       ctx.textAlign = 'left';
     }
@@ -5646,7 +5786,7 @@ async function init() {
   if (btnVincoliSkip) btnVincoliSkip.onclick = () => {
     const w = document.getElementById('prova-vincoli-week');
     if (w && w.value) setProvaWeekFromDate(w.value, false);
-    provaVincoli = {}; provaVincoliNegozi = {}; provaVincoliBagheria = {};
+    provaVincoli = {}; provaVincoliNegozi = {}; provaVincoliBagheria = {}; provaVincoliSlot2 = {};
     closeProvaVincoli();
     generateTurniProva();
   };

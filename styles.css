@@ -2292,26 +2292,29 @@ body {
 .prova-week-pick {
   position: relative;
   flex: 1;
-  text-align: center;
-  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
 }
 .prova-week-pick span {
   display: block;
   font-weight: 700;
   font-size: 1rem;
-  padding: 8px 4px;
-  border-radius: 10px;
-  background: var(--card);
-  border: 1px dashed var(--border);
+  padding: 2px 4px;
 }
-.prova-week-pick input[type="date"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+.prova-week-date-vis {
   width: 100%;
-  height: 100%;
+  max-width: 190px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  background: var(--card);
+  color: var(--text);
   cursor: pointer;
-  font-size: 1.1rem;
 }
 .prova-vincoli-week-lab {
   display: block;
@@ -2409,6 +2412,21 @@ body {
 }
 
 .prova-td { vertical-align: top; }
+.prova-cell2 {
+  width: 100%;
+  margin-top: 3px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.62rem;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
 .prova-neg-cell {
   width: 100%;
   margin-top: 3px;
