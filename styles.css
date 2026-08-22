@@ -2348,8 +2348,7 @@ body {
   background: #fbf7f2;
 }
 .prova-grid-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--card);
@@ -2357,12 +2356,22 @@ body {
 .prova-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 0;
+  table-layout: fixed;
 }
 .prova-table th, .prova-table td {
   border: 1px solid var(--border);
   text-align: center;
-  padding: 4px;
+  padding: 3px;
+  width: 12%;
+}
+.prova-table tbody th {
+  font-size: 0.7rem;
+  text-align: left;
+  padding: 6px 6px;
+  white-space: normal;
+  font-weight: 700;
+  width: 16%;
 }
 .prova-table thead th {
   font-size: 0.72rem;
@@ -2376,30 +2385,23 @@ body {
   color: var(--text);
   font-weight: 700;
 }
-.prova-table tbody th {
-  font-size: 0.72rem;
-  text-align: left;
-  padding: 6px 8px;
-  white-space: nowrap;
-  font-weight: 700;
-}
 .prova-table tbody th small.prova-ore {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--muted);
   font-weight: 700;
 }
 .prova-table tbody th small.prova-ore.is-over { color: var(--danger); }
 .prova-cell {
   width: 100%;
-  min-width: 76px;
-  min-height: 40px;
+  min-width: 0;
+  min-height: 36px;
   height: auto;
-  padding: 6px 2px;
+  padding: 5px 1px;
   border: 1px solid transparent;
   border-radius: 8px;
   font-weight: 800;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-family: inherit;
   background: var(--bg);
   color: var(--muted);
@@ -2455,7 +2457,7 @@ body {
   font-weight: 700;
   font-size: 0.75rem;
 }
-.vincolo-td { min-width: 96px; vertical-align: top; }
+.vincolo-td { min-width: 0; vertical-align: top; }
 .vincolo-td select { display: block; width: 100%; margin-top: 3px; }
 
 .prova-cell.fascia-A { background: #e8f1ff; color: #1d4ed8; }
@@ -2482,15 +2484,15 @@ body {
   padding: 8px 2px;
 }
 .prova-vincoli-table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   margin-top: 10px;
 }
 .prova-vincoli-table {
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 0;
   width: 100%;
-  font-size: 0.75rem;
+  table-layout: fixed;
+  font-size: 0.72rem;
 }
 .prova-vincoli-table th, .prova-vincoli-table td {
   border: 1px solid var(--border);
@@ -2499,12 +2501,14 @@ body {
 }
 .prova-vincoli-table tbody th {
   text-align: left;
-  white-space: nowrap;
-  padding: 6px 8px;
+  white-space: normal;
+  padding: 6px 6px;
+  width: 14%;
 }
 .prova-vincoli-table select {
   width: 100%;
-  min-width: 72px;
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.72rem;
   padding: 6px 2px;
   border-radius: 8px;
@@ -2798,4 +2802,14 @@ body {
   background: var(--card) !important;
   border-color: var(--border) !important;
   color: var(--text) !important;
+}
+
+@media (min-width: 800px) {
+  .main:has(#page-turni-prova.active) {
+    max-width: min(1200px, 98vw);
+  }
+  #page-turni-prova .task-form-card {
+    max-width: min(1100px, 96vw);
+    width: 96vw;
+  }
 }
