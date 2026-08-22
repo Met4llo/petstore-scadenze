@@ -2368,6 +2368,11 @@ body {
 .prova-cell.fascia-6C, .prova-cell.fascia-DS { background: #fce8e6; color: #9a3412; }
 .prova-cell.fascia-4A { background: #dcfce7; color: #166534; }
 .prova-cell.fascia-4C { background: #ffedd5; color: #9a3412; }
+.prova-cell.fascia-B,
+.prova-cell.fascia-B44 { background: #e0f2fe; color: #075985; }
+.prova-cell.fascia-B4A { background: #bae6fd; color: #0c4a6e; }
+.prova-cell.fascia-B4C { background: #7dd3fc; color: #0c4a6e; }
+.prova-cell.fascia-R { background: #f4efe6; color: #6f645b; }
 .prova-cell.fascia-F { background: #fce7f3; color: #9d174d; }
 .prova-bagheria-row th, .prova-bagheria-row td {
   background: #f0f9ff;

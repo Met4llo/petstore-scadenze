@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.92 - turni 6h (09-15 / 14-20) e 4h (09-13 / 16-20)
+// VERSION 1.93 - riga Bagheria: libero o 4+4 / 09-13 / 16-20 (Sorrentino)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,7 +2665,7 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', '6A', '6C', '4A', '4C', 'B', 'DM', 'DS', 'R', 'F'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', '6A', '6C', '4A', '4C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
@@ -2676,6 +2676,9 @@ const PROVA_LABEL = {
   '4A': '9-13',
   '4C': '16-20',
   B: 'Bagh.',
+  B44: 'Bag 4+4',
+  B4A: 'Bag 9-13',
+  B4C: 'Bag 16-20',
   DM: '9-15',
   DS: '14-20',
   R: 'R',
@@ -2690,13 +2693,16 @@ const PROVA_TITLE = {
   '6C': '14:00–20:00 (6h)',
   '4A': '09:00–13:00 (4h)',
   '4C': '16:00–20:00 (4h)',
-  B: 'Bagheria — sostituzione (8h, non in negozio)',
+  B: 'Bagheria giornata (8h)',
+  B44: 'Bagheria 4+4 (09-13 e 16-20, 8h)',
+  B4A: 'Bagheria 09-13 (4h)',
+  B4C: 'Bagheria 16-20 (4h)',
   DM: '09:00–15:00 (6h)',
   DS: '14:00–20:00 (6h)',
   R: 'Riposo',
   F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, '6A': 6, '6C': 6, '4A': 4, '4C': 4, B: 8, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, '6A': 6, '6C': 6, '4A': 4, '4C': 4, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -2741,6 +2747,37 @@ function cycleProvaFascia(cur) {
   return PROVA_FASCE[(i + 1) % PROVA_FASCE.length];
 }
 
+const PROVA_BAGHERIA_OP = 'Sorrentino';
+
+function isBagheriaCode(c) {
+  return c === 'B' || c === 'B44' || c === 'B4A' || c === 'B4C';
+}
+
+function provaBagheriaOptions() {
+  return [
+    ['L', 'Libero'],
+    ['B44', '4+4 (8h)'],
+    ['B4A', '09-13 (4h)'],
+    ['B4C', '16-20 (4h)']
+  ];
+}
+
+function provaBagheriaValue(day) {
+  const c = provaCell(PROVA_BAGHERIA_OP, day);
+  if (c === 'B') return 'B44';
+  if (isBagheriaCode(c)) return c;
+  return 'L';
+}
+
+function applyBagheriaDay(day, val) {
+  const op = PROVA_BAGHERIA_OP;
+  if (!val || val === 'L') {
+    if (isBagheriaCode(provaCell(op, day))) setProvaCell(op, day, 'R');
+    return;
+  }
+  setProvaCell(op, day, val);
+}
+
 function provaCellOptions(day) {
   return [
     ['', '—'],
@@ -2751,7 +2788,9 @@ function provaCellOptions(day) {
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
     ['4C', '16-20 (4h)'],
-    ['B', 'Bagheria'],
+    ['B44', 'Bagheria 4+4'],
+    ['B4A', 'Bagheria 09-13'],
+    ['B4C', 'Bagheria 16-20'],
     ['R', 'Riposo'],
     ['F', 'Ferie']
   ];
@@ -2761,6 +2800,7 @@ function provaOptionSelected(saved, val) {
   if (saved === val) return true;
   if (val === '6A' && saved === 'DM') return true;
   if (val === '6C' && saved === 'DS') return true;
+  if (val === 'B44' && saved === 'B') return true;
   return false;
 }
 
@@ -2794,18 +2834,27 @@ function renderTurniProva() {
     }
     html += '</tr>';
   });
-  html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">punto vendita</small></th>';
+  html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">Sorrentino</small></th>';
   for (let i = 0; i < 7; i++) {
-    const who = OPERATORS.filter(op => provaCell(op, i) === 'B');
-    const txt = who.length ? who.map(n => n.slice(0, 3)).join(' ') : '·';
-    html += `<td><span class="prova-bagheria-cell">${escapeHtml(txt)}</span></td>`;
+    const cur = provaBagheriaValue(i);
+    html += `<td><select class="prova-cell prova-bagheria-select fascia-${cur === 'L' ? 'R' : cur}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
+    provaBagheriaOptions().forEach(([val, lab]) => {
+      html += `<option value="${val}"${cur === val ? ' selected' : ''}>${lab}</option>`;
+    });
+    html += '</select></td>';
   }
   html += '</tr>';
   html += '</tbody></table>';
   grid.innerHTML = html;
-  grid.querySelectorAll('select.prova-cell').forEach(sel => {
+  grid.querySelectorAll('select.prova-cell[data-op]').forEach(sel => {
     sel.onchange = () => {
       setProvaCell(sel.dataset.op, parseInt(sel.dataset.day, 10), sel.value);
+      renderTurniProva();
+    };
+  });
+  grid.querySelectorAll('select.prova-bagheria-select').forEach(sel => {
+    sel.onchange = () => {
+      applyBagheriaDay(parseInt(sel.dataset.bday, 10), sel.value);
       renderTurniProva();
     };
   });
@@ -2944,8 +2993,8 @@ function generateTurniProva() {
     const v = vFor(op, 6);
     if (v === 'DM' || v === 'A' || v === '6A') dm = op;
     if (v === 'DS' || v === 'C' || v === '6C') ds = op;
-    if (v === 'B') {
-      setProvaCell(op, 6, 'B');
+    if (isBagheriaCode(v)) {
+      setProvaCell(op, 6, v === 'B' ? 'B44' : v);
       sunBusy.add(op);
     }
     if (v === 'R' || v === 'F') {
@@ -2996,8 +3045,8 @@ function generateTurniProva() {
 
   for (let day = 0; day < 6; day++) {
     const forcedRest = ops.filter(op => vFor(op, day) === 'R' || vFor(op, day) === 'F');
-    const atBag = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 <= 40);
-    const bagOver = ops.filter(op => vFor(op, day) === 'B' && hours[op] + 8 > 40);
+    const atBag = ops.filter(op => isBagheriaCode(vFor(op, day)) && hours[op] + (PROVA_HOURS[vFor(op, day)] || 8) <= 40);
+    const bagOver = ops.filter(op => isBagheriaCode(vFor(op, day)) && hours[op] + (PROVA_HOURS[vFor(op, day)] || 8) > 40);
     const locked = {};
     ops.forEach(op => {
       const v = vFor(op, day);
@@ -3050,8 +3099,9 @@ function generateTurniProva() {
       if (vFor(op, day) === 'F') setProvaCell(op, day, 'F');
     });
     atBag.forEach(op => {
-      setProvaCell(op, day, 'B');
-      hours[op] += 8;
+      const code = vFor(op, day) === 'B' ? 'B44' : vFor(op, day);
+      setProvaCell(op, day, code);
+      hours[op] += PROVA_HOURS[code] || 8;
     });
     if (bestRoles) {
       working.forEach((op, i) => {
