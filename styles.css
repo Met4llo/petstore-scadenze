@@ -2361,6 +2361,39 @@ body {
   text-align: center;
   text-align-last: center;
 }
+
+.prova-td { vertical-align: top; }
+.prova-neg-cell {
+  width: 100%;
+  margin-top: 3px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.62rem;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+.pv-malfa { background: #ffedd5; color: #9a3412; }
+.pv-rizzo { background: #dbeafe; color: #1d4ed8; }
+.pv-lorenzo { background: #dcfce7; color: #166534; }
+.pv-bagheria { background: #e0f2fe; color: #075985; }
+.pv-riposo { background: #f4efe6; color: #6f645b; }
+.pv-ferie { background: #fce7f3; color: #9d174d; }
+.leg-pv {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+.vincolo-td { min-width: 96px; vertical-align: top; }
+.vincolo-td select { display: block; width: 100%; margin-top: 3px; }
+
 .prova-cell.fascia-A { background: #e8f1ff; color: #1d4ed8; }
 .prova-cell.fascia-C { background: #fff4d6; color: #9a4a12; }
 .prova-cell.fascia-S { background: #f3e8ff; color: #6b21a8; }
