@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.04 - turno 17-20 (3h)
+// VERSION 2.05 - turno 11-20 (7h)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,13 +2665,14 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', '7C', '6A', '6C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
   C: '12-20',
   S: '4+4',
   S6: '3+3',
+  '7C': '11-20',
   '6A': '9-15',
   '6C': '14-20',
   '4A': '9-13',
@@ -2692,6 +2693,7 @@ const PROVA_TITLE = {
   C: 'Intero 12:00–20:00 (8h, pausa inclusa)',
   S: 'Spezzato 09:00–13:00 e 16:00–20:00 (8h)',
   S6: 'Spezzato 09:00–12:00 e 17:00–20:00 (6h)',
+  '7C': '11:00–20:00 (7h)',
   '6A': '09:00–15:00 (6h)',
   '6C': '14:00–20:00 (6h)',
   '4A': '09:00–13:00 (4h)',
@@ -2706,12 +2708,13 @@ const PROVA_TITLE = {
   R: 'Riposo',
   F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '6A': 6, '6C': 6, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '7C': 7, '6A': 6, '6C': 6, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
   S: [[9, 13], [16, 20]],
   S6: [[9, 12], [17, 20]],
+  '7C': [[11, 20]],
   '6A': [[9, 15]],
   '6C': [[14, 20]],
   '4A': [[9, 13]],
@@ -2907,7 +2910,7 @@ function isBagheriaCode(c) {
 function codeToBagheriaRow(code) {
   if (code === '4A' || code === 'B4A') return 'B4A';
   if (code === '4C' || code === 'B4C') return 'B4C';
-  if (code === 'B44' || code === 'B' || code === 'S' || code === 'S6' || code === 'A' || code === 'C' || code === '6A' || code === '6C') return 'B44';
+  if (code === 'B44' || code === 'B' || code === 'S' || code === 'S6' || code === 'A' || code === 'C' || code === '7C' || code === '6A' || code === '6C') return 'B44';
   if (provaIsWorkCode(code)) return 'B44';
   return 'L';
 }
@@ -2977,6 +2980,7 @@ function provaCellOptions(day) {
     ['C', '12-20 (8h)'],
     ['S', '4+4 (8h)'],
     ['S6', '09-12 / 17-20 (6h)'],
+    ['7C', '11-20 (7h)'],
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
@@ -3074,7 +3078,7 @@ function renderTurniProva() {
         setProvaSecond(op, day, '');
       } else if (isBagheriaCode(sel.value)) setProvaNegozio(op, day, 'Bagheria');
       else if (!provaNegozi[op] || !provaNegozi[op][String(day)]) setProvaNegozio(op, day, 'La Malfa');
-      if (sel.value === 'A' || sel.value === 'C' || sel.value === 'S' || sel.value === 'S6' || sel.value === 'B44') setProvaSecond(op, day, '');
+      if (sel.value === 'A' || sel.value === 'C' || sel.value === 'S' || sel.value === 'S6' || sel.value === '7C' || sel.value === 'B44') setProvaSecond(op, day, '');
       renderTurniProva();
     };
   });
@@ -3202,7 +3206,7 @@ function provaWeekNumber(mondayStr) {
 
 function provaRoleOf(code) {
   if (code === 'A' || code === 'DM' || code === '6A' || code === '4A') return 'A';
-  if (code === 'C' || code === 'DS' || code === '6C' || code === '4C' || code === '3C') return 'C';
+  if (code === 'C' || code === 'DS' || code === '7C' || code === '6C' || code === '4C' || code === '3C') return 'C';
   if (code === 'S' || code === 'S6') return 'S';
   return null;
 }
@@ -3272,7 +3276,7 @@ function provaMakePack(need, nDays) {
   const out = [];
   function rec(left, days) {
     if (days === 0) return left === 0;
-    const sizes = [8, 6, 4, 3, 0];
+    const sizes = [8, 7, 6, 4, 3, 0];
     for (let i = 0; i < sizes.length; i++) {
       const s = sizes[i];
       if (s > left) continue;
@@ -3301,6 +3305,7 @@ function provaTakeBag(bag, prefer) {
 
 const PROVA_CODES_BY_H = {
   8: ['A', 'C', 'S'],
+  7: ['7C'],
   6: ['6A', '6C', 'S6'],
   4: ['4A', '4C'],
   3: ['3C']
@@ -3408,7 +3413,7 @@ function generateTurniProva() {
   });
   applyBagheriaVincoliDays();
 
-  const LOCK_CODES = ['A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C', '3C'];
+  const LOCK_CODES = ['A', 'C', 'S', 'S6', '7C', '6A', '6C', '4A', '4C', '3C'];
   for (let day = 0; day < 6; day++) {
     ops.forEach(op => {
       const v = vFor(op, day);
@@ -3491,7 +3496,7 @@ function generateTurniProva() {
     });
     const hourAssign = {};
     workersFlex.forEach(op => {
-      const h = provaTakeBag(bags[op], [8, 6, 4, 3]);
+      const h = provaTakeBag(bags[op], [8, 7, 6, 4, 3]);
       if (!h) {
         setProvaCell(op, day, 'R');
         preset[op] = 'R';
@@ -3528,7 +3533,7 @@ function provaFillExact40() {
     let guard = 0;
     while (provaHours(op) < 40 && guard++ < 6) {
       const miss = 40 - provaHours(op);
-      const want = miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
+      const want = miss >= 8 ? 8 : miss >= 7 ? 7 : miss >= 6 ? 6 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
       if (!want) break;
       const c = provaRoleCounts(op);
       let code;
@@ -3536,7 +3541,8 @@ function provaFillExact40() {
         if (c.S <= c.A && c.S <= c.C) code = 'S';
         else if (c.A <= c.C) code = 'A';
         else code = 'C';
-      } else if (want === 6) code = c.S <= c.A && c.S <= c.C ? 'S6' : (c.A <= c.C ? '6A' : '6C');
+      } else if (want === 7) code = '7C';
+      else if (want === 6) code = c.S <= c.A && c.S <= c.C ? 'S6' : (c.A <= c.C ? '6A' : '6C');
       else if (want === 3) code = '3C';
       else code = c.A <= c.C ? '4A' : '4C';
       let done = false;
@@ -3587,6 +3593,7 @@ function provaVincoloOptions(day) {
     ['C', '12-20 (8h)'],
     ['S', 'Spezzato 4+4 (8h)'],
     ['S6', 'Spezzato 09-12 / 17-20 (6h)'],
+    ['7C', '11-20 (7h)'],
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
