@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.94 - generatore: tutte le fasce, tutti esattamente 40h
+// VERSION 1.95 - 40h e equità aperture / chiusure / spezzati
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2922,7 +2922,7 @@ function renderProvaCheck() {
   }
   if (!issues.length) {
     el.className = 'prova-check is-ok';
-    el.innerHTML = 'Regole ok: chiusura ≥2, tutti a 40 ore, domenica 2 persone.';
+    el.innerHTML = 'Regole ok: chiusura ≥2, tutti a 40 ore, aperture/chiusure/spezzati equilibrati.';
     return;
   }
   el.className = 'prova-check is-warn';
@@ -2972,9 +2972,26 @@ function provaFairScore(counts) {
     const vals = OPERATORS.map(op => counts[op][t]);
     const max = Math.max.apply(null, vals);
     const min = Math.min.apply(null, vals);
-    s += (max - min) * 20;
-    vals.forEach(v => { s += v * v; });
+    const sum = vals.reduce((a, b) => a + b, 0);
+    const avg = sum / vals.length;
+    s += (max - min) * 40;
+    vals.forEach(v => { s += (v - avg) * (v - avg) * 12; });
   });
+  OPERATORS.forEach(op => {
+    const c = counts[op];
+    const work = c.A + c.S + c.C;
+    if (work >= 2) s += Math.abs(c.A - c.C) * 14;
+    if (work >= 2 && c.S === 0) s += 26;
+    if (work >= 3 && c.A === 0) s += 24;
+    if (work >= 3 && c.C === 0) s += 24;
+  });
+  let totA = 0, totS = 0, totC = 0;
+  OPERATORS.forEach(op => {
+    totA += counts[op].A;
+    totS += counts[op].S;
+    totC += counts[op].C;
+  });
+  if (totS * 3 < totA + totC) s += (totA + totC - totS * 3) * 8;
   return s;
 }
 
@@ -3018,9 +3035,9 @@ function provaTakeBag(bag, prefer) {
 }
 
 const PROVA_CODES_BY_H = {
-  8: ['C', 'A', 'S'],
-  6: ['6C', '6A'],
-  4: ['4C', '4A']
+  8: ['A', 'C', 'S'],
+  6: ['6A', '6C'],
+  4: ['4A', '4C']
 };
 
 function provaCodesCover(codes) {
@@ -3035,21 +3052,40 @@ function provaCodesCover(codes) {
   return true;
 }
 
-function provaPickCodes(hourAssign, preset) {
+function provaPickCodes(hourAssign, preset, counts) {
   const workers = Object.keys(hourAssign);
   const codes = {};
   OPERATORS.forEach(op => { codes[op] = preset[op] || 'R'; });
+  let best = null;
+  let bestScore = Infinity;
   function rec(i) {
-    if (i === workers.length) return provaCodesCover(codes);
+    if (i === workers.length) {
+      if (!provaCodesCover(codes)) return;
+      const next = {};
+      OPERATORS.forEach(op => {
+        next[op] = { A: counts[op].A, S: counts[op].S, C: counts[op].C };
+      });
+      workers.forEach(op => {
+        const rk = provaRoleOf(codes[op]);
+        if (rk) next[op][rk] += 1;
+      });
+      const sc = provaFairScore(next);
+      if (sc < bestScore) {
+        bestScore = sc;
+        best = {};
+        OPERATORS.forEach(op => { best[op] = codes[op]; });
+      }
+      return;
+    }
     const op = workers[i];
     const list = PROVA_CODES_BY_H[hourAssign[op]] || ['R'];
     for (let k = 0; k < list.length; k++) {
       codes[op] = list[k];
-      if (rec(i + 1)) return true;
+      rec(i + 1);
     }
-    return false;
   }
-  if (rec(0)) return codes;
+  rec(0);
+  if (best) return best;
   workers.forEach(op => {
     codes[op] = (PROVA_CODES_BY_H[hourAssign[op]] || ['R'])[0];
   });
@@ -3185,7 +3221,7 @@ function generateTurniProva() {
       }
     });
 
-    const picked = provaPickCodes(hourAssign, preset);
+    const picked = provaPickCodes(hourAssign, preset, counts);
     Object.keys(hourAssign).forEach(op => {
       const role = picked[op] || (PROVA_CODES_BY_H[hourAssign[op]] || ['C'])[0];
       setProvaCell(op, day, role);
@@ -3213,7 +3249,14 @@ function provaFillExact40() {
       const miss = 40 - provaHours(op);
       const want = miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : 0;
       if (!want) break;
-      const code = want === 8 ? 'C' : want === 6 ? '6C' : '4C';
+      const c = provaRoleCounts(op);
+      let code;
+      if (want === 8) {
+        if (c.S <= c.A && c.S <= c.C) code = 'S';
+        else if (c.A <= c.C) code = 'A';
+        else code = 'C';
+      } else if (want === 6) code = c.A <= c.C ? '6A' : '6C';
+      else code = c.A <= c.C ? '4A' : '4C';
       let done = false;
       for (let day = 0; day < 6; day++) {
         if (vFor(op, day)) continue;
