@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.02 - spezzato 09-12 / 17-20 (6h)
+// VERSION 2.03 - Bagheria nel menu punto vendita (si allinea la riga Bagheria)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2718,7 +2718,7 @@ const PROVA_SPANS = {
   DS: [[14, 20]]
 };
 const PROVA_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-const PUNTI_VENDITA = ['La Malfa', 'Rizzo', 'San Lorenzo'];
+const PUNTI_VENDITA = ['La Malfa', 'Rizzo', 'San Lorenzo', 'Bagheria'];
 const NEGOZIO_CLASS = {
   'La Malfa': 'pv-malfa',
   'Rizzo': 'pv-rizzo',
@@ -2900,6 +2900,23 @@ function isBagheriaCode(c) {
   return c === 'B' || c === 'B44' || c === 'B4A' || c === 'B4C';
 }
 
+function codeToBagheriaRow(code) {
+  if (code === '4A' || code === 'B4A') return 'B4A';
+  if (code === '4C' || code === 'B4C') return 'B4C';
+  if (code === 'B44' || code === 'B' || code === 'S' || code === 'S6' || code === 'A' || code === 'C' || code === '6A' || code === '6C') return 'B44';
+  if (provaIsWorkCode(code)) return 'B44';
+  return 'L';
+}
+
+function provaOpAtBagheria(day) {
+  return OPERATORS.find(op => {
+    if (isBagheriaCode(provaCell(op, day))) return true;
+    if (provaNegozio(op, day) === 'Bagheria') return true;
+    const s2 = provaSecond(op, day);
+    return !!(s2 && s2.shop === 'Bagheria');
+  }) || null;
+}
+
 function provaBagheriaOptions() {
   return [
     ['L', 'Libero'],
@@ -2910,19 +2927,26 @@ function provaBagheriaOptions() {
 }
 
 function provaBagheriaValue(day) {
-  const c = provaCell(PROVA_BAGHERIA_OP, day);
+  const who = provaOpAtBagheria(day);
+  if (!who) return 'L';
+  const s2 = provaSecond(who, day);
+  if (s2 && s2.shop === 'Bagheria') return codeToBagheriaRow(s2.code);
+  const c = provaCell(who, day);
   if (c === 'B') return 'B44';
   if (isBagheriaCode(c)) return c;
-  return 'L';
+  return codeToBagheriaRow(c);
 }
 
 function applyBagheriaDay(day, val) {
-  const op = PROVA_BAGHERIA_OP;
+  const current = provaOpAtBagheria(day);
+  const op = current || PROVA_BAGHERIA_OP;
   if (!val || val === 'L') {
-    if (isBagheriaCode(provaCell(op, day))) {
-      setProvaCell(op, day, 'R');
+    if (isBagheriaCode(provaCell(op, day)) || provaNegozio(op, day) === 'Bagheria') {
+      if (isBagheriaCode(provaCell(op, day))) setProvaCell(op, day, 'R');
       setProvaNegozio(op, day, '');
     }
+    const s2 = provaSecond(op, day);
+    if (s2 && s2.shop === 'Bagheria') setProvaSecond(op, day, s2.code, 'La Malfa');
     return;
   }
   setProvaCell(op, day, val);
@@ -3051,7 +3075,16 @@ function renderTurniProva() {
   });
   grid.querySelectorAll('select.prova-neg-cell[data-neg-op]').forEach(sel => {
     sel.onchange = () => {
-      setProvaNegozio(sel.dataset.negOp, parseInt(sel.dataset.day, 10), sel.value);
+      const op = sel.dataset.negOp;
+      const day = parseInt(sel.dataset.day, 10);
+      const shop = sel.value;
+      setProvaNegozio(op, day, shop);
+      if (shop !== 'Bagheria' && isBagheriaCode(provaCell(op, day))) {
+        const c = provaCell(op, day);
+        if (c === 'B4A') setProvaCell(op, day, '4A');
+        else if (c === 'B4C') setProvaCell(op, day, '4C');
+        else if (c === 'B44' || c === 'B') setProvaCell(op, day, 'S');
+      }
       renderTurniProva();
     };
   });
