@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.03 - Bagheria nel menu punto vendita (si allinea la riga Bagheria)
+// VERSION 2.04 - turno 17-20 (3h)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,7 +2665,7 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
@@ -2676,6 +2676,7 @@ const PROVA_LABEL = {
   '6C': '14-20',
   '4A': '9-13',
   '4C': '16-20',
+  '3C': '17-20',
   B: 'Bagh.',
   B44: 'Bag 4+4',
   B4A: 'Bag 9-13',
@@ -2695,6 +2696,7 @@ const PROVA_TITLE = {
   '6C': '14:00–20:00 (6h)',
   '4A': '09:00–13:00 (4h)',
   '4C': '16:00–20:00 (4h)',
+  '3C': '17:00–20:00 (3h)',
   B: 'Bagheria giornata (8h)',
   B44: 'Bagheria 4+4 (09-13 e 16-20, 8h)',
   B4A: 'Bagheria 09-13 (4h)',
@@ -2704,7 +2706,7 @@ const PROVA_TITLE = {
   R: 'Riposo',
   F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '6A': 6, '6C': 6, '4A': 4, '4C': 4, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '6A': 6, '6C': 6, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -2714,6 +2716,7 @@ const PROVA_SPANS = {
   '6C': [[14, 20]],
   '4A': [[9, 13]],
   '4C': [[16, 20]],
+  '3C': [[17, 20]],
   DM: [[9, 15]],
   DS: [[14, 20]]
 };
@@ -2813,6 +2816,7 @@ function provaSlot2Options() {
     ['', '— 2° orario'],
     ['4A', '09-13 (4h)'],
     ['4C', '16-20 (4h)'],
+    ['3C', '17-20 (3h)'],
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)']
   ];
@@ -2977,6 +2981,7 @@ function provaCellOptions(day) {
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
     ['4C', '16-20 (4h)'],
+    ['3C', '17-20 (3h)'],
     ['B44', 'Bagheria 4+4'],
     ['B4A', 'Bagheria 09-13'],
     ['B4C', 'Bagheria 16-20'],
@@ -3197,7 +3202,7 @@ function provaWeekNumber(mondayStr) {
 
 function provaRoleOf(code) {
   if (code === 'A' || code === 'DM' || code === '6A' || code === '4A') return 'A';
-  if (code === 'C' || code === 'DS' || code === '6C' || code === '4C') return 'C';
+  if (code === 'C' || code === 'DS' || code === '6C' || code === '4C' || code === '3C') return 'C';
   if (code === 'S' || code === 'S6') return 'S';
   return null;
 }
@@ -3267,7 +3272,7 @@ function provaMakePack(need, nDays) {
   const out = [];
   function rec(left, days) {
     if (days === 0) return left === 0;
-    const sizes = [8, 6, 4, 0];
+    const sizes = [8, 6, 4, 3, 0];
     for (let i = 0; i < sizes.length; i++) {
       const s = sizes[i];
       if (s > left) continue;
@@ -3297,7 +3302,8 @@ function provaTakeBag(bag, prefer) {
 const PROVA_CODES_BY_H = {
   8: ['A', 'C', 'S'],
   6: ['6A', '6C', 'S6'],
-  4: ['4A', '4C']
+  4: ['4A', '4C'],
+  3: ['3C']
 };
 
 function provaCodesCover(codes, day) {
@@ -3402,7 +3408,7 @@ function generateTurniProva() {
   });
   applyBagheriaVincoliDays();
 
-  const LOCK_CODES = ['A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C'];
+  const LOCK_CODES = ['A', 'C', 'S', 'S6', '6A', '6C', '4A', '4C', '3C'];
   for (let day = 0; day < 6; day++) {
     ops.forEach(op => {
       const v = vFor(op, day);
@@ -3485,7 +3491,7 @@ function generateTurniProva() {
     });
     const hourAssign = {};
     workersFlex.forEach(op => {
-      const h = provaTakeBag(bags[op], [8, 6, 4]);
+      const h = provaTakeBag(bags[op], [8, 6, 4, 3]);
       if (!h) {
         setProvaCell(op, day, 'R');
         preset[op] = 'R';
@@ -3522,7 +3528,7 @@ function provaFillExact40() {
     let guard = 0;
     while (provaHours(op) < 40 && guard++ < 6) {
       const miss = 40 - provaHours(op);
-      const want = miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : 0;
+      const want = miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
       if (!want) break;
       const c = provaRoleCounts(op);
       let code;
@@ -3531,6 +3537,7 @@ function provaFillExact40() {
         else if (c.A <= c.C) code = 'A';
         else code = 'C';
       } else if (want === 6) code = c.S <= c.A && c.S <= c.C ? 'S6' : (c.A <= c.C ? '6A' : '6C');
+      else if (want === 3) code = '3C';
       else code = c.A <= c.C ? '4A' : '4C';
       let done = false;
       for (let day = 0; day < 6; day++) {
@@ -3583,7 +3590,8 @@ function provaVincoloOptions(day) {
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
-    ['4C', '16-20 (4h)']
+    ['4C', '16-20 (4h)'],
+    ['3C', '17-20 (3h)']
   ];
 }
 
