@@ -2364,8 +2364,10 @@ body {
 .prova-cell.fascia-A { background: #e8f1ff; color: #1d4ed8; }
 .prova-cell.fascia-C { background: #fff4d6; color: #9a4a12; }
 .prova-cell.fascia-S { background: #f3e8ff; color: #6b21a8; }
-.prova-cell.fascia-DM { background: #e4f0e8; color: #1f6b45; }
-.prova-cell.fascia-DS { background: #fce8e6; color: #9a3412; }
+.prova-cell.fascia-6A, .prova-cell.fascia-DM { background: #e4f0e8; color: #1f6b45; }
+.prova-cell.fascia-6C, .prova-cell.fascia-DS { background: #fce8e6; color: #9a3412; }
+.prova-cell.fascia-4A { background: #dcfce7; color: #166534; }
+.prova-cell.fascia-4C { background: #ffedd5; color: #9a3412; }
 .prova-cell.fascia-F { background: #fce7f3; color: #9d174d; }
 .prova-bagheria-row th, .prova-bagheria-row td {
   background: #f0f9ff;

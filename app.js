@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.91 - tendina per scegliere il turno in cella
+// VERSION 1.92 - turni 6h (09-15 / 14-20) e 4h (09-13 / 16-20)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2665,12 +2665,16 @@ function updateTurniDash() {
   if (el) el.classList.add('hidden');
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'B', 'DM', 'DS', 'R', 'F'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', '6A', '6C', '4A', '4C', 'B', 'DM', 'DS', 'R', 'F'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
   C: '12-20',
   S: '4+4',
+  '6A': '9-15',
+  '6C': '14-20',
+  '4A': '9-13',
+  '4C': '16-20',
   B: 'Bagh.',
   DM: '9-15',
   DS: '14-20',
@@ -2682,17 +2686,25 @@ const PROVA_TITLE = {
   A: 'Intero 09:00–17:00 (8h, pausa inclusa)',
   C: 'Intero 12:00–20:00 (8h, pausa inclusa)',
   S: 'Spezzato 09:00–13:00 e 16:00–20:00 (8h)',
+  '6A': '09:00–15:00 (6h)',
+  '6C': '14:00–20:00 (6h)',
+  '4A': '09:00–13:00 (4h)',
+  '4C': '16:00–20:00 (4h)',
   B: 'Bagheria — sostituzione (8h, non in negozio)',
-  DM: 'Domenica 09:00–15:00 (6h)',
-  DS: 'Domenica 14:00–20:00 (6h)',
+  DM: '09:00–15:00 (6h)',
+  DS: '14:00–20:00 (6h)',
   R: 'Riposo',
   F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, B: 8, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, '6A': 6, '6C': 6, '4A': 4, '4C': 4, B: 8, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
   S: [[9, 13], [16, 20]],
+  '6A': [[9, 15]],
+  '6C': [[14, 20]],
+  '4A': [[9, 13]],
+  '4C': [[16, 20]],
   DM: [[9, 15]],
   DS: [[14, 20]]
 };
@@ -2730,25 +2742,26 @@ function cycleProvaFascia(cur) {
 }
 
 function provaCellOptions(day) {
-  if (day === 6) {
-    return [
-      ['', '—'],
-      ['DM', '09-15'],
-      ['DS', '14-20'],
-      ['B', 'Bagheria'],
-      ['R', 'Riposo'],
-      ['F', 'Ferie']
-    ];
-  }
   return [
     ['', '—'],
-    ['A', '09-17'],
-    ['C', '12-20'],
-    ['S', '4+4'],
+    ['A', '09-17 (8h)'],
+    ['C', '12-20 (8h)'],
+    ['S', '4+4 (8h)'],
+    ['6A', '09-15 (6h)'],
+    ['6C', '14-20 (6h)'],
+    ['4A', '09-13 (4h)'],
+    ['4C', '16-20 (4h)'],
     ['B', 'Bagheria'],
     ['R', 'Riposo'],
     ['F', 'Ferie']
   ];
+}
+
+function provaOptionSelected(saved, val) {
+  if (saved === val) return true;
+  if (val === '6A' && saved === 'DM') return true;
+  if (val === '6C' && saved === 'DS') return true;
+  return false;
 }
 
 function renderTurniProva() {
@@ -2775,7 +2788,7 @@ function renderTurniProva() {
       const v = provaCell(op, i);
       html += `<td><select class="prova-cell fascia-${v || 'empty'}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
       provaCellOptions(i).forEach(([val, lab]) => {
-        html += `<option value="${val}"${v === val ? ' selected' : ''}>${lab}</option>`;
+        html += `<option value="${val}"${provaOptionSelected(v, val) ? ' selected' : ''}>${lab}</option>`;
       });
       html += '</select></td>';
     }
@@ -2821,8 +2834,8 @@ function provaValidate() {
     const name = PROVA_DAYS[day];
     const codes = OPERATORS.map(op => provaCell(op, day));
     if (day === 6) {
-      const dm = codes.filter(c => c === 'DM').length;
-      const ds = codes.filter(c => c === 'DS').length;
+      const dm = codes.filter(c => c === 'DM' || c === '6A').length;
+      const ds = codes.filter(c => c === 'DS' || c === '6C').length;
       const work = codes.filter(c => c && c !== 'R').length;
       if (dm !== 1 || ds !== 1 || work !== 2) {
         issues.push('Domenica: 2 persone, una 09-15 e una 14-20');
@@ -2873,8 +2886,8 @@ function provaWeekNumber(mondayStr) {
 }
 
 function provaRoleOf(code) {
-  if (code === 'A' || code === 'DM') return 'A';
-  if (code === 'C' || code === 'DS') return 'C';
+  if (code === 'A' || code === 'DM' || code === '6A' || code === '4A') return 'A';
+  if (code === 'C' || code === 'DS' || code === '6C' || code === '4C') return 'C';
   if (code === 'S') return 'S';
   return null;
 }
@@ -2929,8 +2942,8 @@ function generateTurniProva() {
   const sunBusy = new Set();
   ops.forEach(op => {
     const v = vFor(op, 6);
-    if (v === 'DM' || v === 'A') dm = op;
-    if (v === 'DS' || v === 'C') ds = op;
+    if (v === 'DM' || v === 'A' || v === '6A') dm = op;
+    if (v === 'DS' || v === 'C' || v === '6C') ds = op;
     if (v === 'B') {
       setProvaCell(op, 6, 'B');
       sunBusy.add(op);
@@ -2957,8 +2970,8 @@ function generateTurniProva() {
   }
   ops.forEach(op => {
     if (provaCell(op, 6)) return;
-    if (op === dm) setProvaCell(op, 6, 'DM');
-    else if (op === ds) setProvaCell(op, 6, 'DS');
+    if (op === dm) setProvaCell(op, 6, '6A');
+    else if (op === ds) setProvaCell(op, 6, '6C');
     else setProvaCell(op, 6, 'R');
   });
 
@@ -2988,7 +3001,7 @@ function generateTurniProva() {
     const locked = {};
     ops.forEach(op => {
       const v = vFor(op, day);
-      if ((v === 'A' || v === 'C' || v === 'S') && hours[op] + 8 <= 40) locked[op] = v;
+      if ((v === 'A' || v === 'C' || v === 'S' || v === '6A' || v === '6C' || v === '4A' || v === '4C') && hours[op] + (PROVA_HOURS[v] || 8) <= 40) locked[op] = v;
     });
 
     const pool = ops.filter(op => forcedRest.indexOf(op) < 0 && atBag.indexOf(op) < 0 && bagOver.indexOf(op) < 0);
@@ -3045,14 +3058,20 @@ function generateTurniProva() {
         const role = bestRoles[i];
         setProvaCell(op, day, role);
         hours[op] += PROVA_HOURS[role] || 8;
-        if (role === 'A' || role === 'S' || role === 'C') counts[op][role] += 1;
+        if (role === 'A' || role === 'S' || role === 'C' || role === '6A' || role === '6C' || role === '4A' || role === '4C') {
+          const rk = provaRoleOf(role);
+          if (rk) counts[op][rk] += 1;
+        }
       });
     } else {
       working.forEach((op, i) => {
         const role = locked[op] || (n === 2 ? (i === 0 ? 'S' : 'C') : (i === 0 ? 'A' : 'C'));
         setProvaCell(op, day, role);
         hours[op] += PROVA_HOURS[role] || 8;
-        if (role === 'A' || role === 'S' || role === 'C') counts[op][role] += 1;
+        if (role === 'A' || role === 'S' || role === 'C' || role === '6A' || role === '6C' || role === '4A' || role === '4C') {
+          const rk = provaRoleOf(role);
+          if (rk) counts[op][rk] += 1;
+        }
       });
     }
   }
@@ -3090,23 +3109,17 @@ function provaRepairHours() {
 }
 
 function provaVincoloOptions(day) {
-  if (day === 6) {
-    return [
-      ['', 'Libero'],
-      ['R', 'Riposo'],
-      ['F', 'Ferie'],
-      ['DM', 'Dom 09-15'],
-      ['DS', 'Dom 14-20'],
-      ['B', 'Bagheria']
-    ];
-  }
   return [
     ['', 'Libero'],
     ['R', 'Riposo'],
     ['F', 'Ferie'],
-    ['A', 'Apertura 9-17'],
-    ['C', 'Chiusura 12-20'],
+    ['A', '09-17 (8h)'],
+    ['C', '12-20 (8h)'],
     ['S', 'Spezzato 4+4'],
+    ['6A', '09-15 (6h)'],
+    ['6C', '14-20 (6h)'],
+    ['4A', '09-13 (4h)'],
+    ['4C', '16-20 (4h)'],
     ['B', 'Bagheria']
   ];
 }
