@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.05 - turno 11-20 (7h)
+// VERSION 2.06 - salva / riprendi bozza turni
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2739,6 +2739,7 @@ let provaVincoliNegozi = {};
 let provaVincoliBagheria = {};
 let provaSlot2 = {};
 let provaVincoliSlot2 = {};
+let provaLastBozza = null;
 let provaTableMissing = false;
 
 function provaMondayStr(d) {
@@ -2869,6 +2870,7 @@ function provaPackCelle() {
   OPERATORS.forEach(op => { out[op] = provaCelle[op] || {}; });
   out._negozi = provaNegozi;
   out._slot2 = provaSlot2;
+  if (provaLastBozza) out._bozza = provaLastBozza;
   return out;
 }
 
@@ -2876,9 +2878,11 @@ function provaUnpackCelle(data) {
   provaCelle = {};
   provaNegozi = {};
   provaSlot2 = {};
+  provaLastBozza = null;
   if (!data || typeof data !== 'object') return;
   if (data._negozi && typeof data._negozi === 'object') provaNegozi = data._negozi;
   if (data._slot2 && typeof data._slot2 === 'object') provaSlot2 = data._slot2;
+  if (data._bozza && typeof data._bozza === 'object') provaLastBozza = data._bozza;
   OPERATORS.forEach(op => { provaCelle[op] = data[op] && typeof data[op] === 'object' ? data[op] : {}; });
 }
 
@@ -3762,6 +3766,7 @@ async function loadTurniProva() {
     const row = data && data[0];
     provaUnpackCelle(row && row.celle);
     renderTurniProva();
+    updateProvaDraftHint();
     if (st) {
       st.textContent = row && row.updated_by
         ? ('Ultimo salvataggio: ' + row.updated_by + (row.updated_at ? ' · ' + new Date(row.updated_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''))
@@ -3977,6 +3982,114 @@ async function createTurniProvaImage() {
   if (img) img.src = provaShareUrl;
   const ov = document.getElementById('prova-share-overlay');
   if (ov) ov.classList.remove('hidden');
+}
+
+function provaDraftKey() {
+  return 'petstore_turni_bozza_' + (provaWeekStart || provaMondayStr());
+}
+
+function provaMakeSnapshot() {
+  return {
+    celle: JSON.parse(JSON.stringify(provaCelle || {})),
+    negozi: JSON.parse(JSON.stringify(provaNegozi || {})),
+    slot2: JSON.parse(JSON.stringify(provaSlot2 || {})),
+    vincoli: JSON.parse(JSON.stringify(provaVincoli || {})),
+    vincoliNegozi: JSON.parse(JSON.stringify(provaVincoliNegozi || {})),
+    vincoliBagheria: JSON.parse(JSON.stringify(provaVincoliBagheria || {})),
+    vincoliSlot2: JSON.parse(JSON.stringify(provaVincoliSlot2 || {})),
+    at: new Date().toISOString(),
+    by: currentOperator || ''
+  };
+}
+
+function provaReadLocalDraft() {
+  try {
+    const raw = localStorage.getItem(provaDraftKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function provaBestDraft() {
+  const local = provaReadLocalDraft();
+  const cloud = provaLastBozza;
+  if (local && cloud && local.at && cloud.at) {
+    return new Date(local.at) >= new Date(cloud.at) ? local : cloud;
+  }
+  return local || cloud || null;
+}
+
+function provaDraftLabel(snap) {
+  if (!snap || !snap.at) return '';
+  const d = new Date(snap.at);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + (snap.by ? ' · ' + snap.by : '');
+}
+
+function updateProvaDraftHint() {
+  const el = document.getElementById('prova-draft-hint');
+  const snap = provaBestDraft();
+  if (!el) return;
+  el.textContent = snap
+    ? ('Bozza: ' + provaDraftLabel(snap) + '. Tocca Riprendi bozza per recuperarla.')
+    : 'Salva bozza mette da parte gli orari senza pubblicare la settimana.';
+}
+
+function applyProvaSnapshot(snap) {
+  if (!snap) return;
+  provaCelle = snap.celle && typeof snap.celle === 'object' ? snap.celle : {};
+  provaNegozi = snap.negozi && typeof snap.negozi === 'object' ? snap.negozi : {};
+  provaSlot2 = snap.slot2 && typeof snap.slot2 === 'object' ? snap.slot2 : {};
+  if (snap.vincoli) provaVincoli = snap.vincoli;
+  if (snap.vincoliNegozi) provaVincoliNegozi = snap.vincoliNegozi;
+  if (snap.vincoliBagheria) provaVincoliBagheria = snap.vincoliBagheria;
+  if (snap.vincoliSlot2) provaVincoliSlot2 = snap.vincoliSlot2;
+}
+
+async function saveTurniProvaDraft() {
+  if (!isSantoemma()) return;
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const empty = OPERATORS.every(op => {
+    for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
+    return true;
+  });
+  if (empty) {
+    showToast('Non c’è nulla da mettere in bozza', 'warn');
+    return;
+  }
+  const snap = provaMakeSnapshot();
+  provaLastBozza = snap;
+  try { localStorage.setItem(provaDraftKey(), JSON.stringify(snap)); } catch (e) {}
+  if (supabase) {
+    const packed = provaPackCelle();
+    packed._bozza = snap;
+    const { error } = await supabase.from('turni_prova').upsert({
+      settimana_inizio: provaWeekStart,
+      celle: packed,
+      updated_by: currentOperator,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'settimana_inizio' });
+    if (error && !/does not exist|schema cache|42P01/i.test(error.message || '')) {
+      showToast('Bozza sul telefono. Cloud: ' + error.message, 'warn');
+      updateProvaDraftHint();
+      return;
+    }
+  }
+  updateProvaDraftHint();
+  showToast('Bozza salvata. Puoi chiudere e riprendere dopo.', 'success');
+}
+
+function restoreTurniProvaDraft() {
+  const snap = provaBestDraft();
+  if (!snap) {
+    showToast('Nessuna bozza per questa settimana', 'warn');
+    return;
+  }
+  applyProvaSnapshot(snap);
+  renderTurniProva();
+  updateProvaDraftHint();
+  showToast('Bozza ripristinata', 'success');
 }
 
 async function saveTurniProva() {
@@ -5847,6 +5960,10 @@ async function init() {
   if (btnVincoliCancel) btnVincoliCancel.onclick = closeProvaVincoli;
   const btnProvaSave = document.getElementById('btn-prova-save');
   if (btnProvaSave) btnProvaSave.onclick = saveTurniProva;
+  const btnProvaDraftSave = document.getElementById('btn-prova-draft-save');
+  if (btnProvaDraftSave) btnProvaDraftSave.onclick = saveTurniProvaDraft;
+  const btnProvaDraftLoad = document.getElementById('btn-prova-draft-load');
+  if (btnProvaDraftLoad) btnProvaDraftLoad.onclick = restoreTurniProvaDraft;
   const btnProvaShare = document.getElementById('btn-prova-share');
   if (btnProvaShare) btnProvaShare.onclick = createTurniProvaImage;
   const btnProvaShareSend = document.getElementById('btn-prova-share-send');
