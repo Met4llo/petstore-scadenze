@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.99 - immagine turni da inviare in chat
+// VERSION 2.00 - scelta settimana da generare
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2741,6 +2741,22 @@ function shiftProvaWeek(days) {
   loadTurniProva();
 }
 
+function syncProvaWeekInputs() {
+  const v = provaWeekStart || provaMondayStr();
+  const a = document.getElementById('prova-week-date');
+  const b = document.getElementById('prova-vincoli-week');
+  if (a) a.value = v;
+  if (b) b.value = v;
+}
+
+function setProvaWeekFromDate(dateStr, load) {
+  const d = parseDate(dateStr);
+  if (!d || isNaN(d.getTime())) return;
+  provaWeekStart = toDateStr(mondayOf(d));
+  syncProvaWeekInputs();
+  if (load) loadTurniProva();
+}
+
 function provaCell(op, dayIdx) {
   const row = provaCelle[op] || {};
   return row[String(dayIdx)] || '';
@@ -2904,6 +2920,7 @@ function renderTurniProva() {
   const start = parseDate(provaWeekStart);
   const end = sundayOf(start);
   if (label) label.textContent = formatRange(provaWeekStart, toDateStr(end));
+  syncProvaWeekInputs();
   if (!grid) return;
   let html = '<table class="prova-table"><thead><tr><th>Ore</th>';
   for (let i = 0; i < 7; i++) {
@@ -3511,6 +3528,7 @@ function collectProvaVincoli() {
 
 function openProvaVincoli() {
   renderProvaVincoliForm();
+  syncProvaWeekInputs();
   const el = document.getElementById('prova-vincoli-overlay');
   if (el) el.classList.remove('hidden');
 }
@@ -3521,6 +3539,8 @@ function closeProvaVincoli() {
 }
 
 function confirmProvaVincoli() {
+  const w = document.getElementById('prova-vincoli-week');
+  if (w && w.value) setProvaWeekFromDate(w.value, false);
   collectProvaVincoli();
   closeProvaVincoli();
   generateTurniProva();
@@ -5614,12 +5634,22 @@ async function init() {
   if (btnProvaNext) btnProvaNext.onclick = () => shiftProvaWeek(7);
   const btnProvaOggi = document.getElementById('btn-prova-oggi');
   if (btnProvaOggi) btnProvaOggi.onclick = () => { provaWeekStart = provaMondayStr(); loadTurniProva(); };
+  const provaWeekDate = document.getElementById('prova-week-date');
+  if (provaWeekDate) provaWeekDate.onchange = () => setProvaWeekFromDate(provaWeekDate.value, true);
+  const provaVincoliWeek = document.getElementById('prova-vincoli-week');
+  if (provaVincoliWeek) provaVincoliWeek.onchange = () => setProvaWeekFromDate(provaVincoliWeek.value, false);
   const btnProvaGen = document.getElementById('btn-prova-generate');
   if (btnProvaGen) btnProvaGen.onclick = openProvaVincoli;
   const btnVincoliOk = document.getElementById('btn-prova-vincoli-ok');
   if (btnVincoliOk) btnVincoliOk.onclick = confirmProvaVincoli;
   const btnVincoliSkip = document.getElementById('btn-prova-vincoli-skip');
-  if (btnVincoliSkip) btnVincoliSkip.onclick = () => { provaVincoli = {}; provaVincoliNegozi = {}; provaVincoliBagheria = {}; closeProvaVincoli(); generateTurniProva(); };
+  if (btnVincoliSkip) btnVincoliSkip.onclick = () => {
+    const w = document.getElementById('prova-vincoli-week');
+    if (w && w.value) setProvaWeekFromDate(w.value, false);
+    provaVincoli = {}; provaVincoliNegozi = {}; provaVincoliBagheria = {};
+    closeProvaVincoli();
+    generateTurniProva();
+  };
   const btnVincoliCancel = document.getElementById('btn-prova-vincoli-cancel');
   if (btnVincoliCancel) btnVincoliCancel.onclick = closeProvaVincoli;
   const btnProvaSave = document.getElementById('btn-prova-save');

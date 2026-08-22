@@ -2289,6 +2289,47 @@ body {
   font-weight: 700;
   font-size: 1rem;
 }
+.prova-week-pick {
+  position: relative;
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+}
+.prova-week-pick span {
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px dashed var(--border);
+}
+.prova-week-pick input[type="date"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.prova-vincoli-week-lab {
+  display: block;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin: 8px 0 10px;
+}
+.prova-vincoli-week-lab input[type="date"] {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font: inherit;
+  background: var(--card);
+  color: var(--text);
+}
 .prova-legend {
   display: flex;
   flex-wrap: wrap;

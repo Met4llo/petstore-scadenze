@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.99">
-  <link rel="stylesheet" href="sheet-overlay.css?v=1.99">
+  <link rel="stylesheet" href="styles.css?v=2.00">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.00">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -257,10 +257,13 @@
 
       <section id="page-turni-prova" class="page">
         <p class="dash-kicker">Turni prova</p>
-        <p class="turni-hint">Riga Bagheria: Libero oppure 4+4 / 09-13 / 16-20 (si assegna Sorrentino). Poi Salva.</p>
+        <p class="turni-hint">Tocca le date per scegliere la settimana, poi Genera. Riga Bagheria: Libero o mezza giornata (Sorrentino).</p>
         <div class="prova-week-bar">
           <button type="button" id="btn-prova-prev" class="turno-zoom-btn">‹</button>
-          <div id="prova-week-label" class="prova-week-label">Settimana</div>
+          <label class="prova-week-pick">
+            <span id="prova-week-label">Settimana</span>
+            <input type="date" id="prova-week-date" aria-label="Scegli la settimana">
+          </label>
           <button type="button" id="btn-prova-next" class="turno-zoom-btn">›</button>
         </div>
         <button type="button" id="btn-prova-oggi" class="btn btn-secondary btn-large" style="margin-bottom:12px;">Settimana in corso</button>
@@ -284,7 +287,10 @@
             <div class="sheet-handle" aria-hidden="true"></div>
             <div class="sheet-body">
               <h3>Vincoli della settimana</h3>
-              <p class="field-hint">Dopo l’orario scegli il punto vendita (La Malfa, Rizzo, San Lorenzo). Il colore in griglia è il negozio. Bagheria in ultima riga → Sorrentino.</p>
+              <label class="prova-vincoli-week-lab">Settimana da generare
+                <input type="date" id="prova-vincoli-week">
+              </label>
+              <p class="field-hint">Dopo l’orario scegli il punto vendita. Il colore in griglia è il negozio. Bagheria in ultima riga → Sorrentino.</p>
               <div id="prova-vincoli-form"></div>
             </div>
             <div class="sheet-footer">
@@ -531,7 +537,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 1.99 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 2.00 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -552,7 +558,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.99"></script>
-  <script src="fuschi-home.js?v=1.99"></script>
+  <script src="app.js?v=2.00"></script>
+  <script src="fuschi-home.js?v=2.00"></script>
 </body>
 </html>
