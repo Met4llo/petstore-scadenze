@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.97">
-  <link rel="stylesheet" href="sheet-overlay.css?v=1.97">
+  <link rel="stylesheet" href="styles.css?v=1.98">
+  <link rel="stylesheet" href="sheet-overlay.css?v=1.98">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -276,6 +276,7 @@
         <div id="prova-check" class="prova-check is-empty">Settimana vuota. Premi Genera settimana.</div>
         <div id="prova-grid" class="prova-grid-wrap"></div>
         <button type="button" id="btn-prova-save" class="btn btn-primary btn-large" style="margin-top:14px;">Salva settimana</button>
+        <button type="button" id="btn-prova-share" class="btn btn-secondary btn-large" style="margin-top:8px;">Crea immagine da inviare</button>
         <button type="button" id="btn-copy-prova-sql" class="btn btn-secondary btn-large" style="margin-top:8px;">Copia SQL tabella</button>
         <p id="prova-status" class="field-hint" style="margin-top:8px;"></p>
         <div id="prova-vincoli-overlay" class="task-form-overlay hidden">
@@ -290,6 +291,20 @@
               <button type="button" id="btn-prova-vincoli-ok" class="btn btn-primary btn-large">Genera con questi vincoli</button>
               <button type="button" id="btn-prova-vincoli-skip" class="btn btn-secondary btn-large" style="margin-top:8px;">Genera senza vincoli</button>
               <button type="button" id="btn-prova-vincoli-cancel" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Annulla</button>
+            </div>
+          </div>
+        </div>
+        <div id="prova-share-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3>Immagine turni</h3>
+              <p class="field-hint">Tieni premuto per salvare, oppure Condividi per WhatsApp e altre chat.</p>
+              <img id="prova-share-img" class="prova-share-img" alt="Turni della settimana">
+            </div>
+            <div class="sheet-footer">
+              <button type="button" id="btn-prova-share-send" class="btn btn-primary btn-large">Condividi</button>
+              <button type="button" id="btn-prova-share-close" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Chiudi</button>
             </div>
           </div>
         </div>
@@ -516,7 +531,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 1.97 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 1.98 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -537,7 +552,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.97"></script>
-  <script src="fuschi-home.js?v=1.97"></script>
+  <script src="app.js?v=1.98"></script>
+  <script src="fuschi-home.js?v=1.98"></script>
 </body>
 </html>

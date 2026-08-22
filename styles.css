@@ -2297,7 +2297,12 @@ body {
   color: var(--muted);
   margin-bottom: 10px;
 }
-.prova-legend b { color: var(--text); }
+.prova-share-img {
+  width: 100%;
+  border-radius: 12px;
+  margin-top: 8px;
+  background: #fbf7f2;
+}
 .prova-grid-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

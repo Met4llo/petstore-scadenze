@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.97 - punti vendita La Malfa / Rizzo / San Lorenzo (colore = negozio)
+// VERSION 1.98 - immagine turni da inviare in chat
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3566,6 +3566,406 @@ async function loadTurniProva() {
   }
 }
 
+let provaShareBlob = null;
+let provaShareUrl = '';
+
+function provaExportColors(op, day) {
+  const c = provaCell(op, day);
+  if (c === 'F') return { bg: '#fce7f3', fg: '#9d174d' };
+  if (!c || c === 'R') return { bg: '#f4efe6', fg: '#6f645b' };
+  const n = provaNegozio(op, day);
+  if (n === 'Rizzo') return { bg: '#dbeafe', fg: '#1d4ed8' };
+  if (n === 'San Lorenzo') return { bg: '#dcfce7', fg: '#166534' };
+  if (n === 'Bagheria' || isBagheriaCode(c)) return { bg: '#e0f2fe', fg: '#075985' };
+  return { bg: '#ffedd5', fg: '#9a3412' };
+}
+
+function provaShopShort(n) {
+  if (n === 'La Malfa') return 'Malfa';
+  if (n === 'San Lorenzo') return 'S. Lorenzo';
+  return n || '';
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function drawTurniProvaCanvas() {
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const start = parseDate(provaWeekStart);
+  const range = formatRange(provaWeekStart, toDateStr(sundayOf(start)));
+  const pad = 28;
+  const nameW = 150;
+  const dayW = 92;
+  const headH = 46;
+  const rowH = 72;
+  const titleH = 52;
+  const subH = 28;
+  const legendH = 44;
+  const footH = 28;
+  const cols = 7;
+  const rows = OPERATORS.length + 1;
+  const W = pad * 2 + nameW + cols * dayW;
+  const H = pad + titleH + subH + headH + rows * rowH + legendH + footH + pad;
+  const dpr = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#fbf7f2';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#2a211c';
+  ctx.font = '700 22px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('PetStore Conad — Turni', pad, pad + 22);
+  ctx.font = '600 16px "DM Sans", system-ui, sans-serif';
+  ctx.fillStyle = '#6f645b';
+  ctx.fillText(range, pad, pad + titleH);
+  const tableY = pad + titleH + subH;
+  ctx.font = '700 12px "DM Sans", system-ui, sans-serif';
+  ctx.fillStyle = '#6f645b';
+  ctx.fillText('Operatore', pad + 8, tableY + 28);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const x = pad + nameW + i * dayW;
+    ctx.fillStyle = '#6f645b';
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(PROVA_DAYS[i], x + dayW / 2, tableY + 18);
+    ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(String(d.getDate()), x + dayW / 2, tableY + 34);
+    ctx.textAlign = 'left';
+  }
+  OPERATORS.forEach((op, ri) => {
+    const y = tableY + headH + ri * rowH;
+    const h = provaHours(op);
+    ctx.fillStyle = '#2a211c';
+    ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(op, pad + 6, y + 28);
+    ctx.fillStyle = h === 40 ? '#4a7c59' : '#b45309';
+    ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(h + 'h', pad + 6, y + 48);
+    for (let i = 0; i < 7; i++) {
+      const x = pad + nameW + i * dayW + 4;
+      const col = provaExportColors(op, i);
+      const code = provaCell(op, i);
+      roundRectPath(ctx, x, y + 8, dayW - 8, rowH - 16, 8);
+      ctx.fillStyle = col.bg;
+      ctx.fill();
+      ctx.fillStyle = col.fg;
+      ctx.textAlign = 'center';
+      ctx.font = '800 12px "DM Sans", system-ui, sans-serif';
+      ctx.fillText(PROVA_LABEL[code] || '·', x + (dayW - 8) / 2, y + 32);
+      const shop = provaIsWorkCode(code) ? provaShopShort(provaNegozio(op, i)) : '';
+      if (shop) {
+        ctx.font = '600 10px "DM Sans", system-ui, sans-serif';
+        ctx.fillText(shop, x + (dayW - 8) / 2, y + 48);
+      }
+      ctx.textAlign = 'left';
+    }
+  });
+  const by = tableY + headH + OPERATORS.length * rowH;
+  ctx.fillStyle = '#2a211c';
+  ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Bagheria', pad + 6, by + 28);
+  ctx.fillStyle = '#6f645b';
+  ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Sorrentino', pad + 6, by + 48);
+  for (let i = 0; i < 7; i++) {
+    const x = pad + nameW + i * dayW + 4;
+    const cur = provaBagheriaValue(i);
+    const work = cur && cur !== 'L';
+    roundRectPath(ctx, x, by + 8, dayW - 8, rowH - 16, 8);
+    ctx.fillStyle = work ? '#e0f2fe' : '#f4efe6';
+    ctx.fill();
+    ctx.fillStyle = work ? '#075985' : '#6f645b';
+    ctx.textAlign = 'center';
+    ctx.font = '800 11px "DM Sans", system-ui, sans-serif';
+    const lab = work ? (PROVA_LABEL[cur] || cur) : 'Libero';
+    ctx.fillText(lab, x + (dayW - 8) / 2, by + 40);
+    ctx.textAlign = 'left';
+  }
+  const ly = by + rowH + 18;
+  ctx.font = '700 11px "DM Sans", system-ui, sans-serif';
+  const chips = [
+    { t: 'La Malfa', bg: '#ffedd5', fg: '#9a3412' },
+    { t: 'Rizzo', bg: '#dbeafe', fg: '#1d4ed8' },
+    { t: 'San Lorenzo', bg: '#dcfce7', fg: '#166534' },
+    { t: 'Bagheria', bg: '#e0f2fe', fg: '#075985' }
+  ];
+  let cx = pad;
+  chips.forEach(ch => {
+    const w = ctx.measureText(ch.t).width + 20;
+    roundRectPath(ctx, cx, ly, w, 22, 6);
+    ctx.fillStyle = ch.bg;
+    ctx.fill();
+    ctx.fillStyle = ch.fg;
+    ctx.fillText(ch.t, cx + 10, ly + 15);
+    cx += w + 8;
+  });
+  ctx.fillStyle = '#8a7d74';
+  ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Generata da PetStore Conad  ·  ' + new Date().toLocaleDateString('it-IT'), pad, H - pad);
+  return canvas;
+}
+
+function closeProvaShare() {
+  const el = document.getElementById('prova-share-overlay');
+  if (el) el.classList.add('hidden');
+}
+
+async function sendProvaShare() {
+  if (!provaShareBlob) return;
+  const name = 'turni-' + (provaWeekStart || 'settimana') + '.png';
+  const file = new File([provaShareBlob], name, { type: 'image/png' });
+  try {
+    if (navigator.share) {
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Turni PetStore Conad' });
+        return;
+      }
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  const a = document.createElement('a');
+  a.href = provaShareUrl;
+  a.download = name;
+  a.click();
+  showToast('Se il download non parte, tieni premuto l’immagine.', 'warn');
+}
+
+async function createTurniProvaImage() {
+  const empty = OPERATORS.every(op => {
+    for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
+    return true;
+  });
+  if (empty) {
+    showToast('Prima genera o compila la settimana', 'warn');
+    return;
+  }
+  const canvas = drawTurniProvaCanvas();
+  provaShareBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!provaShareBlob) {
+    showToast('Impossibile creare l’immagine', 'error');
+    return;
+  }
+  if (provaShareUrl) URL.revokeObjectURL(provaShareUrl);
+  provaShareUrl = URL.createObjectURL(provaShareBlob);
+  const img = document.getElementById('prova-share-img');
+  if (img) img.src = provaShareUrl;
+  const ov = document.getElementById('prova-share-overlay');
+  if (ov) ov.classList.remove('hidden');
+}
+
+let provaShareBlob = null;
+let provaShareUrl = '';
+
+function provaExportColors(op, day) {
+  const c = provaCell(op, day);
+  if (c === 'F') return { bg: '#fce7f3', fg: '#9d174d' };
+  if (!c || c === 'R') return { bg: '#f4efe6', fg: '#6f645b' };
+  const n = provaNegozio(op, day);
+  if (n === 'Rizzo') return { bg: '#dbeafe', fg: '#1d4ed8' };
+  if (n === 'San Lorenzo') return { bg: '#dcfce7', fg: '#166534' };
+  if (n === 'Bagheria' || isBagheriaCode(c)) return { bg: '#e0f2fe', fg: '#075985' };
+  return { bg: '#ffedd5', fg: '#9a3412' };
+}
+
+function provaShopShort(n) {
+  if (n === 'La Malfa') return 'Malfa';
+  if (n === 'San Lorenzo') return 'S. Lorenzo';
+  return n || '';
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function drawTurniProvaCanvas() {
+  if (!provaWeekStart) provaWeekStart = provaMondayStr();
+  const start = parseDate(provaWeekStart);
+  const range = formatRange(provaWeekStart, toDateStr(sundayOf(start)));
+  const pad = 28;
+  const nameW = 150;
+  const dayW = 92;
+  const headH = 46;
+  const rowH = 72;
+  const titleH = 52;
+  const subH = 28;
+  const legendH = 44;
+  const footH = 28;
+  const cols = 7;
+  const rows = OPERATORS.length + 1;
+  const W = pad * 2 + nameW + cols * dayW;
+  const H = pad + titleH + subH + headH + rows * rowH + legendH + footH + pad;
+  const dpr = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#fbf7f2';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#2a211c';
+  ctx.font = '700 22px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('PetStore Conad — Turni', pad, pad + 22);
+  ctx.font = '600 16px "DM Sans", system-ui, sans-serif';
+  ctx.fillStyle = '#6f645b';
+  ctx.fillText(range, pad, pad + titleH);
+  const tableY = pad + titleH + subH;
+  ctx.font = '700 12px "DM Sans", system-ui, sans-serif';
+  ctx.fillStyle = '#6f645b';
+  ctx.fillText('Operatore', pad + 8, tableY + 28);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const x = pad + nameW + i * dayW;
+    ctx.fillStyle = '#6f645b';
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(PROVA_DAYS[i], x + dayW / 2, tableY + 18);
+    ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(String(d.getDate()), x + dayW / 2, tableY + 34);
+    ctx.textAlign = 'left';
+  }
+  OPERATORS.forEach((op, ri) => {
+    const y = tableY + headH + ri * rowH;
+    const h = provaHours(op);
+    ctx.fillStyle = '#2a211c';
+    ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(op, pad + 6, y + 28);
+    ctx.fillStyle = h === 40 ? '#4a7c59' : '#b45309';
+    ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(h + 'h', pad + 6, y + 48);
+    for (let i = 0; i < 7; i++) {
+      const x = pad + nameW + i * dayW + 4;
+      const col = provaExportColors(op, i);
+      const code = provaCell(op, i);
+      roundRectPath(ctx, x, y + 8, dayW - 8, rowH - 16, 8);
+      ctx.fillStyle = col.bg;
+      ctx.fill();
+      ctx.fillStyle = col.fg;
+      ctx.textAlign = 'center';
+      ctx.font = '800 12px "DM Sans", system-ui, sans-serif';
+      ctx.fillText(PROVA_LABEL[code] || '·', x + (dayW - 8) / 2, y + 32);
+      const shop = provaIsWorkCode(code) ? provaShopShort(provaNegozio(op, i)) : '';
+      if (shop) {
+        ctx.font = '600 10px "DM Sans", system-ui, sans-serif';
+        ctx.fillText(shop, x + (dayW - 8) / 2, y + 48);
+      }
+      ctx.textAlign = 'left';
+    }
+  });
+  const by = tableY + headH + OPERATORS.length * rowH;
+  ctx.fillStyle = '#2a211c';
+  ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Bagheria', pad + 6, by + 28);
+  ctx.fillStyle = '#6f645b';
+  ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Sorrentino', pad + 6, by + 48);
+  for (let i = 0; i < 7; i++) {
+    const x = pad + nameW + i * dayW + 4;
+    const cur = provaBagheriaValue(i);
+    const work = cur && cur !== 'L';
+    roundRectPath(ctx, x, by + 8, dayW - 8, rowH - 16, 8);
+    ctx.fillStyle = work ? '#e0f2fe' : '#f4efe6';
+    ctx.fill();
+    ctx.fillStyle = work ? '#075985' : '#6f645b';
+    ctx.textAlign = 'center';
+    ctx.font = '800 11px "DM Sans", system-ui, sans-serif';
+    const lab = work ? (PROVA_LABEL[cur] || cur) : 'Libero';
+    ctx.fillText(lab, x + (dayW - 8) / 2, by + 40);
+    ctx.textAlign = 'left';
+  }
+  const ly = by + rowH + 18;
+  const chips = [
+    { t: 'La Malfa', bg: '#ffedd5', fg: '#9a3412' },
+    { t: 'Rizzo', bg: '#dbeafe', fg: '#1d4ed8' },
+    { t: 'San Lorenzo', bg: '#dcfce7', fg: '#166534' },
+    { t: 'Bagheria', bg: '#e0f2fe', fg: '#075985' }
+  ];
+  let cx = pad;
+  chips.forEach(ch => {
+    const w = ctx.measureText(ch.t).width + 20;
+    roundRectPath(ctx, cx, ly, w, 22, 6);
+    ctx.fillStyle = ch.bg;
+    ctx.fill();
+    ctx.fillStyle = ch.fg;
+    ctx.font = '700 11px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(ch.t, cx + 10, ly + 15);
+    cx += w + 8;
+  });
+  ctx.fillStyle = '#8a7d74';
+  ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
+  ctx.fillText('Generata da PetStore Conad  ·  ' + new Date().toLocaleDateString('it-IT'), pad, H - pad);
+  return canvas;
+}
+
+function closeProvaShare() {
+  const el = document.getElementById('prova-share-overlay');
+  if (el) el.classList.add('hidden');
+}
+
+async function sendProvaShare() {
+  if (!provaShareBlob) return;
+  const name = 'turni-' + (provaWeekStart || 'settimana') + '.png';
+  const file = new File([provaShareBlob], name, { type: 'image/png' });
+  try {
+    if (navigator.share) {
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Turni PetStore Conad' });
+        return;
+      }
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  const a = document.createElement('a');
+  a.href = provaShareUrl;
+  a.download = name;
+  a.click();
+  showToast('Immagine scaricata. Tieni premuto se non parte il download.', 'success');
+}
+
+async function createTurniProvaImage() {
+  const empty = OPERATORS.every(op => {
+    for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
+    return true;
+  });
+  if (empty) {
+    showToast('Prima genera o compila la settimana', 'warn');
+    return;
+  }
+  const canvas = drawTurniProvaCanvas();
+  provaShareBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!provaShareBlob) {
+    showToast('Impossibile creare l’immagine', 'error');
+    return;
+  }
+  if (provaShareUrl) URL.revokeObjectURL(provaShareUrl);
+  provaShareUrl = URL.createObjectURL(provaShareBlob);
+  const img = document.getElementById('prova-share-img');
+  if (img) img.src = provaShareUrl;
+  const ov = document.getElementById('prova-share-overlay');
+  if (ov) ov.classList.remove('hidden');
+}
+
 async function saveTurniProva() {
   if (!isSantoemma()) return;
   if (!supabase) {
@@ -5424,6 +5824,12 @@ async function init() {
   if (btnVincoliCancel) btnVincoliCancel.onclick = closeProvaVincoli;
   const btnProvaSave = document.getElementById('btn-prova-save');
   if (btnProvaSave) btnProvaSave.onclick = saveTurniProva;
+  const btnProvaShare = document.getElementById('btn-prova-share');
+  if (btnProvaShare) btnProvaShare.onclick = createTurniProvaImage;
+  const btnProvaShareSend = document.getElementById('btn-prova-share-send');
+  if (btnProvaShareSend) btnProvaShareSend.onclick = sendProvaShare;
+  const btnProvaShareClose = document.getElementById('btn-prova-share-close');
+  if (btnProvaShareClose) btnProvaShareClose.onclick = closeProvaShare;
   const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');
   if (btnCopyProvaSql) {
     btnCopyProvaSql.onclick = async () => {
