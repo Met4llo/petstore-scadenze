@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 1.93 - riga Bagheria: libero o 4+4 / 09-13 / 16-20 (Sorrentino)
+// VERSION 1.94 - generatore: tutte le fasce, tutti esattamente 40h
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2878,6 +2878,7 @@ function provaValidate() {
   OPERATORS.forEach(op => {
     const h = provaHours(op);
     if (h > 40) issues.push(op + ': ' + h + ' ore (max 40)');
+    if (h < 40 && h > 0) issues.push(op + ': ' + h + ' ore (serve 40)');
   });
   for (let day = 0; day < 7; day++) {
     const name = PROVA_DAYS[day];
@@ -2921,7 +2922,7 @@ function renderProvaCheck() {
   }
   if (!issues.length) {
     el.className = 'prova-check is-ok';
-    el.innerHTML = 'Regole ok: chiusura ≥2, max 8h/turno, max 40h, domenica 2. Turni spalmati su aperture / spezzati / chiusure.';
+    el.innerHTML = 'Regole ok: chiusura ≥2, tutti a 40 ore, domenica 2 persone.';
     return;
   }
   el.className = 'prova-check is-warn';
@@ -2977,6 +2978,84 @@ function provaFairScore(counts) {
   return s;
 }
 
+function provaMakePack(need, nDays) {
+  if (need < 0 || nDays < 0) return null;
+  if (nDays === 0) return need === 0 ? [] : null;
+  if (need === 0) {
+    const z = [];
+    for (let i = 0; i < nDays; i++) z.push(0);
+    return z;
+  }
+  if (need > 8 * nDays) return null;
+  const out = [];
+  function rec(left, days) {
+    if (days === 0) return left === 0;
+    const sizes = [8, 6, 4, 0];
+    for (let i = 0; i < sizes.length; i++) {
+      const s = sizes[i];
+      if (s > left) continue;
+      if (left - s > 8 * (days - 1)) continue;
+      out.push(s);
+      if (rec(left - s, days - 1)) return true;
+      out.pop();
+    }
+    return false;
+  }
+  return rec(need, nDays) ? out.slice() : null;
+}
+
+function provaTakeBag(bag, prefer) {
+  for (let p = 0; p < prefer.length; p++) {
+    const i = bag.indexOf(prefer[p]);
+    if (i >= 0) {
+      bag.splice(i, 1);
+      return prefer[p];
+    }
+  }
+  if (!bag.length) return 0;
+  bag.sort((a, b) => b - a);
+  return bag.shift();
+}
+
+const PROVA_CODES_BY_H = {
+  8: ['C', 'A', 'S'],
+  6: ['6C', '6A'],
+  4: ['4C', '4A']
+};
+
+function provaCodesCover(codes) {
+  function pres(hour) {
+    return OPERATORS.some(op => provaPresent(codes[op], hour));
+  }
+  if (!pres(9)) return false;
+  let close = 0;
+  OPERATORS.forEach(op => { if (provaPresent(codes[op], 19)) close++; });
+  if (close < 2) return false;
+  for (let h = 9; h < 20; h++) if (!pres(h)) return false;
+  return true;
+}
+
+function provaPickCodes(hourAssign, preset) {
+  const workers = Object.keys(hourAssign);
+  const codes = {};
+  OPERATORS.forEach(op => { codes[op] = preset[op] || 'R'; });
+  function rec(i) {
+    if (i === workers.length) return provaCodesCover(codes);
+    const op = workers[i];
+    const list = PROVA_CODES_BY_H[hourAssign[op]] || ['R'];
+    for (let k = 0; k < list.length; k++) {
+      codes[op] = list[k];
+      if (rec(i + 1)) return true;
+    }
+    return false;
+  }
+  if (rec(0)) return codes;
+  workers.forEach(op => {
+    codes[op] = (PROVA_CODES_BY_H[hourAssign[op]] || ['R'])[0];
+  });
+  return codes;
+}
+
 function generateTurniProva() {
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   const ops = OPERATORS.slice();
@@ -3024,113 +3103,129 @@ function generateTurniProva() {
     else setProvaCell(op, 6, 'R');
   });
 
+  const LOCK_CODES = ['A', 'C', 'S', '6A', '6C', '4A', '4C'];
+  for (let day = 0; day < 6; day++) {
+    ops.forEach(op => {
+      const v = vFor(op, day);
+      if (v === 'F') setProvaCell(op, day, 'F');
+      else if (v === 'R') setProvaCell(op, day, 'R');
+      else if (isBagheriaCode(v)) setProvaCell(op, day, v === 'B' ? 'B44' : v);
+      else if (LOCK_CODES.indexOf(v) >= 0) setProvaCell(op, day, v);
+    });
+  }
+
   const hours = {};
   ops.forEach(op => {
-    hours[op] = PROVA_HOURS[provaCell(op, 6)] || 0;
-    for (let d = 0; d < 6; d++) {
-      if (vFor(op, d) === 'F') hours[op] += 8;
+    hours[op] = 0;
+    for (let d = 0; d < 7; d++) hours[op] += PROVA_HOURS[provaCell(op, d)] || 0;
+  });
+
+  const flexDays = {};
+  const bags = {};
+  const packFail = [];
+  ops.forEach(op => {
+    const flex = [];
+    for (let d = 0; d < 6; d++) if (!provaCell(op, d)) flex.push(d);
+    flexDays[op] = flex;
+    const pack = provaMakePack(40 - hours[op], flex.length);
+    if (!pack) {
+      packFail.push(op);
+      bags[op] = [];
+      for (let i = 0; i < flex.length; i++) bags[op].push(0);
+    } else {
+      bags[op] = pack.slice();
     }
   });
 
   const counts = {};
   ops.forEach(op => { counts[op] = { A: 0, S: 0, C: 0 }; });
-  const r0 = dm ? provaRoleOf(provaCell(dm, 6)) : null;
-  const r1 = ds ? provaRoleOf(provaCell(ds, 6)) : null;
-  if (dm && r0) counts[dm][r0] += 1;
-  if (ds && r1) counts[ds][r1] += 1;
-
-  const templates3 = [['A', 'C', 'C'], ['S', 'A', 'C'], ['S', 'C', 'C']];
-  const templates2 = [['S', 'C']];
-  const templates4 = [['A', 'C', 'C', 'S']];
+  ops.forEach(op => {
+    for (let d = 0; d < 7; d++) {
+      const rk = provaRoleOf(provaCell(op, d));
+      if (rk) counts[op][rk] += 1;
+    }
+  });
 
   for (let day = 0; day < 6; day++) {
-    const forcedRest = ops.filter(op => vFor(op, day) === 'R' || vFor(op, day) === 'F');
-    const atBag = ops.filter(op => isBagheriaCode(vFor(op, day)) && hours[op] + (PROVA_HOURS[vFor(op, day)] || 8) <= 40);
-    const bagOver = ops.filter(op => isBagheriaCode(vFor(op, day)) && hours[op] + (PROVA_HOURS[vFor(op, day)] || 8) > 40);
-    const locked = {};
+    const preset = {};
     ops.forEach(op => {
-      const v = vFor(op, day);
-      if ((v === 'A' || v === 'C' || v === 'S' || v === '6A' || v === '6C' || v === '4A' || v === '4C') && hours[op] + (PROVA_HOURS[v] || 8) <= 40) locked[op] = v;
+      const c = provaCell(op, day);
+      if (c) preset[op] = c;
     });
+    const flex = ops.filter(op => flexDays[op].indexOf(day) >= 0);
+    const alreadyStore = ops.filter(op => {
+      const c = preset[op];
+      return c && c !== 'R' && c !== 'F' && !isBagheriaCode(c);
+    }).length;
+    const target = 3;
+    let needWorkers = target - alreadyStore;
+    if (needWorkers < 0) needWorkers = 0;
+    if (needWorkers > flex.length) needWorkers = flex.length;
+    let restN = flex.length - needWorkers;
 
-    const pool = ops.filter(op => forcedRest.indexOf(op) < 0 && atBag.indexOf(op) < 0 && bagOver.indexOf(op) < 0);
-    const capRest = pool.filter(op => !locked[op] && hours[op] + 8 > 40);
-    let available = pool.filter(op => capRest.indexOf(op) < 0);
-    const extraRest = capRest.slice();
-    if (available.length > 3) {
-      const cands = available.filter(op => !locked[op]).sort((a, b) => {
-        if (hours[b] !== hours[a]) return hours[b] - hours[a];
-        return ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4);
-      });
-      while (available.length > 3 && cands.length) {
-        const r = cands.shift();
-        extraRest.push(r);
-        available = available.filter(op => op !== r);
+    const with0 = flex.filter(op => bags[op].indexOf(0) >= 0);
+    with0.sort((a, b) => ((ops.indexOf(a) + w + day) % 4) - ((ops.indexOf(b) + w + day) % 4));
+    if (restN > with0.length) restN = with0.length;
+    const resters = with0.slice(0, restN);
+    const workersFlex = flex.filter(op => resters.indexOf(op) < 0);
+
+    resters.forEach(op => {
+      provaTakeBag(bags[op], [0]);
+      setProvaCell(op, day, 'R');
+      preset[op] = 'R';
+    });
+    const hourAssign = {};
+    workersFlex.forEach(op => {
+      const h = provaTakeBag(bags[op], [8, 6, 4]);
+      if (!h) {
+        setProvaCell(op, day, 'R');
+        preset[op] = 'R';
+      } else {
+        hourAssign[op] = h;
       }
-    }
-
-    const working = available;
-    const n = working.length;
-    const tpls = n >= 4 ? templates4 : n === 2 ? templates2 : templates3;
-
-    let bestScore = Infinity;
-    let bestRoles = null;
-    tpls.forEach(tpl => {
-      if (tpl.length !== n) return;
-      provaUniquePerms(tpl).forEach(roles => {
-        let ok = true;
-        working.forEach((op, i) => {
-          if (locked[op] && locked[op] !== roles[i]) ok = false;
-        });
-        if (!ok) return;
-        const next = {};
-        ops.forEach(op => { next[op] = { A: counts[op].A, S: counts[op].S, C: counts[op].C }; });
-        working.forEach((op, i) => { next[op][roles[i]] += 1; });
-        const sc = provaFairScore(next);
-        if (sc < bestScore) {
-          bestScore = sc;
-          bestRoles = roles.slice();
-        }
-      });
     });
 
-    ops.forEach(op => setProvaCell(op, day, 'R'));
-    ops.forEach(op => {
-      if (vFor(op, day) === 'F') setProvaCell(op, day, 'F');
+    const picked = provaPickCodes(hourAssign, preset);
+    Object.keys(hourAssign).forEach(op => {
+      const role = picked[op] || (PROVA_CODES_BY_H[hourAssign[op]] || ['C'])[0];
+      setProvaCell(op, day, role);
+      hours[op] += PROVA_HOURS[role] || 0;
+      const rk = provaRoleOf(role);
+      if (rk) counts[op][rk] += 1;
     });
-    atBag.forEach(op => {
-      const code = vFor(op, day) === 'B' ? 'B44' : vFor(op, day);
-      setProvaCell(op, day, code);
-      hours[op] += PROVA_HOURS[code] || 8;
-    });
-    if (bestRoles) {
-      working.forEach((op, i) => {
-        const role = bestRoles[i];
-        setProvaCell(op, day, role);
-        hours[op] += PROVA_HOURS[role] || 8;
-        if (role === 'A' || role === 'S' || role === 'C' || role === '6A' || role === '6C' || role === '4A' || role === '4C') {
-          const rk = provaRoleOf(role);
-          if (rk) counts[op][rk] += 1;
-        }
-      });
-    } else {
-      working.forEach((op, i) => {
-        const role = locked[op] || (n === 2 ? (i === 0 ? 'S' : 'C') : (i === 0 ? 'A' : 'C'));
-        setProvaCell(op, day, role);
-        hours[op] += PROVA_HOURS[role] || 8;
-        if (role === 'A' || role === 'S' || role === 'C' || role === '6A' || role === '6C' || role === '4A' || role === '4C') {
-          const rk = provaRoleOf(role);
-          if (rk) counts[op][rk] += 1;
-        }
-      });
-    }
   }
+
+  provaFillExact40();
   provaRepairHours();
   renderTurniProva();
-  const over = OPERATORS.filter(op => provaHours(op) > 40);
-  if (over.length) showToast(over[0] + ' supera ancora 40h: togli un turno a mano', 'warn');
-  else if (provaValidate().length) showToast('Generata con avvisi: controlla il riquadro giallo', 'warn');
-  else showToast('Settimana entro 40h. Controlla e Salva.', 'success');
+  const not40 = OPERATORS.filter(op => provaHours(op) !== 40);
+  if (packFail.length) showToast('Vincoli troppo stretti per 40h: ' + packFail.join(', '), 'warn');
+  else if (not40.length) showToast(not40[0] + ' è a ' + provaHours(not40[0]) + 'h (serve 40). Ritocca a mano.', 'warn');
+  else if (provaValidate().length) showToast('40h ok, ma controlla il riquadro giallo (copertura)', 'warn');
+  else showToast('Tutti a 40 ore. Controlla e Salva.', 'success');
+}
+
+function provaFillExact40() {
+  const vFor = (op, day) => (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
+  OPERATORS.forEach(op => {
+    let guard = 0;
+    while (provaHours(op) < 40 && guard++ < 6) {
+      const miss = 40 - provaHours(op);
+      const want = miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : 0;
+      if (!want) break;
+      const code = want === 8 ? 'C' : want === 6 ? '6C' : '4C';
+      let done = false;
+      for (let day = 0; day < 6; day++) {
+        if (vFor(op, day)) continue;
+        const cur = provaCell(op, day);
+        if (cur && cur !== 'R') continue;
+        setProvaCell(op, day, code);
+        done = true;
+        break;
+      }
+      if (!done) break;
+    }
+  });
 }
 
 function provaRepairHours() {
