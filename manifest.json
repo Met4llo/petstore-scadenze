@@ -1,11 +1,11 @@
 {
-  "name": "PetStore Scadenze",
-  "short_name": "Scadenze",
-  "description": "Gestione scadenze prodotti PetStore Conad",
+  "name": "Pet Store La Malfa",
+  "short_name": "La Malfa",
+  "description": "App negozio Pet Store Conad La Malfa: scadenze, turni, consegne",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#E85A2A",
+  "background_color": "#f6f1ea",
+  "theme_color": "#c45a2a",
   "orientation": "portrait",
   "icons": [
     {

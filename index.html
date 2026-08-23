@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pet Store La Malfa">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#c45a2a">
-  <title>PetStore Scadenze</title>
+  <title>Pet Store La Malfa</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-petstore.png">
   <script>
@@ -14,8 +15,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.19">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.19">
+  <link rel="stylesheet" href="styles.css?v=2.20">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.20">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -558,14 +559,28 @@
           <p id="password-msg" class="msg hidden"></p>
         </div>
         <div class="settings-group">
-          <label>Dati</label>
+          <label>Metti l’app sul telefono</label>
+          <p class="field-hint"><strong>iPhone (Safari)</strong></p>
+          <ol class="install-steps">
+            <li>Apri questa pagina con <strong>Safari</strong> (non Chrome).</li>
+            <li>Tocca il tasto <strong>Condividi</strong> (quadrato con la freccia in su).</li>
+            <li>Scorri e tocca <strong>Aggiungi a Home</strong>.</li>
+            <li>Tocca <strong>Aggiungi</strong>. In home compare <strong>Pet Store La Malfa</strong>.</li>
+          </ol>
+          <p class="field-hint" style="margin-top:10px;"><strong>Android (Chrome)</strong></p>
+          <ol class="install-steps">
+            <li>Menu ⋮ in alto a destra.</li>
+            <li>Tocca <strong>Aggiungi a schermata Home</strong> o <strong>Installa app</strong>.</li>
+          </ol>
+        </div>
+        <div class="settings-group">
           <button id="btn-export" class="btn btn-secondary">Esporta backup</button>
           <button id="btn-import" class="btn btn-secondary" style="margin-top:8px;">Importa backup</button>
           <input type="file" id="import-file" accept=".json" class="hidden">
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.19 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 2.20 – Pet Store La Malfa</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -586,7 +601,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.19"></script>
-  <script src="fuschi-home.js?v=2.19"></script>
+  <script src="app.js?v=2.20"></script>
+  <script src="fuschi-home.js?v=2.20"></script>
 </body>
 </html>

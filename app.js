@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.19 - home consegne più chiare
+// VERSION 2.20 - Pet Store La Malfa, guida Aggiungi a Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4098,7 +4098,7 @@ tbody th { text-align: left; width: 15%; font-size: 13px; }
 @media print { button { display: none !important; } }
 .no-print { margin-top: 12px; }
 </style></head><body>
-<h1>PetStore Conad — Turni 2.0</h1>
+<h1>Pet Store La Malfa — Turni 2.0</h1>
 <p class="range">${escapeHtml(formatRange(start, end))}</p>
 <table>
 <thead>${head}</thead>
@@ -4162,7 +4162,7 @@ function drawTurniProvaCanvas() {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#2a211c';
   ctx.font = '700 22px "DM Sans", system-ui, sans-serif';
-  ctx.fillText('PetStore Conad — Turni 2.0', pad, pad + 22);
+  ctx.fillText('Pet Store La Malfa — Turni 2.0', pad, pad + 22);
   ctx.font = '600 16px "DM Sans", system-ui, sans-serif';
   ctx.fillStyle = '#6f645b';
   ctx.fillText(range, pad, pad + titleH);
@@ -4254,7 +4254,7 @@ function drawTurniProvaCanvas() {
   });
   ctx.fillStyle = '#8a7d74';
   ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
-  ctx.fillText('Generata da PetStore Conad  ·  ' + new Date().toLocaleDateString('it-IT'), pad, H - pad);
+  ctx.fillText('Generata da Pet Store La Malfa  ·  ' + new Date().toLocaleDateString('it-IT'), pad, H - pad);
   return canvas;
 }
 
@@ -4270,7 +4270,7 @@ async function sendProvaShare() {
   try {
     if (navigator.share) {
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Turni PetStore Conad' });
+        await navigator.share({ files: [file], title: 'Turni Pet Store La Malfa' });
         return;
       }
     }

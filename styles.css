@@ -1119,6 +1119,14 @@ body {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+.install-steps {
+  margin: 0 0 4px 18px;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.install-steps li { margin: 6px 0; }
 .settings-op-name {
   font-family: "Fraunces", Georgia, serif;
   font-size: 1.35rem;
