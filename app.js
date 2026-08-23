@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.25 - filtro fornitore in lista (conteggio e azzera)
+// VERSION 2.26 - stampa/PDF lista scadenze in bianco e nero
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1061,6 +1061,57 @@ async function exportCurrentList() {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   showToast('Esportati ' + list.length + ' prodotti', 'success');
+}
+
+function printCurrentList() {
+  const filter = (document.getElementById('list-filter') || {}).value || 'all';
+  const list = getListForFilter(filter);
+  if (!list.length) {
+    showToast('Lista vuota, niente da stampare', 'warn');
+    return;
+  }
+  const title = ((document.getElementById('list-title') || {}).textContent || 'Lista scadenze').trim();
+  const rows = list.map(p => {
+    const days = p.noExpiry ? '—' : (p.expiry == null || p.expiry === '' ? '—' : String(daysRemaining(p.expiry)));
+    const exp = p.noExpiry ? 'escluso' : (formatExportDate(p.expiry) || '—');
+    const sig = p.signaled ? ' *' : '';
+    return '<tr><td class="n">' + escapeHtml((p.name || '') + sig) + '</td><td class="ean">' + escapeHtml(p.ean || '') + '</td><td>' + escapeHtml(p.supplier || '') + '</td><td>' + escapeHtml(exp) + '</td><td class="d">' + escapeHtml(days) + '</td></tr>';
+  }).join('');
+  const html = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title>
+<style>
+@page { size: A4 portrait; margin: 10mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+h1 { font-size: 15px; margin: 0 0 4px; }
+.meta { font-size: 11px; margin: 0 0 10px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 1px solid #000; padding: 4px 5px; font-size: 10px; vertical-align: top; word-wrap: break-word; }
+th { text-align: left; font-size: 10px; }
+.n { width: 34%; }
+.ean { width: 18%; font-variant-numeric: tabular-nums; }
+.d { width: 10%; text-align: right; }
+.leg { margin-top: 8px; font-size: 10px; }
+@media print { button { display: none !important; } }
+.no-print { margin-top: 10px; }
+</style></head><body>
+<h1>Pet Store La Malfa — ${escapeHtml(title)}</h1>
+<p class="meta">${list.length} prodotti · ${escapeHtml(new Date().toLocaleDateString('it-IT'))} · * = segnalato</p>
+<table>
+<thead><tr><th class="n">Nome</th><th class="ean">EAN</th><th>Fornitore</th><th>Scadenza</th><th class="d">Gg</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+<p class="leg">Stampa della lista filtrata in app (fascia, fornitore, ricerca).</p>
+<p class="no-print"><button onclick="window.print()">Stampa / Salva PDF</button></p>
+<script>window.onload=function(){setTimeout(function(){window.print();},250);}</script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('Consenti i popup per stampare', 'warn');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 function renderFilteredList(filter) {
@@ -6899,6 +6950,8 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
   });
   const btnExportList = document.getElementById('btn-export-list');
   if (btnExportList) btnExportList.onclick = exportCurrentList;
+  const btnPrintList = document.getElementById('btn-print-list');
+  if (btnPrintList) btnPrintList.onclick = printCurrentList;
   const listSupplier = document.getElementById('list-supplier');
   if (listSupplier) {
     listSupplier.onchange = () => {
