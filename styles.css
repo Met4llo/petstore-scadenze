@@ -2474,6 +2474,7 @@ body {
 .pv-bagheria { background: #e0f2fe; color: #075985; }
 .pv-riposo { background: #f4efe6; color: #6f645b; }
 .pv-ferie { background: #fce7f3; color: #9d174d; }
+.pv-malattia { background: #fef3c7; color: #92400e; }
 .leg-pv {
   display: inline-block;
   padding: 3px 8px;
@@ -2581,6 +2582,7 @@ body {
 }
 .turni-oggi-row.is-off .turni-oggi-shift { color: var(--muted); }
 .turni-oggi-row.is-ferie .turni-oggi-shift { color: #9d174d; }
+.turni-oggi-row.is-malattia .turni-oggi-shift { color: #92400e; }
 .turni-oggi-row.is-on .turni-oggi-shift { color: var(--success); }
 .consegne-dash {
   background: var(--card);

@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.21 - colonna di oggi evidenziata in Turni 2.0
+// VERSION 2.22 - malattia nei turni (8h, non in negozio)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2813,7 +2813,7 @@ function packedShop(data, op, day) {
   if (typeof n === 'string' && n) return n;
   const c = packedCell(data, op, day);
   if (isBagheriaCode(c)) return 'Bagheria';
-  if (!c || c === 'R' || c === 'F') return '';
+  if (!c || c === 'R' || c === 'F' || c === 'M') return '';
   return 'La Malfa';
 }
 
@@ -2830,6 +2830,7 @@ function provaLineLabel(code, shop) {
   if (!code) return '—';
   if (code === 'R') return 'Riposo';
   if (code === 'F') return 'Ferie';
+  if (code === 'M') return 'Malattia';
   const lab = PROVA_LABEL[code] || code;
   return shop ? (lab + ' · ' + shop) : lab;
 }
@@ -2866,7 +2867,7 @@ async function loadOggiTurniDash() {
       const s2 = packedSlot2(data, op, day);
       const line = provaLineLabel(c, shop);
       const line2 = s2 && s2.code ? provaLineLabel(s2.code, s2.shop) : '';
-      const cls = (!c || c === 'R') ? 'is-off' : (c === 'F' ? 'is-ferie' : 'is-on');
+      const cls = (!c || c === 'R') ? 'is-off' : (c === 'F' ? 'is-ferie' : (c === 'M' ? 'is-malattia' : 'is-on'));
       html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + escapeHtml(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
     });
     el.innerHTML = html;
@@ -2882,7 +2883,7 @@ function updateTurniDash() {
   loadOggiTurniDash();
 }
 
-const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', 'S7', '7C', '6A', '6C', '6M', '5C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
+const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', 'S7', '7C', '6A', '6C', '6M', '5C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F', 'M'];
 const PROVA_LABEL = {
   '': '·',
   A: '9-17',
@@ -2905,7 +2906,8 @@ const PROVA_LABEL = {
   DM: '9-15',
   DS: '14-20',
   R: 'R',
-  F: 'Ferie'
+  F: 'Ferie',
+  M: 'Mal.'
 };
 const PROVA_TITLE = {
   '': 'Vuoto',
@@ -2929,9 +2931,10 @@ const PROVA_TITLE = {
   DM: '09:00–15:00 (6h)',
   DS: '14:00–20:00 (6h)',
   R: 'Riposo',
-  F: 'Ferie (8h, non in negozio)'
+  F: 'Ferie (8h, non in negozio)',
+  M: 'Malattia (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8, M: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -3012,7 +3015,7 @@ function provaNegozio(op, dayIdx) {
   if (typeof n === 'string' && n) return n;
   const c = provaCell(op, dayIdx);
   if (isBagheriaCode(c)) return 'Bagheria';
-  if (!c || c === 'R' || c === 'F') return '';
+  if (!c || c === 'R' || c === 'F' || c === 'M') return '';
   return 'La Malfa';
 }
 
@@ -3059,7 +3062,7 @@ function provaDayHours(op, day) {
 }
 
 function provaIsWorkCode(c) {
-  return !!(c && c !== 'R' && c !== 'F');
+  return !!(c && c !== 'R' && c !== 'F' && c !== 'M');
 }
 
 function provaAtMain(op, day, code) {
@@ -3089,6 +3092,7 @@ function provaAtMainHour(op, day, hour, codeOverride) {
 function provaPvClass(op, day) {
   const c = provaCell(op, day);
   if (c === 'F') return 'pv-ferie';
+  if (c === 'M') return 'pv-malattia';
   if (!c || c === 'R') return 'pv-riposo';
   return NEGOZIO_CLASS[provaNegozio(op, day)] || 'pv-malfa';
 }
@@ -3198,8 +3202,8 @@ function applyBagheriaVincoliDays() {
     const bv = provaVincoliBagheria[String(day)] || '';
     if (!bv || bv === 'L') continue;
     const ov = (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
-    if (ov === 'F' || ov === 'R') continue;
-    if (provaCell(op, day) === 'F') continue;
+    if (ov === 'F' || ov === 'M' || ov === 'R') continue;
+    if (provaCell(op, day) === 'F' || provaCell(op, day) === 'M') continue;
     setProvaCell(op, day, bv === 'B' ? 'B44' : bv);
     setProvaNegozio(op, day, 'Bagheria');
   }
@@ -3225,7 +3229,8 @@ function provaCellOptions(day) {
     ['B4A', 'Bagheria 09-13'],
     ['B4C', 'Bagheria 16-20'],
     ['R', 'Riposo'],
-    ['F', 'Ferie']
+    ['F', 'Ferie'],
+    ['M', 'Malattia']
   ];
 }
 
@@ -3623,8 +3628,8 @@ function generateTurniProva() {
       setProvaCell(op, 6, v === 'B' ? 'B44' : v);
       sunBusy.add(op);
     }
-    if (v === 'R' || v === 'F') {
-      setProvaCell(op, 6, v === 'F' ? 'F' : 'R');
+    if (v === 'R' || v === 'F' || v === 'M') {
+      setProvaCell(op, 6, v);
       sunBusy.add(op);
     }
   });
@@ -3655,7 +3660,7 @@ function generateTurniProva() {
   for (let day = 0; day < 6; day++) {
     ops.forEach(op => {
       const v = vFor(op, day);
-      if (v === 'F') { setProvaCell(op, day, 'F'); setProvaNegozio(op, day, ''); }
+      if (v === 'F' || v === 'M') { setProvaCell(op, day, v); setProvaNegozio(op, day, ''); }
       else if (v === 'R') { setProvaCell(op, day, 'R'); setProvaNegozio(op, day, ''); }
       else if (isBagheriaCode(v)) {
         setProvaCell(op, day, v === 'B' ? 'B44' : v);
@@ -3808,7 +3813,7 @@ function provaRepairHours() {
       for (let day = 5; day >= 0; day--) {
         if (vFor(op, day)) continue;
         const code = provaCell(op, day);
-        if (!code || code === 'R' || code === 'F') continue;
+        if (!code || code === 'R' || code === 'F' || code === 'M') continue;
         setProvaCell(op, day, 'R');
         const atClose = OPERATORS.filter(o => provaPresent(provaCell(o, day), 19)).length;
         const atOpen = OPERATORS.filter(o => provaPresent(provaCell(o, day), 9)).length;
@@ -3829,6 +3834,7 @@ function provaVincoloOptions(day) {
     ['', 'Libero'],
     ['R', 'Riposo'],
     ['F', 'Ferie'],
+    ['M', 'Malattia (8h)'],
     ['A', '09-17 (8h)'],
     ['C', '12-20 (8h)'],
     ['S', 'Spezzato 4+4 (8h)'],
@@ -4025,6 +4031,7 @@ let provaShareUrl = '';
 function provaExportColors(op, day) {
   const c = provaCell(op, day);
   if (c === 'F') return { bg: '#fce7f3', fg: '#9d174d' };
+  if (c === 'M') return { bg: '#fef3c7', fg: '#92400e' };
   if (!c || c === 'R') return { bg: '#f4efe6', fg: '#6f645b' };
   const n = provaNegozio(op, day);
   if (n === 'Rizzo') return { bg: '#dbeafe', fg: '#1d4ed8' };
@@ -4047,6 +4054,7 @@ function printTurniProvaCell(op, day) {
   const s2 = provaSecond(op, day);
   if (!c || c === 'R') return '<span class="off">Riposo</span>';
   if (c === 'F') return '<span class="ferie">FERIE</span>';
+  if (c === 'M') return '<span class="ferie">MALATTIA</span>';
   let html = '<b>' + escapeHtml(PROVA_LABEL[c] || c) + '</b>';
   html += '<div class="shop">' + escapeHtml(provaShopCode(shop) || shop) + '</div>';
   if (s2 && s2.code) {
