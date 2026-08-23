@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.20 - Pet Store La Malfa, guida Aggiungi a Home
+// VERSION 2.21 - colonna di oggi evidenziata in Turni 2.0
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3247,10 +3247,11 @@ function renderTurniProva() {
   syncProvaWeekInputs();
   if (!grid) return;
   let html = '<table class="prova-table"><thead><tr><th>Ore</th>';
+  const todayIdx = (provaWeekStart === provaMondayStr()) ? todayProvaDayIdx() : -1;
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    html += `<th>${PROVA_DAYS[i]}<small>${d.getDate()}</small></th>`;
+    html += `<th${i === todayIdx ? ' class="is-today"' : ''}>${PROVA_DAYS[i]}${i === todayIdx ? '<span class="oggi-mark">Oggi</span>' : ''}<small>${d.getDate()}</small></th>`;
   }
   html += '</tr></thead><tbody>';
   OPERATORS.forEach(op => {
@@ -3264,7 +3265,7 @@ function renderTurniProva() {
       const shop = provaNegozio(op, i);
       const work = provaIsWorkCode(v) && !isBagheriaCode(v);
       const s2 = provaSecond(op, i);
-      html += `<td class="prova-td"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
+      html += `<td class="prova-td${i === todayIdx ? ' is-today' : ''}"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
       provaCellOptions(i).forEach(([val, lab]) => {
         html += `<option value="${val}"${provaOptionSelected(v, val) ? ' selected' : ''}>${lab}</option>`;
       });
@@ -3294,7 +3295,7 @@ function renderTurniProva() {
   html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">Sorrentino</small></th>';
   for (let i = 0; i < 7; i++) {
     const cur = provaBagheriaValue(i);
-    html += `<td><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
+    html += `<td class="${i === todayIdx ? 'is-today' : ''}"><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
     provaBagheriaOptions().forEach(([val, lab]) => {
       html += `<option value="${val}"${cur === val ? ' selected' : ''}>${lab}</option>`;
     });

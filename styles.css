@@ -2396,6 +2396,19 @@ body {
   color: var(--text);
   font-weight: 700;
 }
+.prova-table th.is-today,
+.prova-table td.is-today {
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+.oggi-mark {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
 .prova-table tbody th small.prova-ore {
   display: block;
   font-size: 0.72rem;
