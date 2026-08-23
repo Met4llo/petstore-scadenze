@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.08 - scanner iPhone: HD, più fps, EAN più veloce
+// VERSION 2.09 - Turni 2.0 visibile a tutti
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -560,7 +560,7 @@ function showToast(msg, duration, type) {
 }
 
 function showPage(pageId) {
-  if ((pageId === 'ordini' || pageId === 'turni-prova') && currentOperator !== 'Santoemma') {
+  if (pageId === 'ordini' && currentOperator !== 'Santoemma') {
     showToast('Sezione riservata a Santoemma');
     pageId = 'dashboard';
   }
@@ -2130,6 +2130,8 @@ function updateOperatorUI() {
     if (currentOperator === 'Santoemma') btn.classList.remove('hidden');
     else btn.classList.add('hidden');
   });
+  const sqlBtn = document.getElementById('btn-copy-prova-sql');
+  if (sqlBtn) sqlBtn.classList.toggle('hidden', currentOperator !== 'Santoemma');
 }
 
 let pendingOperator = null;
@@ -3833,7 +3835,6 @@ function confirmProvaVincoli() {
 }
 
 async function loadTurniProva() {
-  if (!isSantoemma()) return;
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   renderTurniProva();
   const st = document.getElementById('prova-status');
@@ -3931,7 +3932,7 @@ function drawTurniProvaCanvas() {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#2a211c';
   ctx.font = '700 22px "DM Sans", system-ui, sans-serif';
-  ctx.fillText('PetStore Conad — Turni', pad, pad + 22);
+  ctx.fillText('PetStore Conad — Turni 2.0', pad, pad + 22);
   ctx.font = '600 16px "DM Sans", system-ui, sans-serif';
   ctx.fillStyle = '#6f645b';
   ctx.fillText(range, pad, pad + titleH);
@@ -4144,7 +4145,6 @@ function applyProvaSnapshot(snap) {
 }
 
 async function saveTurniProvaDraft() {
-  if (!isSantoemma()) return;
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   const empty = OPERATORS.every(op => {
     for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
@@ -4189,7 +4189,6 @@ function restoreTurniProvaDraft() {
 }
 
 async function saveTurniProva() {
-  if (!isSantoemma()) return;
   if (!supabase) {
     showToast('Cloud non disponibile', 'warn');
     return;
@@ -5795,7 +5794,7 @@ function guardOrdiniPage() {
 }
 
 function guardTurniProvaPage() {
-  return guardOrdiniPage();
+  return true;
 }
 
 // ---------- Init ----------

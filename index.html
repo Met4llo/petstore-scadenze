@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.08">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.08">
+  <link rel="stylesheet" href="styles.css?v=2.09">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.09">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -61,7 +61,7 @@
           <button type="button" class="logo-dropdown-item" data-page="tasks">Task</button>
           <button type="button" class="logo-dropdown-item" data-page="missione">Missione <span id="missione-menu-count" class="btn-count hidden">0</span></button>
           <button type="button" class="logo-dropdown-item" data-page="turni">Turni</button>
-          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="turni-prova">Turni prova</button>
+          <button type="button" class="logo-dropdown-item" data-page="turni-prova">Turni 2.0</button>
           <button type="button" class="logo-dropdown-item" data-page="consegne">Consegne</button>
           <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">Ordini fornitore</button>
           <button type="button" class="logo-dropdown-item" data-page="scanner">Scanner / Cerca</button>
@@ -256,8 +256,8 @@
       </section>
 
       <section id="page-turni-prova" class="page">
-        <p class="dash-kicker">Turni prova</p>
-        <p class="turni-hint">Tocca le date per scegliere la settimana, poi Genera. Riga Bagheria: Libero o mezza giornata (Sorrentino).</p>
+        <p class="dash-kicker">Turni 2.0</p>
+        <p class="turni-hint">Visibile a tutti. Il vecchio sistema (foto) resta in Turni. Tocca le date, poi Genera e Salva.</p>
         <div class="prova-week-bar">
           <button type="button" id="btn-prova-prev" class="turno-zoom-btn">‹</button>
           <label class="prova-week-pick">
@@ -540,7 +540,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.08 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 2.09 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -561,7 +561,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.08"></script>
-  <script src="fuschi-home.js?v=2.08"></script>
+  <script src="app.js?v=2.09"></script>
+  <script src="fuschi-home.js?v=2.09"></script>
 </body>
 </html>
