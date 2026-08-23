@@ -2640,7 +2640,20 @@ body {
   font-weight: 600;
 }
 .turni-oggi-row.is-off .turni-oggi-shift { color: var(--muted); }
-.turni-oggi-row.is-ferie .turni-oggi-shift { color: #9d174d; }
+.cover-warn {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+[data-theme="dark"] .cover-warn {
+  background: #3f1d1d;
+  color: #fecaca;
+}
 .turni-oggi-row.is-malattia .turni-oggi-shift { color: #92400e; }
 .turni-oggi-row.is-on .turni-oggi-shift { color: var(--success); }
 .consegne-dash {

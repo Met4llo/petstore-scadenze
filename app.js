@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.34 - lista prodotti senza fornitore
+// VERSION 2.35 - avviso copertura chiusura La Malfa in home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3039,6 +3039,15 @@ function packedSlot2(data, op, day) {
   return (data && data._slot2 && data._slot2[op] && data._slot2[op][String(day)]) || null;
 }
 
+function packedAtMainHour(data, op, day, hour) {
+  const c = packedCell(data, op, day);
+  if (c && c !== 'R' && c !== 'F' && c !== 'M' && !isBagheriaCode(c) && provaPresent(c, hour)) {
+    if (packedShop(data, op, day) === 'La Malfa') return true;
+  }
+  const s2 = packedSlot2(data, op, day);
+  return !!(s2 && s2.shop === 'La Malfa' && provaPresent(s2.code, hour));
+}
+
 function todayProvaDayIdx(d) {
   const day = (d || new Date()).getDay();
   return day === 0 ? 6 : day - 1;
@@ -3088,6 +3097,14 @@ async function loadOggiTurniDash() {
       const cls = (!c || c === 'R') ? 'is-off' : (c === 'F' ? 'is-ferie' : (c === 'M' ? 'is-malattia' : 'is-on'));
       html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + escapeHtml(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
     });
+    if (day !== 6) {
+      const atClose = OPERATORS.filter(op => packedAtMainHour(data, op, day, 19));
+      if (atClose.length < 2) {
+        const who = atClose.length ? atClose.join(', ') : 'nessuno';
+        html = '<div class="cover-warn">Chiusura La Malfa: ' + atClose.length + (atClose.length === 1 ? ' persona' : ' persone') + ' (' + escapeHtml(who) + '). Servono almeno 2.</div>' + html;
+        el.classList.add('has-cover-warn');
+      }
+    }
     el.innerHTML = html;
   }
   el.onclick = () => {
