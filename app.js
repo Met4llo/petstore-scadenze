@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.10 - monte ore accanto a Turni 2.0
+// VERSION 2.11 - home: chi è in turno oggi da Turni 2.0
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -624,6 +624,7 @@ function runPageEnter(page) {
     loadBacheca();
     updateMyTasksAlert();
     loadTurni();
+    loadOggiTurniDash();
   }
   if (page === 'tasks') loadTasks();
   if (page === 'turni') loadTurni();
@@ -2757,10 +2758,82 @@ function renderTurni() {
   });
 }
 
-function updateTurniDash() {
-  // Banner turni rimosso dalla Home (si usano dal menu)
+function packedCell(data, op, day) {
+  return (data && data[op] && data[op][String(day)]) || '';
+}
+
+function packedShop(data, op, day) {
+  const n = data && data._negozi && data._negozi[op] && data._negozi[op][String(day)];
+  if (typeof n === 'string' && n) return n;
+  const c = packedCell(data, op, day);
+  if (isBagheriaCode(c)) return 'Bagheria';
+  if (!c || c === 'R' || c === 'F') return '';
+  return 'La Malfa';
+}
+
+function packedSlot2(data, op, day) {
+  return (data && data._slot2 && data._slot2[op] && data._slot2[op][String(day)]) || null;
+}
+
+function todayProvaDayIdx(d) {
+  const day = (d || new Date()).getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function provaLineLabel(code, shop) {
+  if (!code) return '—';
+  if (code === 'R') return 'Riposo';
+  if (code === 'F') return 'Ferie';
+  const lab = PROVA_LABEL[code] || code;
+  return shop ? (lab + ' · ' + shop) : lab;
+}
+
+async function loadOggiTurniDash() {
   const el = document.getElementById('turni-dash');
-  if (el) el.classList.add('hidden');
+  if (!el) return;
+  const week = provaMondayStr(new Date());
+  const day = todayProvaDayIdx();
+  let data = null;
+  if (provaWeekStart === week && provaCelle && OPERATORS.some(op => provaCell(op, day))) {
+    data = provaPackCelle();
+  } else if (supabase) {
+    try {
+      const { data: rows, error } = await supabase
+        .from('turni_prova')
+        .select('celle')
+        .eq('settimana_inizio', week)
+        .limit(1);
+      if (!error && rows && rows[0]) data = rows[0].celle;
+    } catch (e) {}
+  }
+  const has = data && OPERATORS.some(op => packedCell(data, op, day) || (packedSlot2(data, op, day) && packedSlot2(data, op, day).code));
+  el.className = 'turni-oggi-dash home-alert';
+  el.classList.remove('hidden');
+  const dayLab = PROVA_DAYS[day] + ' ' + new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  if (!has) {
+    el.innerHTML = '<div class="consegne-dash-title">Chi è in turno oggi</div><div class="consegne-dash-sub">Nessun turno 2.0 salvato per ' + escapeHtml(dayLab) + '. Tocca per aprire Turni 2.0.</div>';
+  } else {
+    let html = '<div class="consegne-dash-title">Chi è in turno · ' + escapeHtml(dayLab) + '</div>';
+    OPERATORS.forEach(op => {
+      const c = packedCell(data, op, day);
+      const shop = packedShop(data, op, day);
+      const s2 = packedSlot2(data, op, day);
+      const line = provaLineLabel(c, shop);
+      const line2 = s2 && s2.code ? provaLineLabel(s2.code, s2.shop) : '';
+      const cls = (!c || c === 'R') ? 'is-off' : (c === 'F' ? 'is-ferie' : 'is-on');
+      html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + escapeHtml(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
+    });
+    el.innerHTML = html;
+  }
+  el.onclick = () => {
+    provaWeekStart = week;
+    if (!showPage('turni-prova')) return;
+    runPageEnter('turni-prova');
+  };
+}
+
+function updateTurniDash() {
+  loadOggiTurniDash();
 }
 
 const PROVA_FASCE = ['', 'A', 'C', 'S', 'S6', '7C', '6A', '6C', '4A', '4C', '3C', 'B', 'B44', 'B4A', 'B4C', 'DM', 'DS', 'R', 'F'];
@@ -4217,6 +4290,7 @@ async function saveTurniProva() {
   showToast('Settimana salvata', 'success');
   loadTurniProva();
   loadMonteOre();
+  loadOggiTurniDash();
 }
 
 const MONTE_TARGET = 40;
