@@ -675,7 +675,9 @@ body {
   font-size: 0.88rem;
   margin: 0;
 }
-.history-item {
+.history-item.is-expiry {
+  border-left: 4px solid var(--primary);
+}
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;

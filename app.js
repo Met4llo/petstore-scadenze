@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.16 - modifica e cancella rettifiche monte ore
+// VERSION 2.17 - storico scadenze visibile (chi, quando, da/a)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1287,7 +1287,7 @@ function openProduct(ean, returnPage) {
     </div>
 
     <div class="detail-block" id="product-history-block">
-      <p class="detail-kicker">Storico modifiche</p>
+      <p class="detail-kicker">Storico scadenze</p>
       <div id="product-history" class="product-history"><p class="history-empty">Caricamento...</p></div>
     </div>
 
@@ -1375,7 +1375,20 @@ function formatLogWhen(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+const SCADENZE_LOG_LS = 'petstore_scadenze_log';
+
+function readLocalScadenzeLog() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SCADENZE_LOG_LS) || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function writeLocalScadenzeLog(arr) {
+  try { localStorage.setItem(SCADENZE_LOG_LS, JSON.stringify((arr || []).slice(0, 500))); } catch (e) {}
 }
 
 function markLogTableMissing(error) {
@@ -1385,8 +1398,7 @@ function markLogTableMissing(error) {
   }
 }
 
-async function writeProductLog(before, after) {
-  if (!supabase || scadenzeLogMissing) return;
+function buildProductLogRows(before, after) {
   const rows = [];
   const push = (field, oldV, newV) => {
     const a = oldV == null || oldV === '' ? '' : String(oldV);
@@ -1397,7 +1409,8 @@ async function writeProductLog(before, after) {
       operator: currentOperator || 'Sconosciuto',
       field,
       old_value: a || null,
-      new_value: b || null
+      new_value: b || null,
+      changed_at: new Date().toISOString()
     });
   };
   push('ean', before.ean, after.ean);
@@ -1406,12 +1419,25 @@ async function writeProductLog(before, after) {
   push('signaled', before.signaled ? 'sì' : 'no', after.signaled ? 'sì' : 'no');
   push('signaled_date', before.signaledDate, after.signaledDate);
   push('note', before.note, after.note);
+  return rows;
+}
+
+async function writeProductLog(before, after) {
+  const rows = buildProductLogRows(before, after);
   if (!rows.length) return;
+  writeLocalScadenzeLog(rows.concat(readLocalScadenzeLog()));
+  if (!supabase || scadenzeLogMissing) return;
   try {
     if (before.ean && after.ean && before.ean !== after.ean) {
       await supabase.from('scadenze_log').update({ ean: after.ean }).eq('ean', before.ean);
     }
-    const { error } = await supabase.from('scadenze_log').insert(rows);
+    const { error } = await supabase.from('scadenze_log').insert(rows.map(r => ({
+      ean: r.ean,
+      operator: r.operator,
+      field: r.field,
+      old_value: r.old_value,
+      new_value: r.new_value
+    })));
     if (error) {
       console.warn('scadenze_log insert:', error);
       markLogTableMissing(error);
@@ -1426,55 +1452,67 @@ function logProductChanges(before, after) {
   return writeProductLog(before, after);
 }
 
+function historyLine(r) {
+  const who = r.operator || 'Operatore';
+  if (r.field === 'expiry') {
+    return who + ' ha cambiato la scadenza da ' + formatLogValue(r.old_value) + ' a ' + formatLogValue(r.new_value);
+  }
+  if (r.field === 'no_expiry') {
+    return who + ' ha impostato senza scadenza: ' + formatLogValue(r.new_value);
+  }
+  return formatLogField(r.field) + ': ' + formatLogValue(r.old_value) + ' → ' + formatLogValue(r.new_value);
+}
+
 function renderProductHistory(rows) {
   const el = document.getElementById('product-history');
   if (!el) return;
-  if (scadenzeLogMissing) {
-    el.innerHTML = '<p class="history-empty">Storico non attivo. In Impostazioni copia e avvia lo SQL della tabella.</p>';
-    return;
-  }
   if (!rows || !rows.length) {
-    el.innerHTML = '<p class="history-empty">Nessuna modifica registrata ancora.</p>';
+    el.innerHTML = '<p class="history-empty">Nessuna modifica registrata ancora. Si aggiorna quando salvi una scadenza diversa.</p>';
     return;
   }
   el.innerHTML = rows.map(r => {
-    return `<div class="history-item">
-      <div class="history-what"><strong>${escapeHtml(formatLogField(r.field))}</strong>
-        <span>${escapeHtml(formatLogValue(r.old_value))} → ${escapeHtml(formatLogValue(r.new_value))}</span>
-      </div>
-      <div class="history-meta">${escapeHtml(r.operator || '')} · ${escapeHtml(formatLogWhen(r.changed_at))}</div>
+    const expiry = r.field === 'expiry' || r.field === 'no_expiry';
+    return `<div class="history-item${expiry ? ' is-expiry' : ''}">
+      <div class="history-what"><strong>${escapeHtml(historyLine(r))}</strong></div>
+      <div class="history-meta">${escapeHtml(formatLogWhen(r.changed_at))}</div>
     </div>`;
   }).join('');
+}
+
+function mergeProductHistory(cloud, ean) {
+  const local = readLocalScadenzeLog().filter(r => r.ean === ean || r.ean === (currentProduct && currentProduct.ean));
+  const key = r => [r.field, r.old_value, r.new_value, (r.changed_at || '').slice(0, 16), r.operator].join('|');
+  const seen = {};
+  const out = [];
+  (cloud || []).concat(local).forEach(r => {
+    const k = key(r);
+    if (seen[k]) return;
+    seen[k] = true;
+    out.push(r);
+  });
+  out.sort((a, b) => String(b.changed_at || '').localeCompare(String(a.changed_at || '')));
+  return out.slice(0, 20);
 }
 
 async function loadProductHistory(ean) {
   const el = document.getElementById('product-history');
   if (!el || !ean) return;
-  if (!supabase) {
-    el.innerHTML = '<p class="history-empty">Cloud non disponibile.</p>';
-    return;
-  }
-  if (scadenzeLogMissing) {
-    renderProductHistory(null);
-    return;
-  }
-  try {
-    const { data, error } = await supabase
-      .from('scadenze_log')
-      .select('ean,operator,changed_at,field,old_value,new_value')
-      .eq('ean', ean)
-      .order('changed_at', { ascending: false })
-      .limit(5);
-    if (error) {
-      markLogTableMissing(error);
-      renderProductHistory(null);
-      return;
+  let cloud = [];
+  if (supabase && !scadenzeLogMissing) {
+    try {
+      const { data, error } = await supabase
+        .from('scadenze_log')
+        .select('ean,operator,changed_at,field,old_value,new_value')
+        .eq('ean', ean)
+        .order('changed_at', { ascending: false })
+        .limit(30);
+      if (error) markLogTableMissing(error);
+      else cloud = data || [];
+    } catch (e) {
+      markLogTableMissing(e);
     }
-    renderProductHistory(data || []);
-  } catch (e) {
-    markLogTableMissing(e);
-    renderProductHistory(null);
   }
+  renderProductHistory(mergeProductHistory(cloud, ean));
 }
 
 async function saveProduct() {
@@ -1544,6 +1582,14 @@ async function saveProduct() {
   }
 
   if (!supabase) {
+    await logProductChanges(before, {
+      ean: newEan,
+      expiry: expiry,
+      signaled: signaled,
+      signaledDate: signaled ? signaledDate : null,
+      noExpiry: noExpiry,
+      note: note
+    });
     showToast('Cloud non disponibile — salvato solo su questo telefono', 'warn');
     updateDashboard();
     return;
