@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.29 - consegna non arrivata
+// VERSION 2.30 - calendario consegne del mese
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -82,6 +82,8 @@ let nonInNegozio = new Set(); // EANs not in store
 let consegneList = [];
 let consegneFilter = 'prossime';
 let editingConsegnaId = null;
+let consegneCalCursor = null;
+let consegneCalDay = '';
 
 // ---------- Supabase init ----------
 function initSupabase() {
@@ -5905,14 +5907,88 @@ function normalizeConsegnaRow(row) {
     ...row,
     data: normalizeConsegnaDate(row.data),
     ora: row.ora ? String(row.ora).slice(0, 5) : null,
-    stato: row.stato === 'consegnato' ? 'consegnato' : 'prevista'
+    stato: row.stato === 'consegnato' ? 'consegnato' : (row.stato === 'non_arrivata' ? 'non_arrivata' : 'prevista')
   };
 }
 
 function setConsegneFilter(filter) {
   consegneFilter = filter || 'prossime';
+  consegneCalDay = '';
   document.querySelectorAll('#consegne-filters .task-filter-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.cfilter === consegneFilter);
+  });
+}
+
+function consegneMonthStart() {
+  if (!consegneCalCursor) {
+    const n = new Date();
+    consegneCalCursor = new Date(n.getFullYear(), n.getMonth(), 1);
+  }
+  return consegneCalCursor;
+}
+
+function shiftConsegneCal(delta) {
+  const s = consegneMonthStart();
+  consegneCalCursor = new Date(s.getFullYear(), s.getMonth() + delta, 1);
+  renderConsegneCal();
+}
+
+function renderConsegneCal() {
+  const el = document.getElementById('consegne-cal');
+  if (!el) return;
+  const start = consegneMonthStart();
+  const y = start.getFullYear();
+  const m = start.getMonth();
+  const first = new Date(y, m, 1);
+  const lastD = new Date(y, m + 1, 0).getDate();
+  const pad = first.getDay() === 0 ? 6 : first.getDay() - 1;
+  const monthKey = y + '-' + String(m + 1).padStart(2, '0');
+  const byDay = {};
+  consegneList.forEach(c => {
+    const d = normalizeConsegnaDate(c.data);
+    if (!d || d.slice(0, 7) !== monthKey) return;
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(c);
+  });
+  let cells = '';
+  for (let i = 0; i < pad; i++) cells += '<div class="cal-empty"></div>';
+  for (let day = 1; day <= lastD; day++) {
+    const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const items = byDay[ds] || [];
+    const today = ds === todayStr();
+    const sel = ds === consegneCalDay;
+    let dotCls = '';
+    if (items.some(c => c.stato === 'non_arrivata')) dotCls = ' is-miss';
+    else if (items.length && items.every(c => c.stato === 'consegnato')) dotCls = ' is-done';
+    else if (items.length) dotCls = ' is-wait';
+    const names = items.slice(0, 2).map(c => (c.fornitore || '').split(/[\s-]/)[0].slice(0, 8)).join(' · ');
+    cells += '<button type="button" class="cal-day' + (today ? ' is-today' : '') + (sel ? ' is-on' : '') + (items.length ? ' has' : '') + '" data-day="' + ds + '">' +
+      '<span class="cal-n">' + day + '</span>' +
+      (items.length ? '<span class="cal-dot' + dotCls + '"></span>' : '') +
+      (names ? '<span class="cal-lab">' + escapeHtml(names) + (items.length > 2 ? '+' : '') + '</span>' : '') +
+      '</button>';
+  }
+  el.innerHTML = '<div class="cal-nav"><button type="button" class="turno-zoom-btn" id="btn-cal-prev" aria-label="Mese precedente">‹</button><div class="cal-title">' + MESI[m] + ' ' + y + '</div><button type="button" class="turno-zoom-btn" id="btn-cal-next" aria-label="Mese successivo">›</button></div>' +
+    '<div class="cal-week"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>' +
+    '<div class="cal-grid">' + cells + '</div>';
+  const prev = document.getElementById('btn-cal-prev');
+  const next = document.getElementById('btn-cal-next');
+  if (prev) prev.onclick = () => shiftConsegneCal(-1);
+  if (next) next.onclick = () => shiftConsegneCal(1);
+  el.querySelectorAll('.cal-day').forEach(btn => {
+    btn.onclick = () => {
+      if (consegneCalDay === btn.dataset.day) {
+        consegneCalDay = '';
+        consegneFilter = 'prossime';
+      } else {
+        consegneCalDay = btn.dataset.day;
+        consegneFilter = 'giorno';
+      }
+      document.querySelectorAll('#consegne-filters .task-filter-btn').forEach(b => {
+        b.classList.toggle('active', consegneFilter !== 'giorno' && b.dataset.cfilter === consegneFilter);
+      });
+      renderConsegne();
+    };
   });
 }
 
@@ -5951,12 +6027,15 @@ function populateConsegnaFornitore() {
 }
 
 function renderConsegne() {
+  renderConsegneCal();
   const el = document.getElementById('consegne-list');
   if (!el) return;
   const oggi = todayStr();
   let list = [...consegneList];
 
-  if (consegneFilter === 'oggi') {
+  if (consegneFilter === 'giorno' && consegneCalDay) {
+    list = list.filter(c => normalizeConsegnaDate(c.data) === consegneCalDay);
+  } else if (consegneFilter === 'oggi') {
     list = list.filter(c => normalizeConsegnaDate(c.data) === oggi);
   } else if (consegneFilter === 'prossime') {
     // future + today, not yet delivered
@@ -5986,6 +6065,7 @@ function renderConsegne() {
 
   if (!list.length) {
     const emptyMsg = {
+      giorno: ['Nessuna consegna in questo giorno', 'Tocca un altro giorno nel calendario, oppure aggiungi una consegna.', 'new-consegna', 'Nuova consegna'],
       prossime: ['Nessuna consegna in arrivo', 'Non ci sono consegne previste. Aggiungine una per farla comparire in Home il giorno giusto.', 'new-consegna', 'Nuova consegna'],
       oggi: ['Nessuna consegna per oggi', 'Oggi non è prevista nessuna azienda. Puoi registrare una consegna se serve.', 'new-consegna', 'Nuova consegna'],
       storico: ['Storico vuoto', 'Le consegne passate e quelle già ritirate restano qui.', '', ''],
