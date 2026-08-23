@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.11 - home: chi è in turno oggi da Turni 2.0
+// VERSION 2.12 - 11-20 conta 9 ore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2864,7 +2864,7 @@ const PROVA_TITLE = {
   C: 'Intero 12:00–20:00 (8h, pausa inclusa)',
   S: 'Spezzato 09:00–13:00 e 16:00–20:00 (8h)',
   S6: 'Spezzato 09:00–12:00 e 17:00–20:00 (6h)',
-  '7C': '11:00–20:00 (7h)',
+  '7C': '11:00–20:00 (9h)',
   '6A': '09:00–15:00 (6h)',
   '6C': '14:00–20:00 (6h)',
   '4A': '09:00–13:00 (4h)',
@@ -2879,7 +2879,7 @@ const PROVA_TITLE = {
   R: 'Riposo',
   F: 'Ferie (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '7C': 7, '6A': 6, '6C': 6, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, '7C': 9, '6A': 6, '6C': 6, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -3155,7 +3155,7 @@ function provaCellOptions(day) {
     ['C', '12-20 (8h)'],
     ['S', '4+4 (8h)'],
     ['S6', '09-12 / 17-20 (6h)'],
-    ['7C', '11-20 (7h)'],
+    ['7C', '11-20 (9h)'],
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
@@ -3321,7 +3321,7 @@ function provaValidate() {
     if (h < 40 && h > 0) issues.push(op + ': ' + h + ' ore (serve 40)');
     for (let d = 0; d < 7; d++) {
       const dh = provaDayHours(op, d);
-      if (dh > 8) issues.push(op + ' ' + PROVA_DAYS[d] + ': ' + dh + 'h in un giorno (max 8)');
+      if (dh > 9) issues.push(op + ' ' + PROVA_DAYS[d] + ': ' + dh + 'h in un giorno (max 9)');
     }
   });
   for (let day = 0; day < 7; day++) {
@@ -3447,15 +3447,15 @@ function provaMakePack(need, nDays) {
     for (let i = 0; i < nDays; i++) z.push(0);
     return z;
   }
-  if (need > 8 * nDays) return null;
+  if (need > 9 * nDays) return null;
   const out = [];
   function rec(left, days) {
     if (days === 0) return left === 0;
-    const sizes = [8, 7, 6, 4, 3, 0];
+    const sizes = [9, 8, 6, 4, 3, 0];
     for (let i = 0; i < sizes.length; i++) {
       const s = sizes[i];
       if (s > left) continue;
-      if (left - s > 8 * (days - 1)) continue;
+      if (left - s > 9 * (days - 1)) continue;
       out.push(s);
       if (rec(left - s, days - 1)) return true;
       out.pop();
@@ -3480,7 +3480,7 @@ function provaTakeBag(bag, prefer) {
 
 const PROVA_CODES_BY_H = {
   8: ['A', 'C', 'S'],
-  7: ['7C'],
+  9: ['7C'],
   6: ['6A', '6C', 'S6'],
   4: ['4A', '4C'],
   3: ['3C']
@@ -3671,7 +3671,7 @@ function generateTurniProva() {
     });
     const hourAssign = {};
     workersFlex.forEach(op => {
-      const h = provaTakeBag(bags[op], [8, 7, 6, 4, 3]);
+      const h = provaTakeBag(bags[op], [9, 8, 6, 4, 3]);
       if (!h) {
         setProvaCell(op, day, 'R');
         preset[op] = 'R';
@@ -3708,16 +3708,16 @@ function provaFillExact40() {
     let guard = 0;
     while (provaHours(op) < 40 && guard++ < 6) {
       const miss = 40 - provaHours(op);
-      const want = miss >= 8 ? 8 : miss >= 7 ? 7 : miss >= 6 ? 6 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
+      const want = miss >= 9 ? 9 : miss >= 8 ? 8 : miss >= 6 ? 6 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
       if (!want) break;
       const c = provaRoleCounts(op);
       let code;
-      if (want === 8) {
+      if (want === 9) code = '7C';
+      else if (want === 8) {
         if (c.S <= c.A && c.S <= c.C) code = 'S';
         else if (c.A <= c.C) code = 'A';
         else code = 'C';
-      } else if (want === 7) code = '7C';
-      else if (want === 6) code = c.S <= c.A && c.S <= c.C ? 'S6' : (c.A <= c.C ? '6A' : '6C');
+      } else if (want === 6) code = c.S <= c.A && c.S <= c.C ? 'S6' : (c.A <= c.C ? '6A' : '6C');
       else if (want === 3) code = '3C';
       else code = c.A <= c.C ? '4A' : '4C';
       let done = false;
@@ -3768,7 +3768,7 @@ function provaVincoloOptions(day) {
     ['C', '12-20 (8h)'],
     ['S', 'Spezzato 4+4 (8h)'],
     ['S6', 'Spezzato 09-12 / 17-20 (6h)'],
-    ['7C', '11-20 (7h)'],
+    ['7C', '11-20 (9h)'],
     ['6A', '09-15 (6h)'],
     ['6C', '14-20 (6h)'],
     ['4A', '09-13 (4h)'],
