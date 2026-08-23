@@ -14,8 +14,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.09">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.09">
+  <link rel="stylesheet" href="styles.css?v=2.10">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.10">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -277,14 +277,37 @@
           <span class="leg-pv pv-ferie">Ferie</span>
         </div>
         <div id="prova-check" class="prova-check is-empty">Settimana vuota. Premi Genera settimana.</div>
-        <div id="prova-grid" class="prova-grid-wrap"></div>
-        <button type="button" id="btn-prova-save" class="btn btn-primary btn-large" style="margin-top:14px;">Salva settimana</button>
-        <button type="button" id="btn-prova-draft-save" class="btn btn-secondary btn-large" style="margin-top:8px;">Salva bozza</button>
-        <button type="button" id="btn-prova-draft-load" class="btn btn-secondary btn-large" style="margin-top:8px;">Riprendi bozza</button>
-        <p id="prova-draft-hint" class="field-hint" style="margin-top:6px;"></p>
-        <button type="button" id="btn-prova-share" class="btn btn-secondary btn-large" style="margin-top:8px;">Crea immagine da inviare</button>
-        <button type="button" id="btn-copy-prova-sql" class="btn btn-secondary btn-large" style="margin-top:8px;">Copia SQL tabella</button>
-        <p id="prova-status" class="field-hint" style="margin-top:8px;"></p>
+        <div class="prova-split">
+          <div class="prova-split-grid">
+            <div id="prova-grid" class="prova-grid-wrap"></div>
+            <button type="button" id="btn-prova-save" class="btn btn-primary btn-large" style="margin-top:14px;">Salva settimana</button>
+            <button type="button" id="btn-prova-draft-save" class="btn btn-secondary btn-large" style="margin-top:8px;">Salva bozza</button>
+            <button type="button" id="btn-prova-draft-load" class="btn btn-secondary btn-large" style="margin-top:8px;">Riprendi bozza</button>
+            <p id="prova-draft-hint" class="field-hint" style="margin-top:6px;"></p>
+            <button type="button" id="btn-prova-share" class="btn btn-secondary btn-large" style="margin-top:8px;">Crea immagine da inviare</button>
+            <button type="button" id="btn-copy-prova-sql" class="btn btn-secondary btn-large" style="margin-top:8px;">Copia SQL tabella</button>
+            <p id="prova-status" class="field-hint" style="margin-top:8px;"></p>
+          </div>
+          <aside class="monte-ore-panel" id="monte-ore-panel">
+            <p class="dash-kicker" style="margin:0 0 6px">Monte ore</p>
+            <p class="field-hint" style="margin-bottom:10px">Rispetto alle 40h: in più = straordinario, in meno = debito. Rettifica manuale con data e motivo.</p>
+            <div id="monte-saldi" class="monte-saldi"></div>
+            <p class="monte-form-title">Rettifica manuale</p>
+            <select id="monte-op" aria-label="Operatore"></select>
+            <input type="date" id="monte-data" aria-label="Data">
+            <div class="monte-ore-row">
+              <select id="monte-segno" aria-label="Più o meno">
+                <option value="piu">Ore in più</option>
+                <option value="meno">Ore in meno</option>
+              </select>
+              <input type="number" id="monte-ore" min="0.5" max="24" step="0.5" placeholder="Ore" inputmode="decimal">
+            </div>
+            <textarea id="monte-motivo" rows="2" placeholder="Motivo (obbligatorio)"></textarea>
+            <button type="button" id="btn-monte-add" class="btn btn-primary btn-large">Aggiungi rettifica</button>
+            <p class="monte-form-title" style="margin-top:14px">Storico</p>
+            <div id="monte-storico" class="monte-storico"></div>
+          </aside>
+        </div>
         <div id="prova-vincoli-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
             <div class="sheet-handle" aria-hidden="true"></div>
@@ -540,7 +563,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.09 – PetStore Conad Scadenze</p>
+        <p class="info" id="app-version">Versione 2.10 – PetStore Conad Scadenze</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -561,7 +584,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.09"></script>
-  <script src="fuschi-home.js?v=2.09"></script>
+  <script src="app.js?v=2.10"></script>
+  <script src="fuschi-home.js?v=2.10"></script>
 </body>
 </html>

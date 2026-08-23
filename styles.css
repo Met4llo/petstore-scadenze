@@ -2807,10 +2807,92 @@ body {
 
 @media (min-width: 800px) {
   .main:has(#page-turni-prova.active) {
-    max-width: min(1200px, 98vw);
+    max-width: min(1320px, 98vw);
   }
   #page-turni-prova .task-form-card {
     max-width: min(1100px, 96vw);
     width: 96vw;
   }
+}
+
+.prova-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (min-width: 980px) {
+  .prova-split {
+    grid-template-columns: 1.05fr 0.72fr;
+  }
+}
+.monte-ore-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 12px 14px;
+}
+.monte-saldi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.monte-saldo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.monte-saldo b { font-size: 0.88rem; }
+.monte-saldo .monte-val { font-weight: 800; font-size: 0.95rem; }
+.monte-val.is-plus { color: var(--success); }
+.monte-val.is-minus { color: var(--danger); }
+.monte-val.is-zero { color: var(--muted); }
+.monte-saldo small {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.monte-form-title {
+  font-weight: 800;
+  font-size: 0.78rem;
+  margin: 4px 0 8px;
+}
+.monte-ore-panel select,
+.monte-ore-panel input,
+.monte-ore-panel textarea {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+}
+.monte-ore-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 8px;
+}
+.monte-storico {
+  max-height: 280px;
+  overflow: auto;
+  font-size: 0.78rem;
+}
+.monte-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.monte-item:last-child { border-bottom: 0; }
+.monte-item .monte-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
 }

@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.09 - Turni 2.0 visibile a tutti
+// VERSION 2.10 - monte ore accanto a Turni 2.0
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3840,10 +3840,12 @@ async function loadTurniProva() {
   const st = document.getElementById('prova-status');
   if (!supabase) {
     if (st) st.textContent = 'Cloud non disponibile — solo su questo telefono.';
+    loadMonteOre();
     return;
   }
   if (provaTableMissing) {
     if (st) st.textContent = 'Tabella mancante: premi Copia SQL tabella e avviala su Supabase.';
+    loadMonteOre();
     return;
   }
   try {
@@ -3858,6 +3860,7 @@ async function loadTurniProva() {
       if (st) st.textContent = provaTableMissing
         ? 'Tabella mancante: premi Copia SQL tabella e avviala su Supabase.'
         : ('Errore: ' + error.message);
+      loadMonteOre();
       return;
     }
     const row = data && data[0];
@@ -3872,6 +3875,7 @@ async function loadTurniProva() {
   } catch (e) {
     if (st) st.textContent = 'Errore di rete';
   }
+  loadMonteOre();
 }
 
 let provaShareBlob = null;
@@ -4212,6 +4216,190 @@ async function saveTurniProva() {
   }
   showToast('Settimana salvata', 'success');
   loadTurniProva();
+  loadMonteOre();
+}
+
+const MONTE_TARGET = 40;
+const MONTE_LS = 'petstore_monte_ore';
+let monteMovs = [];
+let monteAuto = [];
+let monteTableMissing = false;
+
+function fmtOreDelta(n) {
+  const v = Math.round(Number(n) * 10) / 10;
+  if (v > 0) return '+' + String(v).replace('.', ',') + 'h';
+  if (v < 0) return String(v).replace('.', ',') + 'h';
+  return '0h';
+}
+
+function hoursFromPackedCelle(data, op) {
+  if (!data || typeof data !== 'object') return 0;
+  const celle = data[op] || {};
+  const slot2 = (data._slot2 && data._slot2[op]) || {};
+  let h = 0;
+  for (let i = 0; i < 7; i++) {
+    h += PROVA_HOURS[celle[String(i)] || ''] || 0;
+    const s2 = slot2[String(i)];
+    if (s2 && s2.code) h += PROVA_HOURS[s2.code] || 0;
+  }
+  return h;
+}
+
+function readLocalMonte() {
+  try {
+    const raw = localStorage.getItem(MONTE_LS);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function writeLocalMonte(arr) {
+  try { localStorage.setItem(MONTE_LS, JSON.stringify(arr)); } catch (e) {}
+}
+
+function computeMonteAuto(weeks) {
+  const auto = [];
+  (weeks || []).forEach(row => {
+    const celle = row && row.celle;
+    if (!celle || typeof celle !== 'object') return;
+    let tot = 0;
+    OPERATORS.forEach(op => { tot += hoursFromPackedCelle(celle, op); });
+    if (!tot) return;
+    OPERATORS.forEach(op => {
+      const h = hoursFromPackedCelle(celle, op);
+      auto.push({
+        tipo: 'turni',
+        operatore: op,
+        settimana: row.settimana_inizio,
+        ore_fatte: h,
+        ore: Math.round((h - MONTE_TARGET) * 10) / 10
+      });
+    });
+  });
+  return auto;
+}
+
+function monteSaldo(op) {
+  let s = 0;
+  monteAuto.forEach(a => { if (a.operatore === op) s += a.ore; });
+  monteMovs.forEach(m => { if (m.operatore === op) s += Number(m.ore) || 0; });
+  return Math.round(s * 10) / 10;
+}
+
+function fillMonteOpSelect() {
+  const sel = document.getElementById('monte-op');
+  if (!sel) return;
+  const cur = sel.value || currentOperator || OPERATORS[0];
+  sel.innerHTML = OPERATORS.map(op => '<option value="' + escapeHtml(op) + '"' + (op === cur ? ' selected' : '') + '>' + escapeHtml(op) + '</option>').join('');
+  const d = document.getElementById('monte-data');
+  if (d && !d.value) d.value = toDateStr(new Date());
+}
+
+function renderMonteOre() {
+  fillMonteOpSelect();
+  const saldi = document.getElementById('monte-saldi');
+  const storico = document.getElementById('monte-storico');
+  if (saldi) {
+    saldi.innerHTML = OPERATORS.map(op => {
+      const v = monteSaldo(op);
+      const cls = v > 0 ? 'is-plus' : v < 0 ? 'is-minus' : 'is-zero';
+      const auto = monteAuto.filter(a => a.operatore === op).reduce((s, a) => s + a.ore, 0);
+      const man = monteMovs.filter(m => m.operatore === op).reduce((s, m) => s + (Number(m.ore) || 0), 0);
+      return '<div class="monte-saldo"><div><b>' + escapeHtml(op) + '</b><small>turni ' + fmtOreDelta(auto) + ' · manuale ' + fmtOreDelta(man) + '</small></div><span class="monte-val ' + cls + '">' + fmtOreDelta(v) + '</span></div>';
+    }).join('');
+  }
+  if (storico) {
+    const items = [];
+    monteAuto.forEach(a => {
+      if (!a.ore) return;
+      const start = a.settimana;
+      const end = start ? toDateStr(sundayOf(parseDate(start))) : '';
+      items.push({
+        t: start || '',
+        html: '<div class="monte-item"><div class="monte-item-top"><span>' + escapeHtml(a.operatore) + '</span><span class="monte-val ' + (a.ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(a.ore) + '</span></div><div class="field-hint">Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40</div></div>'
+      });
+    });
+    monteMovs.forEach(m => {
+      const ore = Number(m.ore) || 0;
+      items.push({
+        t: m.data || m.created_at || '',
+        html: '<div class="monte-item"><div class="monte-item-top"><span>' + escapeHtml(m.operatore) + '</span><span class="monte-val ' + (ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(ore) + '</span></div><div class="field-hint">' + (m.data ? parseDate(m.data).toLocaleDateString('it-IT') : '') + (m.created_by ? ' · ' + escapeHtml(m.created_by) : '') + '</div><div>' + escapeHtml(m.motivo || '') + '</div></div>'
+      });
+    });
+    items.sort((a, b) => (b.t || '').localeCompare(a.t || ''));
+    storico.innerHTML = items.length ? items.map(x => x.html).join('') : '<p class="field-hint">Nessun movimento. I turni salvati e le rettifiche compariranno qui.</p>';
+  }
+}
+
+async function loadMonteOre() {
+  monteAuto = [];
+  monteMovs = readLocalMonte();
+  if (supabase) {
+    try {
+      const weeks = await supabase.from('turni_prova').select('settimana_inizio,celle');
+      if (!weeks.error && weeks.data) monteAuto = computeMonteAuto(weeks.data);
+      const mov = await supabase.from('monte_ore').select('id,operatore,data,ore,motivo,created_by,created_at').order('data', { ascending: false });
+      if (mov.error) {
+        const msg = (mov.error.message || '') + '';
+        if (/does not exist|schema cache|42P01/i.test(msg)) monteTableMissing = true;
+      } else {
+        monteTableMissing = false;
+        monteMovs = mov.data || [];
+      }
+    } catch (e) {}
+  }
+  renderMonteOre();
+}
+
+async function addMonteRettifica() {
+  const op = (document.getElementById('monte-op') || {}).value;
+  const data = (document.getElementById('monte-data') || {}).value;
+  const segno = (document.getElementById('monte-segno') || {}).value;
+  const raw = parseFloat(String((document.getElementById('monte-ore') || {}).value || '').replace(',', '.'));
+  const motivo = ((document.getElementById('monte-motivo') || {}).value || '').trim();
+  if (!op) { showToast('Scegli l’operatore', 'warn'); return; }
+  if (!data) { showToast('Inserisci la data', 'warn'); return; }
+  if (!raw || raw <= 0) { showToast('Inserisci le ore (es. 1 o 1,5)', 'warn'); return; }
+  if (!motivo) { showToast('Il motivo è obbligatorio', 'warn'); return; }
+  const ore = segno === 'meno' ? -Math.abs(raw) : Math.abs(raw);
+  const row = {
+    operatore: op,
+    data: data,
+    ore: ore,
+    motivo: motivo,
+    created_by: currentOperator,
+    created_at: new Date().toISOString()
+  };
+  if (supabase && !monteTableMissing) {
+    const { error } = await supabase.from('monte_ore').insert(row);
+    if (error) {
+      const msg = (error.message || '') + '';
+      if (/does not exist|schema cache|42P01/i.test(msg)) {
+        monteTableMissing = true;
+        showToast('Crea la tabella: Copia SQL tabella', 'warn');
+      } else {
+        showToast('Errore: ' + error.message, 'error');
+        return;
+      }
+    } else {
+      const mot = document.getElementById('monte-motivo');
+      const oreEl = document.getElementById('monte-ore');
+      if (mot) mot.value = '';
+      if (oreEl) oreEl.value = '';
+      showToast('Rettifica inserita', 'success');
+      await loadMonteOre();
+      return;
+    }
+  }
+  row.id = 'local-' + Date.now();
+  monteMovs = [row].concat(readLocalMonte());
+  writeLocalMonte(monteMovs);
+  const mot = document.getElementById('monte-motivo');
+  const oreEl = document.getElementById('monte-ore');
+  if (mot) mot.value = '';
+  if (oreEl) oreEl.value = '';
+  showToast(monteTableMissing ? 'Salvata in locale (crea la tabella SQL)' : 'Rettifica inserita', 'success');
+  renderMonteOre();
 }
 
 // Zoom/pan state for turno viewer
@@ -6065,6 +6253,8 @@ async function init() {
   if (btnProvaShareSend) btnProvaShareSend.onclick = sendProvaShare;
   const btnProvaShareClose = document.getElementById('btn-prova-share-close');
   if (btnProvaShareClose) btnProvaShareClose.onclick = closeProvaShare;
+  const btnMonteAdd = document.getElementById('btn-monte-add');
+  if (btnMonteAdd) btnMonteAdd.onclick = addMonteRettifica;
   const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');
   if (btnCopyProvaSql) {
     btnCopyProvaSql.onclick = async () => {
@@ -6076,7 +6266,20 @@ async function init() {
 );
 alter table turni_prova enable row level security;
 drop policy if exists turni_prova_all on turni_prova;
-create policy turni_prova_all on turni_prova for all using (true) with check (true);`;
+create policy turni_prova_all on turni_prova for all using (true) with check (true);
+
+create table if not exists monte_ore (
+  id uuid primary key default gen_random_uuid(),
+  operatore text not null,
+  data date not null,
+  ore numeric not null,
+  motivo text not null,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+alter table monte_ore enable row level security;
+drop policy if exists monte_ore_all on monte_ore;
+create policy monte_ore_all on monte_ore for all using (true) with check (true);`;
       try {
         await navigator.clipboard.writeText(sql);
         showToast('SQL copiato. Incollalo in Supabase → SQL Editor', 'success');
