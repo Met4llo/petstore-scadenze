@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.38 - scheda prodotto: scadenza grande e semaforo
+// VERSION 2.39 - cambia scadenza dalla lista
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -697,6 +697,10 @@ function renderProductCard(p) {
         <span class="product-ean">${escapeHtml(p.ean)}</span>
       </div>
       ${p.note ? `<p class="product-note">${escapeHtml(p.note)}</p>` : ''}
+      ${p.noExpiry ? '' : `<div class="quick-expiry">
+        <span>${p.expiry ? escapeHtml(formatExportDate(p.expiry)) : 'Senza data'}</span>
+        <label class="btn-quick-exp">Cambia<input type="date" class="quick-exp-input" data-ean="${escapeHtml(p.ean)}" value="${escapeHtml(p.expiry || '')}"></label>
+      </div>`}
       ${needsQuickSignal(p) ? `<button type="button" class="btn btn-primary btn-signal-list" data-ean="${escapeHtml(p.ean)}">Segnala</button>` : ''}
     </div>
   `;
@@ -1219,6 +1223,57 @@ function renderFilteredList(filter) {
   wireSignalButtons(container);
 }
 
+async function quickSetExpiry(ean, iso) {
+  const p = products.find(x => x.ean === ean);
+  if (!p) return;
+  if (p.noExpiry) {
+    showToast('Questo prodotto è senza scadenza', 'warn');
+    return;
+  }
+  if (!iso) {
+    showToast('Scegli una data', 'warn');
+    return;
+  }
+  if (p.expiry === iso) return;
+  const before = {
+    ean: p.ean,
+    expiry: p.expiry || null,
+    signaled: !!p.signaled,
+    signaledDate: p.signaledDate || null,
+    noExpiry: !!p.noExpiry,
+    note: (p.note || '').trim()
+  };
+  p.expiry = iso;
+  p.lastModified = Date.now();
+  p.updatedBy = currentOperator || 'Sconosciuto';
+  const ok = await saveToCloud(p);
+  try { await idbPut(STORE_PRODUCTS, p); } catch (e) {}
+  if (ok) {
+    await logProductChanges(before, {
+      ean: p.ean,
+      expiry: iso,
+      signaled: !!p.signaled,
+      signaledDate: p.signaledDate || null,
+      noExpiry: !!p.noExpiry,
+      note: (p.note || '').trim()
+    });
+    showToast('Scadenza aggiornata', 'success');
+  } else {
+    showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
+  }
+  updateDashboard();
+  const listPage = document.getElementById('page-list');
+  if (listPage && listPage.classList.contains('active')) {
+    const lf = document.getElementById('list-filter');
+    renderFilteredList(lf ? lf.value : 'all');
+  }
+  const scanPage = document.getElementById('page-scanner');
+  if (scanPage && scanPage.classList.contains('active')) {
+    const q = (document.getElementById('search-input') || {}).value || '';
+    if (q.trim().length >= 2) doSearch(q);
+  }
+}
+
 async function quickSignalProduct(ean) {
   const p = products.find(x => x.ean === ean);
   if (!p) return;
@@ -1275,6 +1330,16 @@ function wireSignalButtons(container) {
       e.preventDefault();
       e.stopPropagation();
       quickSignalProduct(btn.dataset.ean);
+    };
+  });
+  container.querySelectorAll('.quick-expiry').forEach(row => {
+    row.onclick = (e) => e.stopPropagation();
+  });
+  container.querySelectorAll('.quick-exp-input').forEach(inp => {
+    inp.onclick = (e) => e.stopPropagation();
+    inp.onchange = (e) => {
+      e.stopPropagation();
+      quickSetExpiry(inp.dataset.ean, inp.value);
     };
   });
 }
