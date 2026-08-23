@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.35 - avviso copertura chiusura La Malfa in home
+// VERSION 2.36 - colori operatori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -58,6 +58,15 @@ create policy turni_prova_all on turni_prova for all using (true) with check (tr
 alter table if exists tasks add column if not exists due_date date;`;
 const SCADENZE_LOG_SQL = EXTRA_TABLES_SQL;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
+const OP_COLOR = { Santoemma: 'santoemma', Fuschi: 'fuschi', Pizzimenti: 'pizzimenti', Sorrentino: 'sorrentino' };
+function opChip(name) {
+  if (!name) return '';
+  const k = OP_COLOR[name] || 'other';
+  return '<span class="op-chip op-' + k + '">' + escapeHtml(name) + '</span>';
+}
+function opChips(arr) {
+  return (arr || []).map(opChip).join('');
+}
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
 let bachecaMessages = [];
@@ -674,7 +683,7 @@ function needsQuickSignal(p) {
 function renderProductCard(p) {
   const days = p.noExpiry ? null : daysRemaining(p.expiry);
   const cls = p.noExpiry ? 'ok' : getStatusClass(days);
-  const by = p.updatedBy ? `<span class="modified-by">${escapeHtml(p.updatedBy)}</span>` : '';
+  const by = p.updatedBy ? opChip(p.updatedBy) : '';
   const supplier = p.supplier ? escapeHtml(p.supplier) : '';
   return `
     <div class="product-card ${cls}" data-ean="${p.ean}">
@@ -1364,7 +1373,7 @@ function openProduct(ean, returnPage) {
         </div>
       </div>
       <div class="modified-by" id="detail-modified-by">
-        ${currentProduct.updatedBy ? 'Ultima modifica di <strong>' + escapeHtml(currentProduct.updatedBy) + '</strong>' : 'Nessuna modifica registrata'}
+        ${currentProduct.updatedBy ? 'Ultima modifica di ' + opChip(currentProduct.updatedBy) : 'Nessuna modifica registrata'}
       </div>
     </div>
 
@@ -1535,12 +1544,11 @@ function logProductChanges(before, after) {
 }
 
 function historyLine(r) {
-  const who = r.operator || 'Operatore';
   if (r.field === 'expiry') {
-    return who + ' ha cambiato la scadenza da ' + formatLogValue(r.old_value) + ' a ' + formatLogValue(r.new_value);
+    return 'ha cambiato la scadenza da ' + formatLogValue(r.old_value) + ' a ' + formatLogValue(r.new_value);
   }
   if (r.field === 'no_expiry') {
-    return who + ' ha impostato senza scadenza: ' + formatLogValue(r.new_value);
+    return 'ha impostato senza scadenza: ' + formatLogValue(r.new_value);
   }
   return formatLogField(r.field) + ': ' + formatLogValue(r.old_value) + ' → ' + formatLogValue(r.new_value);
 }
@@ -1555,7 +1563,7 @@ function renderProductHistory(rows) {
   el.innerHTML = rows.map(r => {
     const expiry = r.field === 'expiry' || r.field === 'no_expiry';
     return `<div class="history-item${expiry ? ' is-expiry' : ''}">
-      <div class="history-what"><strong>${escapeHtml(historyLine(r))}</strong></div>
+      <div class="history-what">${opChip(r.operator || 'Operatore')} <strong>${escapeHtml(historyLine(r))}</strong></div>
       <div class="history-meta">${escapeHtml(formatLogWhen(r.changed_at))}</div>
     </div>`;
   }).join('');
@@ -2251,9 +2259,9 @@ function enterApp() {
 
 function updateOperatorUI() {
   const el = document.getElementById('current-operator');
-  if (el) el.textContent = currentOperator || '';
+  if (el) el.innerHTML = currentOperator ? opChip(currentOperator) : '';
   const settingsName = document.getElementById('settings-operator-name');
-  if (settingsName) settingsName.textContent = currentOperator || 'Nessuno';
+  if (settingsName) settingsName.innerHTML = currentOperator ? opChip(currentOperator) : 'Nessuno';
   // Sezione ordini: solo Santoemma
   document.querySelectorAll('.menu-santoemma-only').forEach(btn => {
     if (currentOperator === 'Santoemma') btn.classList.remove('hidden');
@@ -2469,7 +2477,7 @@ function renderBacheca() {
     return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''}">
       <div>${escapeHtml(m.testo)}</div>
       <div class="bacheca-meta">
-        <span>${escapeHtml(m.created_by || '')} · ${date}${m.fixed ? ' · in evidenza' : ''}</span>
+        <span>${opChip(m.created_by || '')} · ${date}${m.fixed ? ' · in evidenza' : ''}</span>
         <button class="bacheca-del" data-id="${m.id}">Elimina</button>
       </div>
     </div>`;
@@ -2686,7 +2694,7 @@ function renderTasks() {
   }
 
   el.innerHTML = list.map(t => {
-    const resp = (t.responsabili || []).join(', ');
+    const resp = opChips(t.responsabili || []);
     const date = t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : '';
     const isDone = t.stato === 'fatto';
     const dueKind = taskDueKind(t);
@@ -2708,9 +2716,9 @@ function renderTasks() {
       </div>
       ${t.descrizione ? `<div class="task-card-desc">${escapeHtml(t.descrizione)}</div>` : ''}
       <div class="task-card-meta">
-        ${resp ? `<span class="product-supplier">${escapeHtml(resp)}</span>` : ''}
+        ${resp ? `<span class="product-supplier">${resp}</span>` : ''}
         ${dueLab ? `<span class="task-due">${escapeHtml(dueLab)}</span>` : ''}
-        ${t.created_by ? `<span>${escapeHtml(t.created_by)}</span>` : ''}
+        ${t.created_by ? opChip(t.created_by) : ''}
         ${date ? `<span>${date}</span>` : ''}
       </div>
       ${!isDone
@@ -3095,7 +3103,7 @@ async function loadOggiTurniDash() {
       const line = provaLineLabel(c, shop);
       const line2 = s2 && s2.code ? provaLineLabel(s2.code, s2.shop) : '';
       const cls = (!c || c === 'R') ? 'is-off' : (c === 'F' ? 'is-ferie' : (c === 'M' ? 'is-malattia' : 'is-on'));
-      html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + escapeHtml(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
+      html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + opChip(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
     });
     if (day !== 6) {
       const atClose = OPERATORS.filter(op => packedAtMainHour(data, op, day, 19));
@@ -3626,7 +3634,7 @@ function renderTurniProva() {
     const h = provaHours(op);
     const over = h > 40 ? ' is-over' : '';
     const rc = provaRoleCounts(op);
-    html += `<tr><th>${escapeHtml(op)}<small class="prova-ore${over}">${h}h · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
+    html += `<tr><th>${opChip(op)}<small class="prova-ore${over}">${h}h · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
       const pv = provaPvClass(op, i);
@@ -5074,7 +5082,7 @@ function renderMonteOre() {
       const cls = v > 0 ? 'is-plus' : v < 0 ? 'is-minus' : 'is-zero';
       const auto = monteAuto.filter(a => a.operatore === op).reduce((s, a) => s + a.ore, 0);
       const man = monteMovs.filter(m => m.operatore === op).reduce((s, m) => s + (Number(m.ore) || 0), 0);
-      return '<div class="monte-saldo"><div><b>' + escapeHtml(op) + '</b><small>turni ' + fmtOreDelta(auto) + ' · manuale ' + fmtOreDelta(man) + '</small></div><span class="monte-val ' + cls + '">' + fmtOreDelta(v) + '</span></div>';
+      return '<div class="monte-saldo"><div>' + opChip(op) + '<small>turni ' + fmtOreDelta(auto) + ' · manuale ' + fmtOreDelta(man) + '</small></div><span class="monte-val ' + cls + '">' + fmtOreDelta(v) + '</span></div>';
     }).join('');
   }
   if (storico) {
@@ -5085,7 +5093,7 @@ function renderMonteOre() {
       const end = start ? toDateStr(sundayOf(parseDate(start))) : '';
       items.push({
         t: start || '',
-        html: '<div class="monte-item"><div class="monte-item-top"><span>' + escapeHtml(a.operatore) + '</span><span class="monte-val ' + (a.ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(a.ore) + '</span></div><div class="field-hint">Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40</div></div>'
+        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(a.operatore) + '<span class="monte-val ' + (a.ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(a.ore) + '</span></div><div class="field-hint">Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40</div></div>'
       });
     });
     monteMovs.forEach(m => {
@@ -5093,7 +5101,7 @@ function renderMonteOre() {
       const mid = escapeHtml(String(m.id || ''));
       items.push({
         t: m.data || m.created_at || '',
-        html: '<div class="monte-item"><div class="monte-item-top"><span>' + escapeHtml(m.operatore) + '</span><span class="monte-val ' + (ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(ore) + '</span></div><div class="field-hint">' + (m.data ? parseDate(m.data).toLocaleDateString('it-IT') : '') + (m.created_by ? ' · ' + escapeHtml(m.created_by) : '') + '</div><div>' + escapeHtml(m.motivo || '') + '</div>' + (m.id ? '<div class="monte-item-actions"><button type="button" class="btn-small" data-monte-edit="' + mid + '">Modifica</button><button type="button" class="btn-small btn-small-danger" data-monte-del="' + mid + '">Elimina</button></div>' : '') + '</div>'
+        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(m.operatore) + '<span class="monte-val ' + (ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(ore) + '</span></div><div class="field-hint">' + (m.data ? parseDate(m.data).toLocaleDateString('it-IT') : '') + (m.created_by ? ' · ' + opChip(m.created_by) : '') + '</div><div>' + escapeHtml(m.motivo || '') + '</div>' + (m.id ? '<div class="monte-item-actions"><button type="button" class="btn-small" data-monte-edit="' + mid + '">Modifica</button><button type="button" class="btn-small btn-small-danger" data-monte-del="' + mid + '">Elimina</button></div>' : '') + '</div>'
       });
     });
     items.sort((a, b) => (b.t || '').localeCompare(a.t || ''));
@@ -5790,7 +5798,7 @@ function renderMissione() {
     opsEl.innerHTML = OPERATORS.map(op => {
       const doneOp = missioneCompletate.some(c => c.operator === op);
       const mine = op === currentOperator;
-      return `<span class="missione-op-chip ${doneOp ? 'done' : ''} ${mine ? 'mine' : ''}">${op}${mine ? ' · tu' : ''}${doneOp ? ' · fatto' : ''}</span>`;
+      return `<span class="missione-op-chip ${doneOp ? 'done' : ''} ${mine ? 'mine' : ''} op-${OP_COLOR[op] || 'other'}">${op}${mine ? ' · tu' : ''}${doneOp ? ' · fatto' : ''}</span>`;
     }).join('');
   }
 
@@ -6240,7 +6248,7 @@ function renderConsegne() {
       <div class="consegna-meta">
         <span>${d}</span>
         ${c.ora ? '<span>' + escapeHtml(String(c.ora).slice(0,5)) + '</span>' : ''}
-        ${c.created_by ? '<span>' + escapeHtml(c.created_by) + '</span>' : ''}
+        ${c.created_by ? opChip(c.created_by) : ''}
       </div>
       ${c.note ? '<div class="turno-note">' + escapeHtml(c.note) + '</div>' : ''}
     </div>`;
