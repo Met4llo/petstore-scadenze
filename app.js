@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.36 - colori operatori
+// VERSION 2.37 - home apertura turno
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -722,16 +722,16 @@ function updateDashboard() {
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card urgent" data-filter="urgent">
-      <div class="count">${urgent.length}</div>
       <div class="label">7 giorni</div>
+      <div class="count">${urgent.length}</div>
     </div>
     <div class="stat-card attention" data-filter="attention">
-      <div class="count">${attention.length}</div>
       <div class="label">30 giorni</div>
+      <div class="count">${attention.length}</div>
     </div>
     <div class="stat-card monitor" data-filter="monitor">
-      <div class="count">${monitor.length}</div>
       <div class="label">120 giorni</div>
+      <div class="count">${monitor.length}</div>
     </div>
   `;
 
