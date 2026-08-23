@@ -2406,7 +2406,13 @@ body {
 .prova-grid-wrap.is-swapping .prova-cell2 {
   cursor: cell;
 }
-.prova-table td.is-swap-a {
+.prova-grid-wrap.is-locked {
+  opacity: 0.92;
+}
+.prova-grid-wrap.is-locked select:disabled {
+  cursor: default;
+  opacity: 1;
+}
   box-shadow: inset 0 0 0 2px #1d4ed8;
   background: #dbeafe;
 }

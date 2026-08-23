@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.23 - scambio turni tra due celle
+// VERSION 2.24 - settimane passate bloccate
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2972,9 +2972,40 @@ let provaLastBozza = null;
 let provaTableMissing = false;
 let provaSwapArmed = false;
 let provaSwapA = null;
+let provaUnlockedWeek = null;
 
 function provaMondayStr(d) {
   return toDateStr(mondayOf(d || new Date()));
+}
+
+function provaSundayPassed() {
+  if (!provaWeekStart) return false;
+  const sun = sundayOf(parseDate(provaWeekStart));
+  sun.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return sun.getTime() < today.getTime();
+}
+
+function provaIsLocked() {
+  return provaSundayPassed() && provaUnlockedWeek !== provaWeekStart;
+}
+
+function provaGuardLocked(action) {
+  if (!provaIsLocked()) return false;
+  showToast('Settimana chiusa: solo consultazione' + (currentOperator === 'Santoemma' ? '. Puoi sbloccare per una correzione.' : '.'), 'warn');
+  return true;
+}
+
+function unlockProvaWeek() {
+  if (currentOperator !== 'Santoemma') {
+    showToast('Solo Santoemma può sbloccare una settimana chiusa', 'warn');
+    return;
+  }
+  if (!provaSundayPassed()) return;
+  provaUnlockedWeek = provaWeekStart;
+  renderTurniProva();
+  showToast('Settimana sbloccata per correzione. Poi Salva.', 'info');
 }
 
 function shiftProvaWeek(days) {
@@ -3285,6 +3316,23 @@ function doProvaSwap(a, b) {
   return false;
 }
 
+function applyProvaLockUi() {
+  const locked = provaIsLocked();
+  ['btn-prova-generate', 'btn-prova-swap', 'btn-prova-save', 'btn-prova-draft-save', 'btn-prova-draft-load'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = locked;
+  });
+  const unlock = document.getElementById('btn-prova-unlock');
+  if (unlock) {
+    unlock.classList.toggle('hidden', !(provaSundayPassed() && provaIsLocked() && currentOperator === 'Santoemma'));
+  }
+  const grid = document.getElementById('prova-grid');
+  if (grid) {
+    grid.querySelectorAll('select').forEach(s => { s.disabled = locked; });
+    grid.classList.toggle('is-locked', locked);
+  }
+}
+
 function setProvaSwapUi() {
   const btn = document.getElementById('btn-prova-swap');
   if (btn) btn.textContent = provaSwapArmed ? 'Annulla scambio' : 'Scambia turni';
@@ -3293,6 +3341,7 @@ function setProvaSwapUi() {
 }
 
 function toggleProvaSwap() {
+  if (provaGuardLocked()) return;
   provaSwapArmed = !provaSwapArmed;
   provaSwapA = null;
   setProvaSwapUi();
@@ -3459,6 +3508,7 @@ function renderTurniProva() {
   });
   if (provaSwapArmed) grid.classList.add('is-swapping');
   setProvaSwapUi();
+  applyProvaLockUi();
   renderProvaCheck();
 }
 
@@ -3515,6 +3565,14 @@ function provaValidate() {
 function renderProvaCheck() {
   const el = document.getElementById('prova-check');
   if (!el) return;
+  applyProvaLockUi();
+  if (provaSundayPassed()) {
+    el.className = 'prova-check is-warn';
+    el.innerHTML = provaIsLocked()
+      ? 'Settimana chiusa — solo consultazione.' + (currentOperator === 'Santoemma' ? ' Santoemma può sbloccare per una correzione.' : '')
+      : 'Settimana passata sbloccata per correzione. Ricorda di Salvare.';
+    return;
+  }
   const issues = provaValidate();
   const empty = OPERATORS.every(op => {
     for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
@@ -3702,6 +3760,7 @@ function provaPickCodes(hourAssign, preset, counts, day) {
 }
 
 function generateTurniProva() {
+  if (provaGuardLocked()) return;
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   const ops = OPERATORS.slice();
   const w = provaWeekNumber(provaWeekStart);
@@ -4057,6 +4116,7 @@ function collectProvaVincoli() {
 }
 
 function openProvaVincoli() {
+  if (provaGuardLocked()) return;
   renderProvaVincoliForm();
   syncProvaWeekInputs();
   const el = document.getElementById('prova-vincoli-overlay');
@@ -4475,6 +4535,7 @@ function applyProvaSnapshot(snap) {
 }
 
 async function saveTurniProvaDraft() {
+  if (provaGuardLocked()) return;
   if (!provaWeekStart) provaWeekStart = provaMondayStr();
   const empty = OPERATORS.every(op => {
     for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
@@ -4519,6 +4580,7 @@ function restoreTurniProvaDraft() {
 }
 
 async function saveTurniProva() {
+  if (provaGuardLocked()) return;
   if (!supabase) {
     showToast('Cloud non disponibile', 'warn');
     return;
@@ -6661,6 +6723,8 @@ async function init() {
   if (btnProvaGen) btnProvaGen.onclick = openProvaVincoli;
   const btnProvaSwap = document.getElementById('btn-prova-swap');
   if (btnProvaSwap) btnProvaSwap.onclick = toggleProvaSwap;
+  const btnProvaUnlock = document.getElementById('btn-prova-unlock');
+  if (btnProvaUnlock) btnProvaUnlock.onclick = unlockProvaWeek;
   const btnVincoliOk = document.getElementById('btn-prova-vincoli-ok');
   if (btnVincoliOk) btnVincoliOk.onclick = confirmProvaVincoli;
   const btnVincoliSkip = document.getElementById('btn-prova-vincoli-skip');
