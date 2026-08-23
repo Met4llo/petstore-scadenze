@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.37 - home apertura turno
+// VERSION 2.38 - scheda prodotto: scadenza grande e semaforo
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1322,10 +1322,22 @@ function openProduct(ean, returnPage) {
   const condition = findCondition(currentProduct.supplier);
 
   const isNoExp = !!currentProduct.noExpiry;
+  const heroDate = isNoExp ? 'Senza scadenza' : (currentProduct.expiry ? formatExportDate(currentProduct.expiry) : '—');
+  const daysLab = isNoExp ? 'Escluso dai controlli' : (days === null ? 'Nessuna data' : (days <= 0 ? 'Scaduto da ' + Math.abs(days) + ' giorni' : days + ' giorni rimanenti'));
+  const daysCls = isNoExp ? 'ok' : getStatusClass(days);
   document.getElementById('product-detail').innerHTML = `
+    <div class="detail-block detail-hero">
+      <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
+      <div class="expiry-hero" id="expiry-hero">${escapeHtml(heroDate)}</div>
+      <div class="days-display ${daysCls}" id="detail-days">${escapeHtml(daysLab)}</div>
+      <div class="detail-ids">
+        <span>EAN ${escapeHtml(currentProduct.ean || '')}</span>
+        <span>${escapeHtml(currentProduct.supplier || 'Fornitore non indicato')}</span>
+      </div>
+    </div>
+
     <div class="detail-block">
       <p class="detail-kicker">Prodotto</p>
-      <div class="detail-name">${escapeHtml(currentProduct.name)}</div>
       <div class="detail-row">
         <label>EAN</label>
         <input type="text" id="detail-ean" inputmode="numeric" pattern="[0-9]*" value="${escapeHtml(currentProduct.ean || '')}" autocomplete="off">
@@ -1355,9 +1367,6 @@ function openProduct(ean, returnPage) {
         <div class="detail-row">
           <label>Data di scadenza</label>
           <input type="date" id="detail-expiry" value="${currentProduct.expiry || ''}">
-        </div>
-        <div class="days-display ${getStatusClass(days)}" id="detail-days">
-          ${days === null ? 'Nessuna data' : (days <= 0 ? `Scaduto da ${Math.abs(days)} giorni` : `${days} giorni rimanenti`)}
         </div>
         <div class="detail-row">
           <label>Stato</label>
@@ -1399,6 +1408,14 @@ function openProduct(ean, returnPage) {
     noExpCb.addEventListener('change', () => {
       const fields = document.getElementById('expiry-fields');
       if (fields) fields.style.display = noExpCb.checked ? 'none' : '';
+      const hero = document.getElementById('expiry-hero');
+      const daysEl = document.getElementById('detail-days');
+      if (noExpCb.checked) {
+        if (hero) hero.textContent = 'Senza scadenza';
+        if (daysEl) { daysEl.className = 'days-display ok'; daysEl.textContent = 'Escluso dai controlli'; }
+      } else if (expiryInput) {
+        expiryInput.dispatchEvent(new Event('change'));
+      }
     });
   }
 
@@ -1407,6 +1424,8 @@ function openProduct(ean, returnPage) {
     expiryInput.addEventListener('change', (e) => {
       const d = daysRemaining(e.target.value);
       const el = document.getElementById('detail-days');
+      const hero = document.getElementById('expiry-hero');
+      if (hero) hero.textContent = e.target.value ? formatExportDate(e.target.value) : '—';
       if (!el) return;
       el.className = 'days-display ' + getStatusClass(d);
       el.textContent = d === null ? 'Nessuna data' : (d <= 0 ? `Scaduto da ${Math.abs(d)} giorni` : `${d} giorni rimanenti`);

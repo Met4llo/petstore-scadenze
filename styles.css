@@ -796,12 +796,29 @@ body {
 }
 
 .detail-name {
-  font-size: 1.22rem;
+  font-size: 1.35rem;
   font-weight: 650;
-  margin-bottom: 14px;
-  line-height: 1.3;
+  margin-bottom: 8px;
+  line-height: 1.25;
   letter-spacing: -0.02em;
   font-family: "Fraunces", Georgia, serif;
+}
+.expiry-hero {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 2.15rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin: 4px 0 10px;
+}
+.detail-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 650;
+  margin-top: 10px;
 }
 
 .detail-ean {
@@ -904,18 +921,19 @@ body {
 }
 
 .days-display {
-  font-size: 1.25rem;
-  font-weight: 750;
-  margin: 4px 0 16px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0 0 4px;
   letter-spacing: -0.02em;
   text-align: center;
+  padding: 10px 12px;
+  border-radius: 12px;
 }
-
-.days-display.expired { color: var(--danger); }
-.days-display.urgent { color: var(--warning); }
-.days-display.attention { color: #ca8a04; }
-.days-display.monitor { color: #d97706; }
-.days-display.ok { color: var(--success); }
+.days-display.expired { color: #b91c1c; background: #fee2e2; }
+.days-display.urgent { color: #c2410c; background: #ffedd5; }
+.days-display.attention { color: #a16207; background: #fef3c7; }
+.days-display.monitor { color: #b45309; background: #fffbeb; }
+.days-display.ok { color: #166534; background: #dcfce7; }
 
 .supplier-box {
   background: var(--bg);
@@ -967,8 +985,14 @@ body {
   position: sticky;
   bottom: calc(8px + env(safe-area-inset-bottom));
   z-index: 40;
-  padding: 8px 0 4px;
+  padding: 12px 0 8px;
   background: linear-gradient(180deg, transparent, var(--bg) 28%);
+}
+.detail-block-actions .btn {
+  margin-top: 12px;
+}
+.detail-block-actions .btn:first-child {
+  margin-top: 0;
 }
 
 /* ===== SCANNER ===== */
