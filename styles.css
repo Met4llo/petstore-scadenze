@@ -519,7 +519,30 @@ body {
   margin-bottom: 8px !important;
 }
 .home-alert.done { opacity: 0.88; }
-.bacheca-more {
+.bacheca-tools {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.bacheca-search {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+}
+#btn-bacheca-mine.is-on {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.bacheca-item.is-mine {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.bacheca-more { cursor: pointer; }
   font-size: 0.78rem;
   color: var(--muted);
   margin-top: 8px;

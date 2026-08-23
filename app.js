@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.39 - cambia scadenza dalla lista
+// VERSION 2.40 - bacheca: cerca e filtra per me
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -70,6 +70,8 @@ function opChips(arr) {
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
 let currentOperator = localStorage.getItem('petstore_operator') || null;
 let bachecaMessages = [];
+let bachecaMineOnly = false;
+let bachecaShowAll = false;
 let tasksList = [];
 let taskFilter = 'miei';
 let editingTaskId = null;
@@ -2541,9 +2543,32 @@ async function loadBacheca() {
   }
 }
 
+function bachecaMentionsMe(m) {
+  const me = (currentOperator || '').toLowerCase();
+  if (!me) return false;
+  const t = (m.testo || '').toLowerCase();
+  const by = (m.created_by || '').toLowerCase();
+  return t.includes(me) || by === me;
+}
+
+function getBachecaFiltered() {
+  let list = [...bachecaMessages];
+  const q = ((document.getElementById('bacheca-search') || {}).value || '').trim().toLowerCase();
+  if (q.length >= 2) {
+    list = list.filter(m =>
+      (m.testo || '').toLowerCase().includes(q) ||
+      (m.created_by || '').toLowerCase().includes(q)
+    );
+  }
+  if (bachecaMineOnly) list = list.filter(bachecaMentionsMe);
+  return list;
+}
+
 function renderBacheca() {
   const el = document.getElementById('bacheca-list');
   if (!el) return;
+  const mineBtn = document.getElementById('btn-bacheca-mine');
+  if (mineBtn) mineBtn.classList.toggle('is-on', bachecaMineOnly);
   if (!bachecaMessages.length) {
     el.innerHTML = emptyStateHtml(
       'Bacheca vuota',
@@ -2554,21 +2579,31 @@ function renderBacheca() {
     wireEmptyActions(el);
     return;
   }
-  const shown = bachecaMessages.slice(0, 2);
-  const extra = bachecaMessages.length - shown.length;
+  const filtered = getBachecaFiltered();
+  const q = ((document.getElementById('bacheca-search') || {}).value || '').trim();
+  const expanded = bachecaShowAll || q.length >= 2 || bachecaMineOnly;
+  const shown = expanded ? filtered : filtered.slice(0, 4);
+  const extra = filtered.length - shown.length;
+  if (!filtered.length) {
+    el.innerHTML = '<p class="muted-center">Nessun messaggio con questi filtri.</p>';
+    return;
+  }
   el.innerHTML = shown.map(m => {
     const date = m.created_at ? new Date(m.created_at).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
-    return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''}">
+    const mine = bachecaMentionsMe(m);
+    return `<div class="bacheca-item ${m.fixed ? 'fixed' : ''} ${mine ? 'is-mine' : ''}">
       <div>${escapeHtml(m.testo)}</div>
       <div class="bacheca-meta">
         <span>${opChip(m.created_by || '')} · ${date}${m.fixed ? ' · in evidenza' : ''}</span>
         <button class="bacheca-del" data-id="${m.id}">Elimina</button>
       </div>
     </div>`;
-  }).join('') + (extra > 0 ? `<p class="bacheca-more">${extra} altri messaggi</p>` : '');
+  }).join('') + (extra > 0 ? `<p class="bacheca-more" id="bacheca-more">${extra} altri messaggi · tocca per vedere tutti</p>` : '');
   el.querySelectorAll('.bacheca-del').forEach(btn => {
     btn.onclick = () => deleteBacheca(btn.dataset.id);
   });
+  const more = document.getElementById('bacheca-more');
+  if (more) more.onclick = () => { bachecaShowAll = true; renderBacheca(); };
 }
 
 async function saveBacheca() {
@@ -7370,6 +7405,15 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
   if (btnCancelBacheca) btnCancelBacheca.onclick = () => {
     document.getElementById('bacheca-form').classList.add('hidden');
   };
+  const bachecaSearch = document.getElementById('bacheca-search');
+  if (bachecaSearch) bachecaSearch.addEventListener('input', () => renderBacheca());
+  const btnBachecaMine = document.getElementById('btn-bacheca-mine');
+  if (btnBachecaMine) {
+    btnBachecaMine.onclick = () => {
+      bachecaMineOnly = !bachecaMineOnly;
+      renderBacheca();
+    };
+  }
 
   // Tasks
   const btnNewTask = document.getElementById('btn-new-task');
