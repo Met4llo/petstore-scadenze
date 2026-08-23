@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.40 - bacheca: cerca e filtra per me
+// VERSION 2.41 - calendario consegne più leggibile
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -6236,11 +6236,12 @@ function renderConsegneCal() {
     if (items.some(c => c.stato === 'non_arrivata')) dotCls = ' is-miss';
     else if (items.length && items.every(c => c.stato === 'consegnato')) dotCls = ' is-done';
     else if (items.length) dotCls = ' is-wait';
-    const names = items.slice(0, 2).map(c => (c.fornitore || '').split(/[\s-]/)[0].slice(0, 8)).join(' · ');
+    const names = items.slice(0, 2).map(c => escapeHtml((c.fornitore || '').split(/[\s-]/)[0].slice(0, 10)));
+    const lab = names.join('<br>') + (items.length > 2 ? '<br>+' + (items.length - 2) : '');
     cells += '<button type="button" class="cal-day' + (today ? ' is-today' : '') + (sel ? ' is-on' : '') + (items.length ? ' has' : '') + '" data-day="' + ds + '">' +
       '<span class="cal-n">' + day + '</span>' +
       (items.length ? '<span class="cal-dot' + dotCls + '"></span>' : '') +
-      (names ? '<span class="cal-lab">' + escapeHtml(names) + (items.length > 2 ? '+' : '') + '</span>' : '') +
+      (names.length ? '<span class="cal-lab">' + lab + '</span>' : '') +
       '</button>';
   }
   el.innerHTML = '<div class="cal-nav"><button type="button" class="turno-zoom-btn" id="btn-cal-prev" aria-label="Mese precedente">‹</button><div class="cal-title">' + MESI[m] + ' ' + y + '</div><button type="button" class="turno-zoom-btn" id="btn-cal-next" aria-label="Mese successivo">›</button></div>' +
