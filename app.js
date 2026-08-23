@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.22 - malattia nei turni (8h, non in negozio)
+// VERSION 2.23 - scambio turni tra due celle
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2970,6 +2970,8 @@ let provaSlot2 = {};
 let provaVincoliSlot2 = {};
 let provaLastBozza = null;
 let provaTableMissing = false;
+let provaSwapArmed = false;
+let provaSwapA = null;
 
 function provaMondayStr(d) {
   return toDateStr(mondayOf(d || new Date()));
@@ -3242,6 +3244,83 @@ function provaOptionSelected(saved, val) {
   return false;
 }
 
+function provaSnapOp(op, day) {
+  const s2 = provaSecond(op, day);
+  return {
+    code: provaCell(op, day) || '',
+    shop: (provaNegozi[op] && provaNegozi[op][String(day)]) || '',
+    s2code: (s2 && s2.code) || '',
+    s2shop: (s2 && s2.shop) || ''
+  };
+}
+
+function provaApplyOp(op, day, snap) {
+  setProvaCell(op, day, snap.code);
+  setProvaNegozio(op, day, snap.shop || '');
+  setProvaSecond(op, day, snap.s2code || '', snap.s2shop || 'La Malfa');
+}
+
+function sameProvaSwapRef(a, b) {
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (a.kind === 'bag') return a.day === b.day;
+  return a.op === b.op && a.day === b.day;
+}
+
+function doProvaSwap(a, b) {
+  if (a.kind === 'op' && b.kind === 'op') {
+    const sa = provaSnapOp(a.op, a.day);
+    const sb = provaSnapOp(b.op, b.day);
+    provaApplyOp(a.op, a.day, sb);
+    provaApplyOp(b.op, b.day, sa);
+    return true;
+  }
+  if (a.kind === 'bag' && b.kind === 'bag') {
+    const va = provaBagheriaValue(a.day);
+    const vb = provaBagheriaValue(b.day);
+    applyBagheriaDay(a.day, vb || 'L');
+    applyBagheriaDay(b.day, va || 'L');
+    return true;
+  }
+  showToast('Scambia due operatori, oppure due celle Bagheria', 'warn');
+  return false;
+}
+
+function setProvaSwapUi() {
+  const btn = document.getElementById('btn-prova-swap');
+  if (btn) btn.textContent = provaSwapArmed ? 'Annulla scambio' : 'Scambia turni';
+  const grid = document.getElementById('prova-grid');
+  if (grid) grid.classList.toggle('is-swapping', !!provaSwapArmed);
+}
+
+function toggleProvaSwap() {
+  provaSwapArmed = !provaSwapArmed;
+  provaSwapA = null;
+  setProvaSwapUi();
+  showToast(provaSwapArmed ? 'Tocca la prima cella, poi la seconda' : 'Scambio annullato', 'info');
+  renderTurniProva();
+}
+
+function pickProvaSwap(ref) {
+  if (!provaSwapA) {
+    provaSwapA = ref;
+    showToast('Ora tocca la seconda cella');
+    renderTurniProva();
+    return;
+  }
+  if (sameProvaSwapRef(provaSwapA, ref)) {
+    provaSwapA = null;
+    showToast('Prima cella deselezionata');
+    renderTurniProva();
+    return;
+  }
+  const ok = doProvaSwap(provaSwapA, ref);
+  provaSwapArmed = false;
+  provaSwapA = null;
+  renderTurniProva();
+  setProvaSwapUi();
+  if (ok) showToast('Turni scambiati. Premi Salva settimana.', 'success');
+}
+
 function renderTurniProva() {
   const label = document.getElementById('prova-week-label');
   const grid = document.getElementById('prova-grid');
@@ -3270,7 +3349,8 @@ function renderTurniProva() {
       const shop = provaNegozio(op, i);
       const work = provaIsWorkCode(v) && !isBagheriaCode(v);
       const s2 = provaSecond(op, i);
-      html += `<td class="prova-td${i === todayIdx ? ' is-today' : ''}"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
+      const swapOp = (provaSwapA && provaSwapA.kind === 'op' && provaSwapA.op === op && provaSwapA.day === i) ? ' is-swap-a' : '';
+      html += `<td class="prova-td${i === todayIdx ? ' is-today' : ''}${swapOp}"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
       provaCellOptions(i).forEach(([val, lab]) => {
         html += `<option value="${val}"${provaOptionSelected(v, val) ? ' selected' : ''}>${lab}</option>`;
       });
@@ -3300,7 +3380,8 @@ function renderTurniProva() {
   html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">Sorrentino</small></th>';
   for (let i = 0; i < 7; i++) {
     const cur = provaBagheriaValue(i);
-    html += `<td class="${i === todayIdx ? 'is-today' : ''}"><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
+    const swapBag = (provaSwapA && provaSwapA.kind === 'bag' && provaSwapA.day === i) ? ' is-swap-a' : '';
+    html += `<td class="${i === todayIdx ? 'is-today' : ''}${swapBag}"><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
     provaBagheriaOptions().forEach(([val, lab]) => {
       html += `<option value="${val}"${cur === val ? ' selected' : ''}>${lab}</option>`;
     });
@@ -3364,6 +3445,20 @@ function renderTurniProva() {
       renderTurniProva();
     };
   });
+  const swapSels = grid.querySelectorAll('select.prova-cell[data-op], select.prova-bagheria-select');
+  swapSels.forEach(sel => {
+    sel.addEventListener('mousedown', (e) => {
+      if (!provaSwapArmed) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const ref = sel.classList.contains('prova-bagheria-select')
+        ? { kind: 'bag', day: parseInt(sel.dataset.bday, 10) }
+        : { kind: 'op', op: sel.dataset.op, day: parseInt(sel.dataset.day, 10) };
+      pickProvaSwap(ref);
+    }, true);
+  });
+  if (provaSwapArmed) grid.classList.add('is-swapping');
+  setProvaSwapUi();
   renderProvaCheck();
 }
 
@@ -6564,6 +6659,8 @@ async function init() {
   if (provaVincoliWeek) provaVincoliWeek.onchange = () => setProvaWeekFromDate(provaVincoliWeek.value, false);
   const btnProvaGen = document.getElementById('btn-prova-generate');
   if (btnProvaGen) btnProvaGen.onclick = openProvaVincoli;
+  const btnProvaSwap = document.getElementById('btn-prova-swap');
+  if (btnProvaSwap) btnProvaSwap.onclick = toggleProvaSwap;
   const btnVincoliOk = document.getElementById('btn-prova-vincoli-ok');
   if (btnVincoliOk) btnVincoliOk.onclick = confirmProvaVincoli;
   const btnVincoliSkip = document.getElementById('btn-prova-vincoli-skip');
