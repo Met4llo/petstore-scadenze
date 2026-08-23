@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.31 - conteggio sui chip lista
+// VERSION 2.32 - nasconde task completati oltre 30 giorni da Tutti
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2639,6 +2639,13 @@ function renderTasks() {
     list = list.filter(t => t.stato !== 'fatto');
   } else if (taskFilter === 'fatti') {
     list = list.filter(t => t.stato === 'fatto');
+  } else if (taskFilter === 'tutti') {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    list = list.filter(t => {
+      if (t.stato !== 'fatto') return true;
+      const done = new Date(t.completed_at || t.created_at || 0).getTime();
+      return !isNaN(done) && done >= cutoff;
+    });
   }
 
   list.sort((a, b) => {
@@ -2663,7 +2670,7 @@ function renderTasks() {
       miei: ['Nessun task per te', 'Non hai task aperti assegnati. Puoi crearne uno nuovo per il reparto.', 'new-task', 'Nuovo task'],
       aperti: ['Nessun task aperto', 'Tutti i task risultano completati, oppure non ne è stato creato nessuno.', 'new-task', 'Nuovo task'],
       fatti: ['Nessun task completato', 'Quando un task viene chiuso, resta visibile qui.', '', ''],
-      tutti: ['Nessun task', 'Crea il primo task e assegnalo a uno o più operatori.', 'new-task', 'Nuovo task']
+      tutti: ['Nessun task', 'Crea il primo task e assegnalo a uno o più operatori. I completati oltre 30 giorni stanno in Completati.', 'new-task', 'Nuovo task']
     };
     const cfg = emptyTask[taskFilter] || emptyTask.tutti;
     el.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2] || null, cfg[3]);
