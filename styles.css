@@ -636,6 +636,12 @@ body {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+.product-note {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
 .quick-expiry {
   display: flex;
   align-items: center;
