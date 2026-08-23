@@ -1045,12 +1045,27 @@ body {
   transform: scale(0.97);
 }
 
+.list-supplier-lab {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.list-supplier-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 8px;
+}
 .list-supplier {
   display: block;
   width: 100%;
   box-sizing: border-box;
   min-height: 48px;
-  margin: 0 0 4px;
+  margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1059,6 +1074,21 @@ body {
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 600;
+  flex: 1;
+}
+.list-supplier.is-on {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.btn-clear-supplier {
+  min-width: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
 }
 .list-search {
   display: block;

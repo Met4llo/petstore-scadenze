@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.24 - settimane passate bloccate
+// VERSION 2.25 - filtro fornitore in lista (conteggio e azzera)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -960,12 +960,21 @@ function fillListSupplierSelect() {
   const sel = document.getElementById('list-supplier');
   if (!sel) return;
   const prev = sel.value;
-  const names = [...new Set(products.map(p => (p.supplier || '').trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'it'));
+  const counts = {};
+  let none = 0;
+  products.forEach(p => {
+    const s = (p.supplier || '').trim();
+    if (!s) { none++; return; }
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const names = Object.keys(counts).sort((a, b) => a.localeCompare(b, 'it'));
   sel.innerHTML = '<option value="">Tutti i fornitori</option>' +
-    '<option value="__none__">Senza fornitore</option>' +
-    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    '<option value="__none__">Senza fornitore (' + none + ')</option>' +
+    names.map(n => '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + ' (' + counts[n] + ')</option>').join('');
   if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  sel.classList.toggle('is-on', !!sel.value);
+  const clr = document.getElementById('btn-clear-supplier');
+  if (clr) clr.classList.toggle('hidden', !sel.value);
 }
 
 function csvCell(v) {
@@ -6893,6 +6902,19 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
   const listSupplier = document.getElementById('list-supplier');
   if (listSupplier) {
     listSupplier.onchange = () => {
+      listSupplier.classList.toggle('is-on', !!listSupplier.value);
+      const clr = document.getElementById('btn-clear-supplier');
+      if (clr) clr.classList.toggle('hidden', !listSupplier.value);
+      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+    };
+  }
+  const btnClearSupplier = document.getElementById('btn-clear-supplier');
+  if (btnClearSupplier) {
+    btnClearSupplier.onclick = () => {
+      const sel = document.getElementById('list-supplier');
+      if (sel) sel.value = '';
+      if (listSupplier) listSupplier.classList.remove('is-on');
+      btnClearSupplier.classList.add('hidden');
       renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
     };
   }
