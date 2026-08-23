@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.13 - turni 10-16 (6h), 9-12/16-20 (7h), 15-20 (5h)
+// VERSION 2.14 - immagine turni senza ore sotto il nome
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4052,13 +4052,9 @@ function drawTurniProvaCanvas() {
   }
   OPERATORS.forEach((op, ri) => {
     const y = tableY + headH + ri * rowH;
-    const h = provaHours(op);
     ctx.fillStyle = '#2a211c';
-    ctx.font = '700 13px "DM Sans", system-ui, sans-serif';
-    ctx.fillText(op, pad + 6, y + 28);
-    ctx.fillStyle = h === 40 ? '#4a7c59' : '#b45309';
-    ctx.font = '600 11px "DM Sans", system-ui, sans-serif';
-    ctx.fillText(h + 'h', pad + 6, y + 48);
+    ctx.font = '700 14px "DM Sans", system-ui, sans-serif';
+    ctx.fillText(op, pad + 6, y + 40);
     for (let i = 0; i < 7; i++) {
       const x = pad + nameW + i * dayW + 4;
       const col = provaExportColors(op, i);
