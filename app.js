@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.30 - calendario consegne del mese
+// VERSION 2.31 - conteggio sui chip lista
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -882,7 +882,8 @@ function handleEmptyAction(action) {
   }
 }
 
-function getListForFilter(filter) {
+function getListForFilter(filter, opts) {
+  opts = opts || {};
   let list;
   if (filter === 'all' || filter === 'no-date') {
     list = products.filter(p => !p.expiry && !p.noExpiry);
@@ -922,20 +923,27 @@ function getListForFilter(filter) {
     list = products.filter(p => !p.expiry && !p.noExpiry);
   }
 
-  const wanted = getSelectedListSupplier();
-  if (wanted) list = list.filter(p => supplierMatches(p, wanted));
-
-  const q = getListSearchQuery();
-  if (q.length >= 2) {
-    list = list.filter(p => productMatchesListSearch(p, q));
-  }
-
-  if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
-    list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
-  } else {
-    list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
+  if (!opts.countsOnly) {
+    const wanted = getSelectedListSupplier();
+    if (wanted) list = list.filter(p => supplierMatches(p, wanted));
+    const q = getListSearchQuery();
+    if (q.length >= 2) list = list.filter(p => productMatchesListSearch(p, q));
+    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
+    } else {
+      list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
+    }
   }
   return list;
+}
+
+function updateListChipCounts() {
+  document.querySelectorAll('.list-chip').forEach(ch => {
+    const n = getListForFilter(ch.dataset.filter, { countsOnly: true }).length;
+    const lab = ch.dataset.label || ch.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
+    ch.dataset.label = lab;
+    ch.textContent = lab + ' (' + n + ')';
+  });
 }
 
 function getSelectedListSupplier() {
@@ -1122,6 +1130,7 @@ th { text-align: left; font-size: 10px; }
 
 function renderFilteredList(filter) {
   fillListSupplierSelect();
+  updateListChipCounts();
   const list = getListForFilter(filter);
   const titles = {
     expired: 'Prodotti scaduti',
