@@ -2716,7 +2716,22 @@ body {
   color: var(--muted);
   margin-bottom: 4px;
 }
-.btn-consegna-ok {
+.consegne-dash-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.consegne-dash-actions .btn {
+  min-height: 36px !important;
+  width: auto !important;
+  padding: 6px 12px !important;
+  font-size: 0.8rem !important;
+}
+.consegne-dash-card.is-missed {
+  border-left: 3px solid var(--danger);
+  padding-left: 8px;
+}
   flex-shrink: 0;
   min-height: 40px !important;
   padding: 8px 14px !important;
@@ -2751,6 +2766,9 @@ body {
   border-left-color: var(--success);
   opacity: 0.88;
 }
+.consegna-card.non_arrivata {
+  border-left-color: var(--danger);
+}
 .consegna-fornitore {
   font-weight: 650;
   font-size: 1.05rem;
@@ -2778,6 +2796,7 @@ body {
 .consegna-badge.prevista { background: #f4efe6; color: #6f645b; }
 .consegna-badge.oggi { background: var(--primary-soft); color: var(--primary); }
 .consegna-badge.consegnato { background: #e4f0e8; color: var(--success); }
+.consegna-badge.non_arrivata { background: #fee2e2; color: #b91c1c; }
 [data-theme="dark"] .consegna-card.oggi {
   background: var(--card);
 }

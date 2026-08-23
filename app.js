@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.28 - modifica task esistenti
+// VERSION 2.29 - consegna non arrivata
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -5962,13 +5962,12 @@ function renderConsegne() {
     // future + today, not yet delivered
     list = list.filter(c => {
       const d = normalizeConsegnaDate(c.data);
-      return d >= oggi && c.stato !== 'consegnato';
+      return d >= oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata';
     });
   } else if (consegneFilter === 'storico') {
-    // past dates OR already delivered (history kept)
     list = list.filter(c => {
       const d = normalizeConsegnaDate(c.data);
-      return d < oggi || c.stato === 'consegnato';
+      return d < oggi || c.stato === 'consegnato' || c.stato === 'non_arrivata';
     });
   }
   // 'tutte' = no filter
@@ -6001,11 +6000,11 @@ function renderConsegne() {
   el.innerHTML = list.map(c => {
     const dNorm = normalizeConsegnaDate(c.data);
     const isOggi = dNorm === oggi;
-    const stato = c.stato === 'consegnato' ? 'consegnato' : 'prevista';
+    const st = c.stato === 'consegnato' ? 'consegnato' : (c.stato === 'non_arrivata' ? 'non_arrivata' : 'prevista');
     const d = dNorm ? formatGiornoSafe(dNorm) : '';
-    const statoLabel = stato === 'consegnato' ? 'Consegnato' : (isOggi ? 'Oggi' : 'In arrivo');
-    const statoClass = stato === 'consegnato' ? 'consegnato' : (isOggi ? 'oggi' : 'prevista');
-    return `<div class="consegna-card ${isOggi ? 'oggi' : ''} ${stato}" data-id="${c.id}">
+    const statoLabel = st === 'consegnato' ? 'Consegnato' : (st === 'non_arrivata' ? 'Non arrivata' : (isOggi ? 'Oggi' : 'In arrivo'));
+    const statoClass = st === 'consegnato' ? 'consegnato' : (st === 'non_arrivata' ? 'non_arrivata' : (isOggi ? 'oggi' : 'prevista'));
+    return `<div class="consegna-card ${isOggi ? 'oggi' : ''} ${st}" data-id="${c.id}">
       <div class="product-card-top">
         <div class="consegna-fornitore">${escapeHtml(c.fornitore || '')}</div>
         <span class="consegna-badge ${statoClass}">${statoLabel}</span>
@@ -6041,12 +6040,13 @@ function updateConsegneDash() {
   d.setDate(d.getDate() + 1);
   const domani = toDateStr(d);
   const oggiList = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi);
-  const domaniList = consegneList.filter(c => normalizeConsegnaDate(c.data) === domani && c.stato !== 'consegnato');
+  const domaniList = consegneList.filter(c => normalizeConsegnaDate(c.data) === domani && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
   if (!oggiList.length && !domaniList.length) {
     el.classList.add('hidden');
     return;
   }
-  const pending = oggiList.filter(c => c.stato !== 'consegnato');
+  const pending = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const missed = oggiList.filter(c => c.stato === 'non_arrivata');
   const done = oggiList.filter(c => c.stato === 'consegnato');
   el.classList.remove('hidden');
   let html = '';
@@ -6059,12 +6059,28 @@ function updateConsegneDash() {
           <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
           <div class="consegne-dash-time">${ora ? 'Previsto · ' + escapeHtml(ora) : 'Orario non indicato'}</div>
         </div>
+        <div class="consegne-dash-actions">
+          <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
+          <button type="button" class="btn btn-secondary btn-consegna-miss" data-id="${escapeHtml(String(c.id || ''))}">Non arrivata</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else if (done.length && !missed.length) {
+    html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
+    html += '<div class="consegne-dash-done-all">Tutte consegnate</div>';
+  }
+  if (missed.length) {
+    html += '<div class="consegne-dash-title">Non arrivate</div>';
+    html += missed.map(c => {
+      const ora = c.ora ? String(c.ora).slice(0, 5) : '';
+      return `<div class="consegne-dash-card is-missed">
+        <div class="consegne-dash-info">
+          <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
+          <div class="consegne-dash-time">Non arrivata${ora ? ' · ' + escapeHtml(ora) : ''}</div>
+        </div>
         <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
       </div>`;
     }).join('');
-  } else if (oggiList.length) {
-    html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
-    html += '<div class="consegne-dash-done-all">Tutte consegnate</div>';
   }
   if (done.length) {
     html += done.map(c => {
@@ -6089,18 +6105,25 @@ function updateConsegneDash() {
     btn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      markConsegnaDone(btn.dataset.id);
+      markConsegnaStato(btn.dataset.id, 'consegnato');
+    };
+  });
+  el.querySelectorAll('.btn-consegna-miss').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      markConsegnaStato(btn.dataset.id, 'non_arrivata');
     };
   });
   el.onclick = (e) => {
-    if (e.target.closest('.btn-consegna-ok')) return;
-    setConsegneFilter(pending.length || oggiList.length ? 'oggi' : 'prossime');
+    if (e.target.closest('.btn-consegna-ok') || e.target.closest('.btn-consegna-miss')) return;
+    setConsegneFilter(pending.length || missed.length || oggiList.length ? 'oggi' : 'prossime');
     showPage('consegne');
     renderConsegne();
   };
 }
 
-async function markConsegnaDone(id) {
+async function markConsegnaStato(id, stato) {
   if (!id) {
     showToast('Consegna senza id, aprila da Consegne', 'warn');
     return;
@@ -6112,7 +6135,7 @@ async function markConsegnaDone(id) {
   const c = consegneList.find(x => String(x.id) === String(id));
   if (!c) return;
   const { error } = await supabase.from('consegne').update({
-    stato: 'consegnato',
+    stato: stato,
     updated_by: currentOperator || 'Sconosciuto',
     updated_at: new Date().toISOString()
   }).eq('id', id);
@@ -6120,8 +6143,8 @@ async function markConsegnaDone(id) {
     showToast('Errore: ' + error.message, 'error');
     return;
   }
-  c.stato = 'consegnato';
-  showToast('Consegnato · ' + (c.fornitore || ''), 'success');
+  c.stato = stato;
+  showToast((stato === 'consegnato' ? 'Consegnato' : 'Non arrivata') + ' · ' + (c.fornitore || ''), stato === 'consegnato' ? 'success' : 'warn');
   updateConsegneDash();
   const page = document.getElementById('page-consegne');
   if (page && page.classList.contains('active')) renderConsegne();
@@ -6140,7 +6163,7 @@ function openConsegnaForm(id) {
     document.getElementById('consegna-fornitore').value = c.fornitore || '';
     document.getElementById('consegna-ora').value = (c.ora || '').toString().slice(0, 5);
     document.getElementById('consegna-note').value = c.note || '';
-    document.getElementById('consegna-stato').value = c.stato === 'consegnato' ? 'consegnato' : 'prevista';
+    document.getElementById('consegna-stato').value = (c.stato === 'consegnato' || c.stato === 'non_arrivata') ? c.stato : 'prevista';
     if (btnDel) btnDel.classList.remove('hidden');
   } else {
     title.textContent = 'Nuova consegna';
