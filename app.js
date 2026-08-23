@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.26 - stampa/PDF lista scadenze in bianco e nero
+// VERSION 2.27 - task con data di scadenza
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -53,7 +53,9 @@ create table if not exists turni_prova (
 );
 alter table turni_prova enable row level security;
 drop policy if exists turni_prova_all on turni_prova;
-create policy turni_prova_all on turni_prova for all using (true) with check (true);`;
+create policy turni_prova_all on turni_prova for all using (true) with check (true);
+
+alter table if exists tasks add column if not exists due_date date;`;
 const SCADENZE_LOG_SQL = EXTRA_TABLES_SQL;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const SUPPLIERS_LIST = ["4 HEALTHY PETS NV", "AFFINITY PETCARE ITALIA S.R.L. - DISTRIBUTORE", "AGROMARKET S.R.L.- Distributore Zoodiaco", "ALIVIT DISTRIBUZIONE SRL", "ALMO NATURE S.P.A.PETSTORE", "ASKOLL UNO SRL", "C.I.A.M.S.R.L", "CAMON&CROCI PET GROUP SPA", "COLTIVIA S.R.L.", "DORADO SRL", "FARMAZOO EMILIA SRL", "G.M.DISTRIBUZIONE S.R.L.", "GIA PET DISTRIBUTION SRLS", "GIMBORN ITALIA SRL", "GIUNTI EDITORE SPA", "HILL'S PET NUTRITION ITALIA SRL", "I.G.C. SRL", "IMAC S.R.L.", "IO VEG-CONSORZIO ETICO S.R.L. PETSTORE", "LANDINI GIUNTINI SPA", "LAVIOSA SPA", "LIFE PET CARE SRL", "MARS ITALIA S.P.A.PETSTORE", "ME PET S.R.L.", "MENNUTIGROUP DISTRIBUZIONE S.R.L.", "MONGE & C.S.P.A.PETSTORE ....", "MP GROUP S.R.L.", "MSM PET FOOD SRL", "MYFAMILY S.R.L.", "NATURAL LINE S.R.L.", "NECON PET FOOD SRL", "NESTLE' PURINA COMMERCIALE S.R.L.-PETSTORE", "NEXTMUNE ITALY SRL", "Natua s.r.l.", "OLISTIKA SRL", "PET DISTRIBUZIONE SRL", "PET VILLAGE SRL", "PETCO SRL", "PLATTO SRL", "REAL BOWL SRL", "REBO S.R.L.", "RINALDO FRANCO S.P.A.", "ROYAL CANIN ITALIA S.R.L.", "RUSSO MANGIMI S.P.A.", "SANYPET SPA", "TRE PONTI S.R.L.", "TRIXIE ITALIA SPA", "UNIPRO S.R.L.", "UNITED PETS S.r.l.", "VISAN ITALIA SRL", "VITAKRAFT ITALIA SPA PETSTORE", "WHITEBRIDGE PET BRANDS S.R.L. PETSTORE", "WONDERFOOD ITALIA SRL A SOCIO UNICO"];
@@ -62,6 +64,8 @@ let bachecaMessages = [];
 let tasksList = [];
 let taskFilter = 'miei';
 let editingTaskId = null;
+let taskDueLocal = {};
+let taskDueColumnMissing = false;
 let turniList = [];
 let editingTurnoDate = null;
 let missioneOggi = null;
@@ -2511,11 +2515,54 @@ async function loadTasks() {
       return;
     }
     tasksList = data || [];
+    mergeTaskDueLocal();
     renderTasks();
     updateMyTasksAlert();
   } catch (e) {
     console.error(e);
   }
+}
+
+function readTaskDueLocal() {
+  try {
+    const o = JSON.parse(localStorage.getItem('petstore_task_due') || '{}');
+    return o && typeof o === 'object' ? o : {};
+  } catch (e) { return {}; }
+}
+
+function writeTaskDueLocal() {
+  try { localStorage.setItem('petstore_task_due', JSON.stringify(taskDueLocal)); } catch (e) {}
+}
+
+function mergeTaskDueLocal() {
+  taskDueLocal = readTaskDueLocal();
+  tasksList.forEach(t => {
+    if (!t.due_date && taskDueLocal[t.id]) t.due_date = taskDueLocal[t.id];
+  });
+}
+
+function taskDueStr(t) {
+  const d = t && (t.due_date || (t.id && taskDueLocal[t.id]));
+  return d ? String(d).slice(0, 10) : '';
+}
+
+function taskDueKind(t) {
+  if (!t || t.stato === 'fatto') return '';
+  const d = taskDueStr(t);
+  if (!d) return '';
+  const today = todayStr();
+  if (d < today) return 'overdue';
+  if (d === today) return 'today';
+  return 'later';
+}
+
+function formatTaskDue(t) {
+  const kind = taskDueKind(t);
+  const d = taskDueStr(t);
+  if (kind === 'overdue') return 'Scaduta il ' + formatExportDate(d);
+  if (kind === 'today') return 'Da fare oggi';
+  if (d) return 'Entro ' + formatExportDate(d);
+  return '';
 }
 
 function getMyOpenTasks() {
@@ -2536,9 +2583,15 @@ function updateMyTasksAlert() {
     return;
   }
   const alte = mine.filter(t => t.priorita === 'alta').length;
+  const overdue = mine.filter(t => taskDueKind(t) === 'overdue');
+  const todayDue = mine.filter(t => taskDueKind(t) === 'today');
   el.classList.remove('hidden');
+  let extra = '';
+  if (overdue.length) extra += ` · <strong>${overdue.length}</strong> in ritardo`;
+  if (todayDue.length) extra += ` · <strong>${todayDue.length}</strong> per oggi`;
   el.innerHTML = `Hai <strong>${mine.length}</strong> task da fare` +
     (alte ? ` (di cui <strong>${alte}</strong> ad alta priorità)` : '') +
+    extra +
     ` — tocca per aprirle`;
   el.onclick = () => {
     taskFilter = 'miei';
@@ -2577,10 +2630,18 @@ function renderTasks() {
     list = list.filter(t => t.stato === 'fatto');
   }
 
-  // Sort: alta first, then by date
   list.sort((a, b) => {
     if (a.stato === 'fatto' && b.stato !== 'fatto') return 1;
     if (b.stato === 'fatto' && a.stato !== 'fatto') return -1;
+    const ka = taskDueKind(a);
+    const kb = taskDueKind(b);
+    const rank = { overdue: 0, today: 1, later: 2, '': 3 };
+    const ra = rank[ka] != null ? rank[ka] : 3;
+    const rb = rank[kb] != null ? rank[kb] : 3;
+    if (ra !== rb) return ra - rb;
+    const da = taskDueStr(a);
+    const db = taskDueStr(b);
+    if (da && db && da !== db) return da.localeCompare(db);
     if (a.priorita === 'alta' && b.priorita !== 'alta') return -1;
     if (b.priorita === 'alta' && a.priorita !== 'alta') return 1;
     return new Date(b.created_at || 0) - new Date(a.created_at || 0);
@@ -2603,12 +2664,18 @@ function renderTasks() {
     const resp = (t.responsabili || []).join(', ');
     const date = t.created_at ? new Date(t.created_at).toLocaleDateString('it-IT') : '';
     const isDone = t.stato === 'fatto';
-    const cls = (t.priorita === 'alta' ? 'alta ' : '') + (isDone ? 'fatto' : '');
+    const dueKind = taskDueKind(t);
+    const dueLab = formatTaskDue(t);
+    const cls = (t.priorita === 'alta' ? 'alta ' : '') + (isDone ? 'fatto' : '') + (dueKind === 'overdue' ? ' overdue' : '') + (dueKind === 'today' ? ' due-today' : '');
     const badge = isDone
       ? '<span class="task-badge fatto">Fatto</span>'
-      : (t.priorita === 'alta'
-        ? '<span class="task-badge alta">Alta</span>'
-        : '<span class="task-badge normale">Normale</span>');
+      : (dueKind === 'overdue'
+        ? '<span class="task-badge overdue">In ritardo</span>'
+        : (dueKind === 'today'
+          ? '<span class="task-badge today">Oggi</span>'
+          : (t.priorita === 'alta'
+            ? '<span class="task-badge alta">Alta</span>'
+            : '<span class="task-badge normale">Normale</span>')));
     return `<div class="task-card ${cls}" data-id="${t.id}">
       <div class="product-card-top">
         <div class="task-card-title">${escapeHtml(t.titolo)}</div>
@@ -2617,6 +2684,7 @@ function renderTasks() {
       ${t.descrizione ? `<div class="task-card-desc">${escapeHtml(t.descrizione)}</div>` : ''}
       <div class="task-card-meta">
         ${resp ? `<span class="product-supplier">${escapeHtml(resp)}</span>` : ''}
+        ${dueLab ? `<span class="task-due">${escapeHtml(dueLab)}</span>` : ''}
         ${t.created_by ? `<span>${escapeHtml(t.created_by)}</span>` : ''}
         ${date ? `<span>${date}</span>` : ''}
       </div>
@@ -2641,6 +2709,8 @@ function openTaskForm() {
   document.getElementById('task-titolo').value = '';
   document.getElementById('task-descrizione').value = '';
   document.getElementById('task-priorita').value = 'normale';
+  const dueEl = document.getElementById('task-due-date');
+  if (dueEl) dueEl.value = '';
   document.querySelectorAll('#task-responsabili input').forEach(cb => { cb.checked = false; });
   // Pre-check current operator
   document.querySelectorAll('#task-responsabili input').forEach(cb => {
@@ -2658,6 +2728,7 @@ async function saveTask() {
   const titolo = (document.getElementById('task-titolo').value || '').trim();
   const descrizione = (document.getElementById('task-descrizione').value || '').trim();
   const priorita = document.getElementById('task-priorita').value;
+  const dueDate = ((document.getElementById('task-due-date') || {}).value || '').slice(0, 10);
   const responsabili = [...document.querySelectorAll('#task-responsabili input:checked')].map(cb => cb.value);
 
   if (!titolo) {
@@ -2681,12 +2752,30 @@ async function saveTask() {
     stato: 'da_fare',
     created_by: currentOperator || 'Sconosciuto'
   };
+  if (dueDate && !taskDueColumnMissing) payload.due_date = dueDate;
 
-  const { error } = await supabase.from('tasks').insert(payload);
+  let { error } = await supabase.from('tasks').insert(payload);
+  if (error && /due_date|schema cache|42703/i.test((error.message || '') + (error.code || ''))) {
+    taskDueColumnMissing = true;
+    delete payload.due_date;
+    const retry = await supabase.from('tasks').insert(payload);
+    error = retry.error;
+    if (!error && dueDate) {
+      showToast('Task creato. Per la data: Impostazioni → Copia SQL tabelle extra', 'warn');
+    }
+  }
   if (error) {
     showToast('Errore: ' + error.message);
     console.error(error);
     return;
+  }
+  if (dueDate) {
+    const { data } = await supabase.from('tasks').select('id').eq('titolo', titolo).order('created_at', { ascending: false }).limit(1);
+    const id = data && data[0] && data[0].id;
+    if (id) {
+      taskDueLocal[id] = dueDate;
+      writeTaskDueLocal();
+    }
   }
   showToast('Task creato');
   closeTaskForm();

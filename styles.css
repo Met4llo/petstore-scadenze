@@ -1445,9 +1445,23 @@ body {
   border-left-color: var(--danger);
 }
 
-.task-card.fatto {
-  opacity: 0.72;
-  border-left-color: var(--success);
+.task-card.overdue {
+  border-left-color: var(--danger);
+}
+.task-card.due-today {
+  border-left-color: var(--primary);
+}
+.task-badge.overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.task-badge.today {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.task-due {
+  font-weight: 800;
+  color: var(--text);
 }
 
 .task-card-title {
