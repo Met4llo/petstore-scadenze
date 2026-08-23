@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.32 - nasconde task completati oltre 30 giorni da Tutti
+// VERSION 2.33 - export CSV e PDF monte ore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4895,6 +4895,114 @@ function fillMonteOpSelect() {
   if (d && !d.value) d.value = toDateStr(new Date());
 }
 
+function collectMonteRows() {
+  const rows = [];
+  monteAuto.forEach(a => {
+    if (!a.ore) return;
+    const start = a.settimana || '';
+    const end = start ? toDateStr(sundayOf(parseDate(start))) : '';
+    rows.push({
+      tipo: 'turni',
+      operatore: a.operatore,
+      data: start,
+      ore: a.ore,
+      motivo: 'Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40',
+      created_by: ''
+    });
+  });
+  monteMovs.forEach(m => {
+    rows.push({
+      tipo: 'rettifica',
+      operatore: m.operatore,
+      data: m.data || '',
+      ore: Number(m.ore) || 0,
+      motivo: m.motivo || '',
+      created_by: m.created_by || ''
+    });
+  });
+  rows.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+  return rows;
+}
+
+async function exportMonteOreCsv() {
+  const rows = collectMonteRows();
+  if (!rows.length) {
+    showToast('Niente da esportare', 'warn');
+    return;
+  }
+  const header = ['Operatore', 'Tipo', 'Data', 'Ore', 'Motivo', 'Inserito da'];
+  const body = rows.map(r => [
+    csvCell(r.operatore),
+    csvCell(r.tipo),
+    csvCell(formatExportDate(r.data) || r.data),
+    csvCell(String(r.ore).replace('.', ',')),
+    csvCell(r.motivo),
+    csvCell(r.created_by)
+  ].join(';'));
+  const saldi = OPERATORS.map(op => csvCell(op) + ';saldo;;' + csvCell(String(monteSaldo(op)).replace('.', ',')) + ';;').join('\n');
+  const blob = new Blob(['\uFEFF' + header.join(';') + '\n' + saldi + '\n' + body.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = 'monte-ore-' + stamp + '.csv';
+  const file = new File([blob], filename, { type: 'text/csv' });
+  if (navigator.share && navigator.canShare) {
+    try {
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('Monte ore esportato', 'success');
+}
+
+function printMonteOre() {
+  const rows = collectMonteRows();
+  const saldi = OPERATORS.map(op => {
+    const v = monteSaldo(op);
+    return '<tr><th>' + escapeHtml(op) + '</th><td>' + escapeHtml(fmtOreDelta(v)) + '</td></tr>';
+  }).join('');
+  const body = rows.map(r => {
+    return '<tr><td>' + escapeHtml(r.operatore) + '</td><td>' + escapeHtml(r.tipo) + '</td><td>' + escapeHtml(formatExportDate(r.data) || r.data || '') + '</td><td>' + escapeHtml(fmtOreDelta(r.ore)) + '</td><td>' + escapeHtml(r.motivo) + (r.created_by ? ' · ' + escapeHtml(r.created_by) : '') + '</td></tr>';
+  }).join('');
+  const html = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Monte ore</title>
+<style>
+@page { size: A4 portrait; margin: 10mm; }
+body { margin: 0; color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+h1 { font-size: 16px; margin: 0 0 8px; }
+h2 { font-size: 13px; margin: 14px 0 6px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #000; padding: 5px 6px; font-size: 11px; text-align: left; }
+@media print { button { display: none !important; } }
+</style></head><body>
+<h1>Pet Store La Malfa — Monte ore</h1>
+<p>${escapeHtml(new Date().toLocaleDateString('it-IT'))} · rispetto alle 40h settimanali</p>
+<h2>Saldi</h2>
+<table><thead><tr><th>Operatore</th><th>Saldo</th></tr></thead><tbody>${saldi}</tbody></table>
+<h2>Movimenti</h2>
+<table><thead><tr><th>Operatore</th><th>Tipo</th><th>Data</th><th>Ore</th><th>Motivo</th></tr></thead><tbody>${body || '<tr><td colspan="5">Nessun movimento</td></tr>'}</tbody></table>
+<p class="no-print"><button onclick="window.print()">Stampa / Salva PDF</button></p>
+<script>window.onload=function(){setTimeout(function(){window.print();},250);}</script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('Consenti i popup per stampare', 'warn');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 let monteEditId = null;
 
 function monteClearForm() {
@@ -7067,6 +7175,10 @@ async function init() {
   if (btnMonteAdd) btnMonteAdd.onclick = addMonteRettifica;
   const btnMonteCancel = document.getElementById('btn-monte-cancel');
   if (btnMonteCancel) btnMonteCancel.onclick = monteClearForm;
+  const btnMonteCsv = document.getElementById('btn-monte-csv');
+  if (btnMonteCsv) btnMonteCsv.onclick = exportMonteOreCsv;
+  const btnMontePrint = document.getElementById('btn-monte-print');
+  if (btnMontePrint) btnMontePrint.onclick = printMonteOre;
   const btnCopyProvaSql = document.getElementById('btn-copy-prova-sql');
   if (btnCopyProvaSql) {
     btnCopyProvaSql.onclick = async () => {
