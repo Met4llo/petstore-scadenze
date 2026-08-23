@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.33 - export CSV e PDF monte ore
+// VERSION 2.34 - lista prodotti senza fornitore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -919,16 +919,20 @@ function getListForFilter(filter, opts) {
     list = products.filter(p => p.signaled && !p.noExpiry);
   } else if (filter === 'no-expiry') {
     list = products.filter(p => p.noExpiry);
+  } else if (filter === 'no-supplier') {
+    list = products.filter(p => !(p.supplier || '').trim());
   } else {
     list = products.filter(p => !p.expiry && !p.noExpiry);
   }
 
   if (!opts.countsOnly) {
-    const wanted = getSelectedListSupplier();
-    if (wanted) list = list.filter(p => supplierMatches(p, wanted));
+    if (filter !== 'no-supplier') {
+      const wanted = getSelectedListSupplier();
+      if (wanted) list = list.filter(p => supplierMatches(p, wanted));
+    }
     const q = getListSearchQuery();
     if (q.length >= 2) list = list.filter(p => productMatchesListSearch(p, q));
-    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry') {
+    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry' || filter === 'no-supplier') {
       list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
     } else {
       list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
@@ -1044,6 +1048,7 @@ async function exportCurrentList() {
     unsignaled: 'da-segnalare',
     signaled: 'segnalati',
     'no-expiry': 'esclusi',
+    'no-supplier': 'senza-fornitore',
     'with-date': 'con-data'
   };
   const today = new Date();
@@ -1140,6 +1145,7 @@ function renderFilteredList(filter) {
     unsignaled: 'Non segnalati',
     signaled: 'Solo segnalati',
     'no-expiry': 'Senza scadenza (esclusi dal controllo)',
+    'no-supplier': 'Senza fornitore in anagrafica',
     'with-date': 'Con data inserita',
     'no-date': 'Senza data di scadenza',
     all: 'Senza data di scadenza'
@@ -1187,6 +1193,7 @@ function renderFilteredList(filter) {
       unsignaled: ['Tutto già segnalato', 'I prodotti in scadenza risultano già segnalati.', 'list-signaled', 'Vedi segnalati'],
       signaled: ['Nessun prodotto segnalato', 'Non ci sono ancora segnalazioni registrate.', 'list-unsignaled', 'Vedi da segnalare'],
       'no-expiry': ['Nessun prodotto escluso', 'Nessun articolo è stato segnato come senza scadenza.', 'scanner', 'Vai allo scanner'],
+      'no-supplier': ['Tutti i prodotti hanno il fornitore', 'L’anagrafica è completa su questo campo.', 'home', 'Torna in Home'],
       'with-date': ['Nessun prodotto con data', 'Non risultano ancora scadenze inserite.', 'scanner', 'Vai allo scanner']
     };
     const cfg = emptyByFilter[filter] || ['Lista vuota', 'Nessun prodotto in questa vista.', 'home', 'Torna in Home'];

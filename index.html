@@ -15,8 +15,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.33">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.33">
+  <link rel="stylesheet" href="styles.css?v=2.34">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.34">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -480,6 +480,7 @@
             <option value="unsignaled">Non segnalati</option>
             <option value="signaled">Solo segnalati</option>
             <option value="no-expiry">Senza scadenza (esclusi)</option>
+            <option value="no-supplier">Senza fornitore</option>
         </select>
         <div class="list-chips" role="tablist" aria-label="Filtri lista">
           <button type="button" class="list-chip active" data-filter="all" data-label="Senza data">Senza data</button>
@@ -490,6 +491,7 @@
           <button type="button" class="list-chip" data-filter="unsignaled" data-label="Da segnalare">Da segnalare</button>
           <button type="button" class="list-chip" data-filter="signaled" data-label="Segnalati">Segnalati</button>
           <button type="button" class="list-chip" data-filter="no-expiry" data-label="Esclusi">Esclusi</button>
+          <button type="button" class="list-chip" data-filter="no-supplier" data-label="Senza fornitore">Senza fornitore</button>
         </div>
         <label class="list-supplier-lab" for="list-supplier">Fornitore</label>
         <div class="list-supplier-row">
@@ -597,7 +599,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.33 – Pet Store La Malfa</p>
+        <p class="info" id="app-version">Versione 2.34 – Pet Store La Malfa</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -618,7 +620,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.33"></script>
-  <script src="fuschi-home.js?v=2.33"></script>
+  <script src="app.js?v=2.34"></script>
+  <script src="fuschi-home.js?v=2.34"></script>
 </body>
 </html>
