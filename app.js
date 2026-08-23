@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.17 - storico scadenze visibile (chi, quando, da/a)
+// VERSION 2.18 - stampa/PDF turni in bianco e nero
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4032,6 +4032,92 @@ function provaExportColors(op, day) {
   return { bg: '#ffedd5', fg: '#9a3412' };
 }
 
+function provaShopCode(n) {
+  if (n === 'La Malfa') return 'LM';
+  if (n === 'Rizzo') return 'RZ';
+  if (n === 'San Lorenzo') return 'SL';
+  if (n === 'Bagheria') return 'BG';
+  return n || '';
+}
+
+function printTurniProvaCell(op, day) {
+  const c = provaCell(op, day);
+  const shop = provaNegozio(op, day);
+  const s2 = provaSecond(op, day);
+  if (!c || c === 'R') return '<span class="off">Riposo</span>';
+  if (c === 'F') return '<span class="ferie">FERIE</span>';
+  let html = '<b>' + escapeHtml(PROVA_LABEL[c] || c) + '</b>';
+  html += '<div class="shop">' + escapeHtml(provaShopCode(shop) || shop) + '</div>';
+  if (s2 && s2.code) {
+    html += '<b>' + escapeHtml(PROVA_LABEL[s2.code] || s2.code) + '</b>';
+    html += '<div class="shop">' + escapeHtml(provaShopCode(s2.shop) || s2.shop || '') + '</div>';
+  }
+  return html;
+}
+
+function printTurniProva() {
+  const start = provaWeekStart || provaMondayStr();
+  const end = toDateStr(sundayOf(parseDate(start)));
+  let head = '<tr><th>Operatore</th>';
+  for (let i = 0; i < 7; i++) {
+    const d = parseDate(start);
+    d.setDate(d.getDate() + i);
+    head += '<th>' + PROVA_DAYS[i] + '<br>' + d.getDate() + '/' + (d.getMonth() + 1) + '</th>';
+  }
+  head += '</tr>';
+  let body = '';
+  OPERATORS.forEach(op => {
+    body += '<tr><th>' + escapeHtml(op) + '</th>';
+    for (let i = 0; i < 7; i++) body += '<td>' + printTurniProvaCell(op, i) + '</td>';
+    body += '</tr>';
+  });
+  body += '<tr><th>Bagheria<br><span class="sub">Sorrentino</span></th>';
+  for (let i = 0; i < 7; i++) {
+    const cur = provaBagheriaValue(i);
+    const work = cur && cur !== 'L';
+    body += '<td>' + (work ? ('<b>' + escapeHtml(PROVA_LABEL[cur] || cur) + '</b><div class="shop">BG</div>') : '<span class="off">Libero</span>') + '</td>';
+  }
+  body += '</tr>';
+  const html = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Turni ${escapeHtml(formatRange(start, end))}</title>
+<style>
+@page { size: A4 landscape; margin: 8mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+h1 { font-size: 16px; margin: 0 0 4px; }
+.range { font-size: 13px; margin: 0 0 10px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 1px solid #000; padding: 6px 4px; text-align: center; vertical-align: middle; font-size: 12px; }
+thead th { font-size: 11px; font-weight: 700; }
+tbody th { text-align: left; width: 15%; font-size: 13px; }
+.shop { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; margin-top: 2px; }
+.off { font-style: italic; }
+.ferie { font-weight: 800; text-decoration: underline; }
+.sub { font-weight: 400; font-size: 11px; }
+.leg { margin-top: 10px; font-size: 11px; }
+.leg b { display: inline-block; min-width: 22px; }
+@media print { button { display: none !important; } }
+.no-print { margin-top: 12px; }
+</style></head><body>
+<h1>PetStore Conad — Turni 2.0</h1>
+<p class="range">${escapeHtml(formatRange(start, end))}</p>
+<table>
+<thead>${head}</thead>
+<tbody>${body}</tbody>
+</table>
+<p class="leg"><b>LM</b> La Malfa &nbsp;&nbsp; <b>RZ</b> Rizzo &nbsp;&nbsp; <b>SL</b> San Lorenzo &nbsp;&nbsp; <b>BG</b> Bagheria</p>
+<p class="no-print"><button onclick="window.print()">Stampa / Salva PDF</button></p>
+<script>window.onload=function(){setTimeout(function(){window.print();},250);}</script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('Consenti i popup per stampare', 'warn');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 function provaShopShort(n) {
   if (n === 'La Malfa') return 'Malfa';
   if (n === 'San Lorenzo') return 'S. Lorenzo';
@@ -6472,6 +6558,8 @@ async function init() {
   if (btnProvaDraftLoad) btnProvaDraftLoad.onclick = restoreTurniProvaDraft;
   const btnProvaShare = document.getElementById('btn-prova-share');
   if (btnProvaShare) btnProvaShare.onclick = createTurniProvaImage;
+  const btnProvaPrint = document.getElementById('btn-prova-print');
+  if (btnProvaPrint) btnProvaPrint.onclick = printTurniProva;
   const btnProvaShareSend = document.getElementById('btn-prova-share-send');
   if (btnProvaShareSend) btnProvaShareSend.onclick = sendProvaShare;
   const btnProvaShareClose = document.getElementById('btn-prova-share-close');
