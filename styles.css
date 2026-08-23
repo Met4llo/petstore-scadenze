@@ -2925,3 +2925,17 @@ body {
   gap: 8px;
   font-weight: 700;
 }
+.monte-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.monte-item-actions .btn-small {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+.btn-small-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
