@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.27 - task con data di scadenza
+// VERSION 2.28 - modifica task esistenti
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2690,6 +2690,7 @@ function renderTasks() {
       </div>
       ${!isDone
         ? `<button class="btn btn-primary mission-check-btn btn-complete-task" data-id="${t.id}">Completa</button>
+           <button type="button" class="btn btn-secondary btn-large btn-edit-task" data-id="${t.id}" style="margin-top:8px;">Modifica</button>
            <button type="button" class="btn-text-back btn-delete-task" data-id="${t.id}">Elimina</button>`
         : `<button type="button" class="btn-text-back btn-delete-task" data-id="${t.id}">Elimina</button>`}
     </div>`;
@@ -2698,23 +2699,36 @@ function renderTasks() {
   el.querySelectorAll('.btn-complete-task').forEach(btn => {
     btn.onclick = () => completeTask(btn.dataset.id);
   });
+  el.querySelectorAll('.btn-edit-task').forEach(btn => {
+    btn.onclick = () => openTaskEdit(btn.dataset.id);
+  });
   el.querySelectorAll('.btn-delete-task').forEach(btn => {
     btn.onclick = () => deleteTask(btn.dataset.id);
   });
 }
 
 function openTaskForm() {
-  editingTaskId = null;
-  document.getElementById('task-form-title').textContent = 'Nuovo task';
-  document.getElementById('task-titolo').value = '';
-  document.getElementById('task-descrizione').value = '';
-  document.getElementById('task-priorita').value = 'normale';
+  fillTaskForm(null);
+}
+
+function openTaskEdit(id) {
+  const t = tasksList.find(x => String(x.id) === String(id));
+  if (!t) return;
+  fillTaskForm(t);
+}
+
+function fillTaskForm(t) {
+  editingTaskId = t ? t.id : null;
+  document.getElementById('task-form-title').textContent = t ? 'Modifica task' : 'Nuovo task';
+  const saveBtn = document.getElementById('btn-save-task');
+  if (saveBtn) saveBtn.textContent = t ? 'Salva modifiche' : 'Salva task';
+  document.getElementById('task-titolo').value = t ? (t.titolo || '') : '';
+  document.getElementById('task-descrizione').value = t ? (t.descrizione || '') : '';
+  document.getElementById('task-priorita').value = t && t.priorita === 'alta' ? 'alta' : 'normale';
   const dueEl = document.getElementById('task-due-date');
-  if (dueEl) dueEl.value = '';
-  document.querySelectorAll('#task-responsabili input').forEach(cb => { cb.checked = false; });
-  // Pre-check current operator
+  if (dueEl) dueEl.value = t ? taskDueStr(t) : '';
   document.querySelectorAll('#task-responsabili input').forEach(cb => {
-    if (cb.value === currentOperator) cb.checked = true;
+    cb.checked = t ? (t.responsabili || []).indexOf(cb.value) >= 0 : (cb.value === currentOperator);
   });
   document.getElementById('task-form-overlay').classList.remove('hidden');
 }
@@ -2722,6 +2736,8 @@ function openTaskForm() {
 function closeTaskForm() {
   document.getElementById('task-form-overlay').classList.add('hidden');
   editingTaskId = null;
+  const saveBtn = document.getElementById('btn-save-task');
+  if (saveBtn) saveBtn.textContent = 'Salva task';
 }
 
 async function saveTask() {
@@ -2753,6 +2769,34 @@ async function saveTask() {
     created_by: currentOperator || 'Sconosciuto'
   };
   if (dueDate && !taskDueColumnMissing) payload.due_date = dueDate;
+
+  if (editingTaskId) {
+    const update = {
+      titolo,
+      descrizione: descrizione || null,
+      priorita,
+      responsabili
+    };
+    if (!taskDueColumnMissing) update.due_date = dueDate || null;
+    let { error } = await supabase.from('tasks').update(update).eq('id', editingTaskId);
+    if (error && /due_date|schema cache|42703/i.test((error.message || '') + (error.code || ''))) {
+      taskDueColumnMissing = true;
+      delete update.due_date;
+      const retry = await supabase.from('tasks').update(update).eq('id', editingTaskId);
+      error = retry.error;
+    }
+    if (error) {
+      showToast('Errore: ' + error.message);
+      return;
+    }
+    if (dueDate) taskDueLocal[editingTaskId] = dueDate;
+    else delete taskDueLocal[editingTaskId];
+    writeTaskDueLocal();
+    showToast('Task aggiornato', 'success');
+    closeTaskForm();
+    await loadTasks();
+    return;
+  }
 
   let { error } = await supabase.from('tasks').insert(payload);
   if (error && /due_date|schema cache|42703/i.test((error.message || '') + (error.code || ''))) {
