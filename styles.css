@@ -2588,11 +2588,51 @@ body {
   gap: 10px;
   margin-top: 8px;
 }
+.consegne-dash-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.consegne-dash-card:last-of-type { border-bottom: 0; }
+.consegne-dash-card.is-done { opacity: 0.72; }
+.consegne-dash-info { min-width: 0; flex: 1; }
 .consegne-dash-name {
+  font-weight: 800;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.consegne-dash-time {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.consegne-dash-done-all {
   font-weight: 700;
-  font-size: 0.95rem;
-  min-width: 0;
-  flex: 1;
+  color: var(--success);
+  margin: 4px 0 8px;
+}
+.consegne-dash-domani {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.45;
+}
+.consegne-dash-domani span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
 }
 .btn-consegna-ok {
   flex-shrink: 0;

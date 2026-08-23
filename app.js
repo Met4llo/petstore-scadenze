@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.18 - stampa/PDF turni in bianco e nero
+// VERSION 2.19 - home consegne più chiare
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -5694,19 +5694,36 @@ function updateConsegneDash() {
   if (pending.length) {
     html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
     html += pending.map(c => {
-      return `<div class="consegne-dash-row">
-        <span class="consegne-dash-name">${escapeHtml(c.fornitore || '')}${c.ora ? ' · ' + escapeHtml(String(c.ora).slice(0, 5)) : ''}</span>
+      const ora = c.ora ? String(c.ora).slice(0, 5) : '';
+      return `<div class="consegne-dash-card">
+        <div class="consegne-dash-info">
+          <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
+          <div class="consegne-dash-time">${ora ? 'Previsto · ' + escapeHtml(ora) : 'Orario non indicato'}</div>
+        </div>
         <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
       </div>`;
     }).join('');
-    if (done.length) {
-      html += '<div class="consegne-dash-sub">' + done.length + ' già consegnat' + (done.length === 1 ? 'a' : 'e') + '</div>';
-    }
   } else if (oggiList.length) {
-    html += '<div>Consegne di oggi: tutte segnate come consegnate</div>';
+    html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
+    html += '<div class="consegne-dash-done-all">Tutte consegnate</div>';
+  }
+  if (done.length) {
+    html += done.map(c => {
+      const ora = c.ora ? String(c.ora).slice(0, 5) : '';
+      return `<div class="consegne-dash-card is-done">
+        <div class="consegne-dash-info">
+          <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
+          <div class="consegne-dash-time">Consegnato${ora ? ' · ' + escapeHtml(ora) : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
   }
   if (domaniList.length) {
-    html += '<div class="consegne-dash-sub">Domani: <strong>' + escapeHtml(domaniList.map(c => c.fornitore).join(', ')) + '</strong></div>';
+    html += '<div class="consegne-dash-domani"><span>Domani</span>' +
+      domaniList.map(c => {
+        const ora = c.ora ? String(c.ora).slice(0, 5) : '';
+        return '<strong>' + escapeHtml(c.fornitore || '') + '</strong>' + (ora ? ' · ' + escapeHtml(ora) : '');
+      }).join('<br>') + '</div>';
   }
   el.innerHTML = html;
   el.querySelectorAll('.btn-consegna-ok').forEach(btn => {
