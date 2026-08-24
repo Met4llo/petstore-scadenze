@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.45 - skeleton al posto di Caricamento
+// VERSION 2.46 - ferie = 6,5 ore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3308,10 +3308,10 @@ const PROVA_TITLE = {
   DM: '09:00–15:00 (6h)',
   DS: '14:00–20:00 (6h)',
   R: 'Riposo',
-  F: 'Ferie (8h, non in negozio)',
+  F: 'Ferie (6,5h, non in negozio)',
   M: 'Malattia (8h, non in negozio)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 8, M: 8 };
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 6.5, M: 8 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -3639,7 +3639,7 @@ function provaCellOptions(day) {
     ['B4A', 'Bagheria 09-13'],
     ['B4C', 'Bagheria 16-20'],
     ['R', 'Riposo'],
-    ['F', 'Ferie'],
+    ['F', 'Ferie (6,5h)'],
     ['M', 'Malattia']
   ];
 }
@@ -4364,7 +4364,7 @@ function provaVincoloOptions(day) {
   return [
     ['', 'Libero'],
     ['R', 'Riposo'],
-    ['F', 'Ferie'],
+    ['F', 'Ferie (6,5h)'],
     ['M', 'Malattia (8h)'],
     ['A', '09-17 (8h)'],
     ['C', '12-20 (8h)'],
