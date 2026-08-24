@@ -615,6 +615,27 @@ body {
 .stat-card.signaled { border-color: #6366f1; background: linear-gradient(135deg, #eef2ff, #e0e7ff); }
 
 /* ===== PRODUCT CARDS ===== */
+.skel-list { display: flex; flex-direction: column; gap: 8px; }
+.skel-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.skel-line {
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg) 20%, var(--border) 50%, var(--bg) 80%);
+  background-size: 200% 100%;
+  animation: skel 1.15s ease-in-out infinite;
+  margin-bottom: 8px;
+}
+.skel-line.w70 { width: 70%; }
+.skel-line.w40 { width: 42%; margin-bottom: 0; }
+@keyframes skel {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
 .product-list {
   display: flex;
   flex-direction: column;

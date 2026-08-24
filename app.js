@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.44 - avviso apertura La Malfa in home
+// VERSION 2.45 - skeleton al posto di Caricamento
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -708,9 +708,16 @@ function renderProductCard(p) {
   `;
 }
 
+function skeletonHtml(n) {
+  n = n || 3;
+  let cards = '';
+  for (let i = 0; i < n; i++) cards += '<div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div>';
+  return '<div class="skel-list" aria-hidden="true">' + cards + '</div>';
+}
+
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
 }
 
 // ---------- Dashboard ----------
@@ -1455,7 +1462,7 @@ function openProduct(ean, returnPage) {
 
     <div class="detail-block" id="product-history-block">
       <p class="detail-kicker">Storico scadenze</p>
-      <div id="product-history" class="product-history"><p class="history-empty">Caricamento...</p></div>
+      <div id="product-history" class="product-history">${skeletonHtml(2)}</div>
     </div>
 
     <div class="detail-block detail-block-actions">

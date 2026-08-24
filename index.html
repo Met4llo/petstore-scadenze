@@ -15,8 +15,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.44">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.44">
+  <link rel="stylesheet" href="styles.css?v=2.45">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.45">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -118,7 +118,7 @@
             <button type="button" id="btn-bacheca-mine" class="btn-small">Per me</button>
           </div>
           <div id="bacheca-list" class="bacheca-list">
-            <p class="muted-center">Caricamento...</p>
+            <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
           </div>
           <div id="bacheca-form" class="bacheca-form hidden">
             <textarea id="bacheca-text" rows="3" placeholder="Scrivi un messaggio per il team..."></textarea>
@@ -150,7 +150,7 @@
           <button class="task-filter-btn" data-filter="fatti">Completati</button>
         </div>
         <div id="tasks-list" class="tasks-list">
-          <p class="muted-center">Caricamento...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
         <div id="task-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
@@ -199,11 +199,11 @@
         <p class="dash-kicker">Missione di oggi</p>
         <p class="turni-hint">Prodotti in negozio ancora senza data. Ogni operatore ha una lista diversa.</p>
         <div id="missione-status" class="missione-status">
-          <p class="muted-center">Caricamento...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
         <div id="missione-operators" class="missione-operators"></div>
         <div id="missione-list" class="product-list">
-          <p class="muted-center">Caricamento prodotti...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
       </section>
 
@@ -216,7 +216,7 @@
         <div id="turni-corrente" class="turni-corrente hidden"></div>
         <h3 class="section-label">Storico settimane</h3>
         <div id="turni-list" class="turni-list">
-          <p class="muted-center">Caricamento...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
         <div id="turno-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
@@ -372,7 +372,7 @@
           <button class="task-filter-btn" data-cfilter="storico">Storico</button>
         </div>
         <div id="consegne-list" class="consegne-list">
-          <p class="muted-center">Caricamento...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
         <div id="consegna-form-overlay" class="task-form-overlay hidden">
           <div class="task-form-card">
@@ -541,7 +541,7 @@
         <p class="dash-kicker">Non in negozio</p>
         <p class="turni-hint">Prodotti in assortimento generale ma non presenti a scaffale. Puoi segnarli dal dettaglio prodotto.</p>
         <div id="non-negozio-list" class="product-list">
-          <p class="muted-center">Caricamento...</p>
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
         </div>
       </section>
 
@@ -608,7 +608,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.44 – Pet Store La Malfa</p>
+        <p class="info" id="app-version">Versione 2.45 – Pet Store La Malfa</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -629,7 +629,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.44"></script>
-  <script src="fuschi-home.js?v=2.44"></script>
+  <script src="app.js?v=2.45"></script>
+  <script src="fuschi-home.js?v=2.45"></script>
 </body>
 </html>
