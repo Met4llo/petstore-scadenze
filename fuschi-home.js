@@ -13,18 +13,10 @@
   }
 
   function openUnsignaledList() {
-    if (typeof window.setListFilter === 'function') {
-      window.setListFilter('unsignaled');
-    } else {
-      var lf = document.getElementById('list-filter');
-      if (lf) {
-        lf.value = 'unsignaled';
-        lf.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    }
-    if (typeof window.showPage === 'function') {
-      window.showPage('list');
-      return;
+    var lf = document.getElementById('list-filter');
+    if (lf) {
+      lf.value = 'unsignaled';
+      lf.dispatchEvent(new Event('change', { bubbles: true }));
     }
     document.querySelectorAll('.page').forEach(function (p) {
       p.classList.remove('active');
@@ -49,9 +41,6 @@
   function tick() {
     applyFuschiVisibility();
     wireButton();
-    if (typeof window.updateSegnalareCount === 'function') {
-      window.updateSegnalareCount();
-    }
   }
 
   if (document.readyState === 'loading') {
