@@ -279,13 +279,119 @@ body {
   font-weight: 700;
   color: var(--primary);
   background: var(--primary-soft);
-  padding: 5px 12px;
+  padding: 6px 10px 6px 8px;
   border-radius: 20px;
-  max-width: 110px;
+  max-width: 148px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   border: 1px solid var(--primary-mid);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.2;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.current-op .op-chip {
+  margin: 0;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.current-op-caret {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.current-op.open,
+.current-op:active {
+  background: var(--primary-mid);
+  transform: scale(0.97);
+}
+
+.op-switch-wrap {
+  position: relative;
+  z-index: 120;
+}
+.op-switch-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  padding: 8px;
+  z-index: 130;
+  animation: fadeIn 0.15s ease;
+}
+.op-switch-dropdown.hidden {
+  display: none !important;
+}
+.op-switch-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+.op-switch-item:active {
+  background: var(--primary-soft);
+}
+.op-switch-item.is-current {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.op-switch-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.op-switch-item[data-op="Santoemma"] .op-switch-dot { background: #ffedd5; color: #9a3412; }
+.op-switch-item[data-op="Fuschi"] .op-switch-dot { background: #dbeafe; color: #1d4ed8; }
+.op-switch-item[data-op="Pizzimenti"] .op-switch-dot { background: #dcfce7; color: #166534; }
+.op-switch-item[data-op="Sorrentino"] .op-switch-dot { background: #ede9fe; color: #6d28d9; }
+.op-switch-meta {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#switch-op-overlay input[type=password] {
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 1rem;
+  min-height: 50px;
+  background: var(--bg);
+  text-align: center;
+  font-family: inherit;
+  color: var(--text);
 }
 
 /* ===== BOTTOM NAV ===== */
@@ -2189,6 +2295,14 @@ body {
   background: rgba(255, 122, 77, 0.15);
   border-color: rgba(255, 122, 77, 0.35);
   color: var(--primary);
+}
+[data-theme="dark"] .op-switch-dropdown {
+  background: var(--card);
+  border-color: var(--border);
+}
+[data-theme="dark"] .op-switch-item:active,
+[data-theme="dark"] .op-switch-item.is-current {
+  background: var(--primary-soft);
 }
 
 [data-theme="dark"] .badge.expired { background: #3b1515; color: #fca5a5; }

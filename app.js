@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.49 - Ferie = 40/6h; malattia esclusa dal monte ore
+// VERSION 2.50 - Cambia operatore dal nome in alto a destra
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -59,6 +59,7 @@ alter table if exists tasks add column if not exists due_date date;`;
 const SCADENZE_LOG_SQL = EXTRA_TABLES_SQL;
 const OPERATORS = ['Santoemma', 'Fuschi', 'Pizzimenti', 'Sorrentino'];
 const OP_COLOR = { Santoemma: 'santoemma', Fuschi: 'fuschi', Pizzimenti: 'pizzimenti', Sorrentino: 'sorrentino' };
+const OP_INITIAL = { Santoemma: 'S', Fuschi: 'F', Pizzimenti: 'P', Sorrentino: 'So' };
 function opChip(name) {
   if (!name) return '';
   const k = OP_COLOR[name] || 'other';
@@ -2352,16 +2353,21 @@ function enterApp() {
 
 function updateOperatorUI() {
   const el = document.getElementById('current-operator');
-  if (el) el.innerHTML = currentOperator ? opChip(currentOperator) : '';
+  if (el) {
+    el.innerHTML = currentOperator
+      ? (opChip(currentOperator) + '<span class="current-op-caret" aria-hidden="true">▾</span>')
+      : 'Cambia';
+    el.setAttribute('aria-label', currentOperator ? ('Operatore ' + currentOperator + ', tocca per cambiare') : 'Scegli operatore');
+  }
   const settingsName = document.getElementById('settings-operator-name');
   if (settingsName) settingsName.innerHTML = currentOperator ? opChip(currentOperator) : 'Nessuno';
-  // Sezione ordini: solo Santoemma
   document.querySelectorAll('.menu-santoemma-only').forEach(btn => {
     if (currentOperator === 'Santoemma') btn.classList.remove('hidden');
     else btn.classList.add('hidden');
   });
   const sqlBtn = document.getElementById('btn-copy-prova-sql');
   if (sqlBtn) sqlBtn.classList.toggle('hidden', currentOperator !== 'Santoemma');
+  renderOpSwitchDropdown();
 }
 
 let pendingOperator = null;
@@ -2379,13 +2385,132 @@ function selectOperator(name) {
 
 function logoutToOperators() {
   stopAutoSync();
+  closeOpSwitch();
+  closeSwitchOpOverlay();
   currentOperator = null;
   pendingOperator = null;
+  switchPendingOp = null;
   localStorage.removeItem('petstore_operator');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('password-screen').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-password').value = '';
+}
+
+let switchPendingOp = null;
+
+function closeOpSwitch() {
+  const dd = document.getElementById('op-switch-dropdown');
+  const btn = document.getElementById('current-operator');
+  if (dd) dd.classList.add('hidden');
+  if (btn) {
+    btn.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function renderOpSwitchDropdown() {
+  const dd = document.getElementById('op-switch-dropdown');
+  if (!dd) return;
+  dd.innerHTML = OPERATORS.map(op => {
+    const mine = op === currentOperator;
+    return '<button type="button" class="op-switch-item' + (mine ? ' is-current' : '') + '" data-op="' + escapeHtml(op) + '" role="menuitem">' +
+      '<span class="op-switch-dot">' + escapeHtml(OP_INITIAL[op] || op.charAt(0)) + '</span>' +
+      '<span>' + escapeHtml(op) + '</span>' +
+      (mine ? '<span class="op-switch-meta">tu</span>' : '') +
+      '</button>';
+  }).join('');
+  dd.querySelectorAll('.op-switch-item').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      pickSwitchOperator(btn.getAttribute('data-op'));
+    };
+  });
+}
+
+function toggleOpSwitch(e) {
+  if (e) e.stopPropagation();
+  const dd = document.getElementById('op-switch-dropdown');
+  const btn = document.getElementById('current-operator');
+  if (!dd) return;
+  const willOpen = dd.classList.contains('hidden');
+  const logoDd = document.getElementById('logo-dropdown');
+  if (logoDd) logoDd.classList.add('hidden');
+  const logoBtn = document.getElementById('btn-logo-menu');
+  if (logoBtn) logoBtn.classList.remove('open');
+  if (willOpen) {
+    renderOpSwitchDropdown();
+    dd.classList.remove('hidden');
+    if (btn) {
+      btn.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+  } else {
+    closeOpSwitch();
+  }
+}
+
+function pickSwitchOperator(name) {
+  closeOpSwitch();
+  if (!name || name === currentOperator) return;
+  switchPendingOp = name;
+  const title = document.getElementById('switch-op-title');
+  const hint = document.getElementById('switch-op-hint');
+  const err = document.getElementById('switch-op-error');
+  const inp = document.getElementById('switch-op-password');
+  if (title) title.textContent = name;
+  if (hint) hint.textContent = 'Password di ' + name;
+  if (err) {
+    err.classList.add('hidden');
+    err.textContent = 'Password non corretta';
+  }
+  if (inp) inp.value = '';
+  const ov = document.getElementById('switch-op-overlay');
+  if (ov) ov.classList.remove('hidden');
+  setTimeout(() => { if (inp) inp.focus(); }, 80);
+}
+
+function closeSwitchOpOverlay() {
+  const ov = document.getElementById('switch-op-overlay');
+  if (ov) ov.classList.add('hidden');
+  switchPendingOp = null;
+  const inp = document.getElementById('switch-op-password');
+  if (inp) inp.value = '';
+}
+
+async function confirmSwitchOperator() {
+  const op = switchPendingOp;
+  const inp = document.getElementById('switch-op-password');
+  const err = document.getElementById('switch-op-error');
+  if (!op) return;
+  try {
+    const stored = await getOperatorPassword(op);
+    if (inp && inp.value === stored) {
+      currentOperator = op;
+      localStorage.setItem('petstore_operator', op);
+      closeSwitchOpOverlay();
+      updateOperatorUI();
+      if (typeof applyProvaLockUi === 'function') applyProvaLockUi();
+      if (typeof renderProvaCheck === 'function') renderProvaCheck();
+      if (typeof fillMonteOpSelect === 'function') fillMonteOpSelect();
+      if (typeof refreshMissione === 'function') refreshMissione();
+      if (typeof updateDashboard === 'function') updateDashboard();
+      if (typeof loadOggiTurniDash === 'function') loadOggiTurniDash();
+      loadTasks().then(() => { if (typeof renderTasks === 'function') renderTasks(); });
+      const active = document.querySelector('.page.active');
+      if (active && active.id === 'page-ordini' && !isSantoemma()) showPage('dashboard');
+      showToast('Sei ' + op, 'success');
+    } else if (err) {
+      err.classList.remove('hidden');
+      err.textContent = 'Password non corretta per ' + op;
+      if (inp) {
+        inp.value = '';
+        inp.focus();
+      }
+    }
+  } catch (e) {
+    showToast('Errore accesso: ' + (e.message || e), 'error');
+  }
 }
 
 
@@ -7347,6 +7472,24 @@ async function init() {
     }
   }
   if (btnLogoMenu) btnLogoMenu.onclick = toggleLogoMenu;
+  const btnCurrentOp = document.getElementById('current-operator');
+  if (btnCurrentOp) btnCurrentOp.onclick = toggleOpSwitch;
+  const btnSwitchOk = document.getElementById('btn-switch-op-ok');
+  if (btnSwitchOk) btnSwitchOk.onclick = confirmSwitchOperator;
+  const btnSwitchCancel = document.getElementById('btn-switch-op-cancel');
+  if (btnSwitchCancel) btnSwitchCancel.onclick = closeSwitchOpOverlay;
+  const switchPwd = document.getElementById('switch-op-password');
+  if (switchPwd) {
+    switchPwd.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmSwitchOperator();
+    });
+  }
+  const switchOv = document.getElementById('switch-op-overlay');
+  if (switchOv) {
+    switchOv.addEventListener('click', (e) => {
+      if (e.target === switchOv) closeSwitchOpOverlay();
+    });
+  }
   document.querySelectorAll('.logo-dropdown-item').forEach(item => {
     item.onclick = () => {
       const page = item.dataset.page;
@@ -7362,6 +7505,7 @@ async function init() {
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.logo-menu-wrap')) closeLogoMenu();
+    if (!e.target.closest('.op-switch-wrap')) closeOpSwitch();
   });
 
   const btnParseOrdine = document.getElementById('btn-parse-ordine');
