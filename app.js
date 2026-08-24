@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.43 - liste compatte
+// VERSION 2.44 - avviso apertura La Malfa in home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3225,10 +3225,18 @@ async function loadOggiTurniDash() {
       html += '<div class="turni-oggi-row ' + cls + '"><span class="turni-oggi-name">' + opChip(op) + '</span><span class="turni-oggi-shift">' + escapeHtml(line) + (line2 ? '<small>' + escapeHtml(line2) + '</small>' : '') + '</span></div>';
     });
     if (day !== 6) {
+      const warns = [];
+      const atOpen = OPERATORS.filter(op => packedAtMainHour(data, op, day, 9));
+      if (atOpen.length < 1) {
+        warns.push('<div class="cover-warn">Apertura La Malfa: nessuno alle 9. Serve almeno 1 persona.</div>');
+      }
       const atClose = OPERATORS.filter(op => packedAtMainHour(data, op, day, 19));
       if (atClose.length < 2) {
         const who = atClose.length ? atClose.join(', ') : 'nessuno';
-        html = '<div class="cover-warn">Chiusura La Malfa: ' + atClose.length + (atClose.length === 1 ? ' persona' : ' persone') + ' (' + escapeHtml(who) + '). Servono almeno 2.</div>' + html;
+        warns.push('<div class="cover-warn">Chiusura La Malfa: ' + atClose.length + (atClose.length === 1 ? ' persona' : ' persone') + ' (' + escapeHtml(who) + '). Servono almeno 2.</div>');
+      }
+      if (warns.length) {
+        html = warns.join('') + html;
         el.classList.add('has-cover-warn');
       }
     }
