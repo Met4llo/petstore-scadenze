@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.48 - Monte ore: rettifiche salvate in cloud (turni_prova)
+// VERSION 2.49 - Ferie = 40/6h; malattia esclusa dal monte ore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3308,10 +3308,13 @@ const PROVA_TITLE = {
   DM: '09:00–15:00 (6h)',
   DS: '14:00–20:00 (6h)',
   R: 'Riposo',
-  F: 'Ferie (6,5h, non in negozio)',
-  M: 'Malattia (8h, non in negozio)'
+  F: 'Ferie (6h40, 40÷6, non in negozio)',
+  M: 'Malattia (non conta come ore, non in monte ore)'
 };
-const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: 6.5, M: 8 };
+const ORE_SETTIMANA = 40;
+const GIORNI_LAVORATIVI = 6;
+const ORE_GIORNO = ORE_SETTIMANA / GIORNI_LAVORATIVI;
+const PROVA_HOURS = { '': 0, A: 8, C: 8, S: 8, S6: 6, S7: 7, '7C': 9, '6A': 6, '6C': 6, '6M': 6, '5C': 5, '4A': 4, '4C': 4, '3C': 3, B: 8, B44: 8, B4A: 4, B4C: 4, DM: 6, DS: 6, R: 0, F: ORE_GIORNO, M: 0 };
 const PROVA_SPANS = {
   A: [[9, 17]],
   C: [[12, 20]],
@@ -3472,7 +3475,36 @@ function provaSlot2Options() {
 }
 
 function provaDayHours(op, day) {
-  return (PROVA_HOURS[provaCell(op, day)] || 0) + (PROVA_HOURS[(provaSecond(op, day) || {}).code] || 0);
+  const c = provaCell(op, day);
+  if (c === 'M') return 0;
+  return (PROVA_HOURS[c] || 0) + (c === 'F' ? 0 : (PROVA_HOURS[(provaSecond(op, day) || {}).code] || 0));
+}
+
+function provaMalattiaDays(op) {
+  let n = 0;
+  for (let i = 0; i < 7; i++) if (provaCell(op, i) === 'M') n++;
+  return n;
+}
+
+function provaHoursLavorative(op) {
+  let h = 0;
+  for (let i = 0; i < 7; i++) h += provaDayHours(op, i);
+  return h;
+}
+
+function provaHours(op) {
+  return provaHoursLavorative(op) + provaMalattiaDays(op) * ORE_GIORNO;
+}
+
+function provaHoursIs40(h) {
+  return Math.abs((Number(h) || 0) - ORE_SETTIMANA) < 0.4;
+}
+
+function fmtOreShort(n) {
+  const v = Math.round(Number(n) * 100) / 100;
+  if (!isFinite(v)) return '0';
+  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+  return String(v).replace('.', ',');
 }
 
 function provaIsWorkCode(c) {
@@ -3643,7 +3675,7 @@ function provaCellOptions(day) {
     ['B4A', 'Bagheria 09-13'],
     ['B4C', 'Bagheria 16-20'],
     ['R', 'Riposo'],
-    ['F', 'Ferie (6,5h)'],
+    ['F', 'Ferie (6h40)'],
     ['M', 'Malattia']
   ];
 }
@@ -3771,10 +3803,12 @@ function renderTurniProva() {
   }
   html += '</tr></thead><tbody>';
   OPERATORS.forEach(op => {
+    const lav = provaHoursLavorative(op);
     const h = provaHours(op);
-    const over = h > 40 ? ' is-over' : '';
+    const mal = provaMalattiaDays(op);
+    const over = lav > 40.4 ? ' is-over' : '';
     const rc = provaRoleCounts(op);
-    html += `<tr><th>${opChip(op)}<small class="prova-ore${over}">${h}h · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
+    html += `<tr><th>${opChip(op)}<small class="prova-ore${over}">${fmtOreShort(lav)}h` + (mal ? ' · ' + mal + ' mal.' : '') + ` · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
       const pv = provaPvClass(op, i);
@@ -3895,12 +3929,6 @@ function renderTurniProva() {
   renderProvaCheck();
 }
 
-function provaHours(op) {
-  let h = 0;
-  for (let i = 0; i < 7; i++) h += provaDayHours(op, i);
-  return h;
-}
-
 function provaPresent(code, hour) {
   const spans = PROVA_SPANS[code];
   if (!spans) return false;
@@ -3911,8 +3939,10 @@ function provaValidate() {
   const issues = [];
   OPERATORS.forEach(op => {
     const h = provaHours(op);
-    if (h > 40) issues.push(op + ': ' + h + ' ore (max 40)');
-    if (h < 40 && h > 0) issues.push(op + ': ' + h + ' ore (serve 40)');
+    const lav = provaHoursLavorative(op);
+    const mal = provaMalattiaDays(op);
+    if (h > ORE_SETTIMANA + 0.4) issues.push(op + ': ' + fmtOreShort(lav) + ' ore lavorative' + (mal ? ' + ' + mal + ' mal.' : '') + ' (max 40)');
+    if (h < ORE_SETTIMANA - 0.4 && h > 0) issues.push(op + ': ' + fmtOreShort(lav) + ' ore lavorative' + (mal ? ' + ' + mal + ' mal.' : '') + ' (serve 40)');
     for (let d = 0; d < 7; d++) {
       const dh = provaDayHours(op, d);
       if (dh > 9) issues.push(op + ' ' + PROVA_DAYS[d] + ': ' + dh + 'h in un giorno (max 9)');
@@ -4305,9 +4335,9 @@ function generateTurniProva() {
   provaFillExact40();
   provaRepairHours();
   renderTurniProva();
-  const not40 = OPERATORS.filter(op => provaHours(op) !== 40);
+  const not40 = OPERATORS.filter(op => !provaHoursIs40(provaHours(op)));
   if (packFail.length) showToast('Vincoli troppo stretti per 40h: ' + packFail.join(', '), 'warn');
-  else if (not40.length) showToast(not40[0] + ' è a ' + provaHours(not40[0]) + 'h (serve 40). Ritocca a mano.', 'warn');
+  else if (not40.length) showToast(not40[0] + ' è a ' + fmtOreShort(provaHoursLavorative(not40[0])) + 'h lavorative (serve 40). Ritocca a mano.', 'warn');
   else if (provaValidate().length) showToast('40h ok, ma controlla il riquadro giallo (copertura)', 'warn');
   else showToast('Tutti a 40 ore. Controlla e Salva.', 'success');
 }
@@ -4316,8 +4346,8 @@ function provaFillExact40() {
   const vFor = (op, day) => (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
   OPERATORS.forEach(op => {
     let guard = 0;
-    while (provaHours(op) < 40 && guard++ < 6) {
-      const miss = 40 - provaHours(op);
+    while (provaHours(op) < ORE_SETTIMANA - 0.4 && guard++ < 6) {
+      const miss = ORE_SETTIMANA - provaHours(op);
       const want = miss >= 9 ? 9 : miss >= 8 ? 8 : miss >= 7 ? 7 : miss >= 6 ? 6 : miss >= 5 ? 5 : miss >= 4 ? 4 : miss >= 3 ? 3 : 0;
       if (!want) break;
       const c = provaRoleCounts(op);
@@ -4350,7 +4380,7 @@ function provaRepairHours() {
   const vFor = (op, day) => (provaVincoli[op] && provaVincoli[op][String(day)]) || '';
   OPERATORS.forEach(op => {
     let guard = 0;
-    while (provaHours(op) > 40 && guard++ < 6) {
+    while (provaHours(op) > ORE_SETTIMANA + 0.4 && guard++ < 6) {
       let done = false;
       for (let day = 5; day >= 0; day--) {
         if (vFor(op, day)) continue;
@@ -4375,8 +4405,8 @@ function provaVincoloOptions(day) {
   return [
     ['', 'Libero'],
     ['R', 'Riposo'],
-    ['F', 'Ferie (6,5h)'],
-    ['M', 'Malattia (8h)'],
+    ['F', 'Ferie (6h40)'],
+    ['M', 'Malattia (esclusa dal monte ore)'],
     ['A', '09-17 (8h)'],
     ['C', '12-20 (8h)'],
     ['S', 'Spezzato 4+4 (8h)'],
@@ -5017,11 +5047,22 @@ function hoursFromPackedCelle(data, op) {
   const slot2 = (data._slot2 && data._slot2[op]) || {};
   let h = 0;
   for (let i = 0; i < 7; i++) {
-    h += PROVA_HOURS[celle[String(i)] || ''] || 0;
+    const code = celle[String(i)] || '';
+    if (code === 'M') continue;
+    h += PROVA_HOURS[code] || 0;
+    if (code === 'F') continue;
     const s2 = slot2[String(i)];
-    if (s2 && s2.code) h += PROVA_HOURS[s2.code] || 0;
+    if (s2 && s2.code && s2.code !== 'M') h += PROVA_HOURS[s2.code] || 0;
   }
   return h;
+}
+
+function packedMalattiaDays(data, op) {
+  if (!data || typeof data !== 'object') return 0;
+  const celle = data[op] || {};
+  let n = 0;
+  for (let i = 0; i < 7; i++) if (celle[String(i)] === 'M') n++;
+  return n;
 }
 
 function readLocalMonte() {
@@ -5082,17 +5123,22 @@ function computeMonteAuto(weeks) {
     if (isMonteSentinelRow(row)) return;
     const celle = row && row.celle;
     if (!celle || typeof celle !== 'object') return;
-    let tot = 0;
-    OPERATORS.forEach(op => { tot += hoursFromPackedCelle(celle, op); });
-    if (!tot) return;
+    let any = false;
     OPERATORS.forEach(op => {
-      const h = hoursFromPackedCelle(celle, op);
+      if (hoursFromPackedCelle(celle, op) || packedMalattiaDays(celle, op)) any = true;
+    });
+    if (!any) return;
+    OPERATORS.forEach(op => {
+      const lav = hoursFromPackedCelle(celle, op);
+      const mal = packedMalattiaDays(celle, op);
+      const hEq = lav + mal * ORE_GIORNO;
       auto.push({
         tipo: 'turni',
         operatore: op,
         settimana: row.settimana_inizio,
-        ore_fatte: h,
-        ore: Math.round((h - MONTE_TARGET) * 10) / 10
+        ore_fatte: lav,
+        malattia_giorni: mal,
+        ore: Math.round((hEq - MONTE_TARGET) * 10) / 10
       });
     });
   });
@@ -5126,7 +5172,7 @@ function collectMonteRows() {
       operatore: a.operatore,
       data: start,
       ore: a.ore,
-      motivo: 'Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40',
+      motivo: 'Turni ' + (start ? formatRange(start, end) : '') + ' · ' + fmtOreShort(a.ore_fatte) + 'h lavorate su 40' + (a.malattia_giorni ? ' · ' + a.malattia_giorni + 'g malattia esclusa' : ''),
       created_by: ''
     });
   });
@@ -5281,7 +5327,7 @@ function renderMonteOre() {
       const end = start ? toDateStr(sundayOf(parseDate(start))) : '';
       items.push({
         t: start || '',
-        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(a.operatore) + '<span class="monte-val ' + (a.ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(a.ore) + '</span></div><div class="field-hint">Turni ' + (start ? formatRange(start, end) : '') + ' · ' + a.ore_fatte + 'h su 40</div></div>'
+        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(a.operatore) + '<span class="monte-val ' + (a.ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(a.ore) + '</span></div><div class="field-hint">Turni ' + (start ? formatRange(start, end) : '') + ' · ' + fmtOreShort(a.ore_fatte) + 'h lavorate su 40' + (a.malattia_giorni ? ' · ' + a.malattia_giorni + 'g malattia (esclusa)' : '') + '</div></div>'
       });
     });
     monteMovs.forEach(m => {
