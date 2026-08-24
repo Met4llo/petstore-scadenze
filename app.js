@@ -5635,8 +5635,6 @@ function applyDensity(compact) {
 function initDensity() {
   applyDensity(isDensityCompact());
 }
-  setScanBeep(isScanBeepOn());
-}
 
 function initTheme() {
   applyTheme(getTheme());
