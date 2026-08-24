@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Pet Store La Malfa">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#c45a2a">
   <title>Pet Store La Malfa</title>
   <link rel="manifest" href="manifest.json">
@@ -14,31 +15,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.47b">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.47b">
-  <style>
-  /* Emergency fix v2.47b – operator tiles */
-  .operator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
-  .operator-card, .operator-btn {
-    width: 100%; padding: 18px 10px 16px; font-size: 1rem; border-radius: 20px !important;
-    font-weight: 650; background: var(--card) !important; color: var(--text) !important;
-    border: 1px solid var(--border) !important; min-height: 128px;
-    display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  }
-  .operator-card[data-op="Santoemma"] { border-top: 6px solid #c45a2a !important; }
-  .operator-card[data-op="Fuschi"] { border-top: 6px solid #2563eb !important; }
-  .operator-card[data-op="Pizzimenti"] { border-top: 6px solid #16a34a !important; }
-  .operator-card[data-op="Sorrentino"] { border-top: 6px solid #7c3aed !important; }
-  .op-initial {
-    width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
-    font-family: "Fraunces", Georgia, serif; font-size: 1.55rem; font-weight: 600; letter-spacing: -0.04em;
-  }
-  .operator-card[data-op="Santoemma"] .op-initial { background: #ffedd5; color: #9a3412; }
-  .operator-card[data-op="Fuschi"] .op-initial { background: #dbeafe; color: #1d4ed8; }
-  .operator-card[data-op="Pizzimenti"] .op-initial { background: #dcfce7; color: #166534; }
-  .operator-card[data-op="Sorrentino"] .op-initial { background: #ede9fe; color: #6d28d9; }
-  .op-name { font-weight: 800; font-size: 0.95rem; }
-  </style>
+  <link rel="stylesheet" href="styles.css?v=2.47c">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.47c">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -57,21 +35,601 @@
       </div>
     </div>
   </div>
+
   <div id="password-screen" class="screen login-screen hidden">
     <div class="login-box login-box-pwd">
-      <h1 id="pwd-title">Password</h1>
+      <img src="logo-petstore.png" alt="PetStore Conad" class="logo-login">
+      <h1 id="pwd-operator-name">Password</h1>
+      <p class="subtitle">Inserisci la tua password personale</p>
       <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-      <p class="error hidden" id="pwd-error">Password errata</p>
-      <button type="button" id="btn-login" class="btn btn-primary btn-large">Entra</button>
-      <button type="button" id="btn-back-login" class="btn-text-back">← Cambia operatore</button>
+      <p id="login-error" class="error hidden">Password non corretta</p>
+      <button type="button" id="btn-back-to-operators" class="btn-text-back">Cambia operatore</button>
+    </div>
+    <div class="login-footer">
+      <button id="login-btn" class="btn btn-primary btn-large">Entra</button>
     </div>
   </div>
-  <!-- Full pages restored from local v2.47 – the JS will handle the rest of the UI -->
+
   <div id="app" class="hidden">
-    <!-- The complete structure is in the full local index; this emergency version ensures login works and tiles look correct. Reload after full restore. -->
+    <header class="header">
+      <div class="logo-menu-wrap">
+        <button type="button" id="btn-logo-menu" class="logo-menu-btn" title="Menu">
+          <img src="logo-petstore.png" alt="PetStore" class="logo-header">
+          <span class="logo-menu-caret">▾</span>
+        </button>
+        <div id="logo-dropdown" class="logo-dropdown hidden">
+          <button type="button" class="logo-dropdown-item" data-page="dashboard">Home</button>
+          <button type="button" class="logo-dropdown-item" data-page="tasks">Task</button>
+          <button type="button" class="logo-dropdown-item" data-page="missione">Missione <span id="missione-menu-count" class="btn-count hidden">0</span></button>
+          <button type="button" class="logo-dropdown-item" data-page="turni">Turni (foto)</button>
+          <button type="button" class="logo-dropdown-item" data-page="turni-prova">Turni 2.0</button>
+          <button type="button" class="logo-dropdown-item" data-page="consegne">Consegne</button>
+          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">Ordini fornitore</button>
+          <button type="button" class="logo-dropdown-item" data-page="scanner">Scanner / Cerca</button>
+          <button type="button" class="logo-dropdown-item" data-page="list">Lista scadenze</button>
+          <button type="button" class="logo-dropdown-item" data-page="non-negozio">Non in negozio</button>
+          <div class="logo-dropdown-divider"></div>
+          <button type="button" class="logo-dropdown-item" data-page="settings">Impostazioni</button>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="current-operator" class="current-op"></span>
+        <button id="btn-sync" class="icon-btn" title="Sincronizza" aria-label="Sincronizza">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-page="dashboard">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg></span>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-page="tasks">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
+        <span>Task</span>
+      </button>
+      <button class="nav-btn" data-page="turni-prova">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+        <span>Turni</span>
+      </button>
+      <button class="nav-btn" data-page="scanner">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <span>Scanner</span>
+      </button>
+    </nav>
+
+    <main class="main">
+      <section id="page-dashboard" class="page active">
+        <p class="dash-kicker">Apertura turno</p>
+        <div id="turni-dash" class="turni-oggi-dash home-alert hidden"></div>
+        <div id="consegne-dash" class="consegne-dash home-alert hidden"></div>
+        <p class="dash-kicker">Scadenze da fare</p>
+        <div class="stats-grid stats-grid-home" id="stats-grid"></div>
+        <div id="missione-dash" class="missione-dash home-alert hidden"></div>
+        <div id="my-tasks-alert" class="my-tasks-alert home-alert hidden"></div>
+        <div class="bacheca-box">
+          <div class="bacheca-header">
+            <h3>Bacheca</h3>
+            <button id="btn-new-bacheca" class="btn-small">Messaggio</button>
+          </div>
+          <div class="bacheca-tools">
+            <input type="search" id="bacheca-search" class="bacheca-search" placeholder="Cerca in bacheca" autocomplete="off">
+            <button type="button" id="btn-bacheca-mine" class="btn-small">Per me</button>
+          </div>
+          <div id="bacheca-list" class="bacheca-list">
+            <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+          </div>
+          <div id="bacheca-form" class="bacheca-form hidden">
+            <textarea id="bacheca-text" rows="3" placeholder="Scrivi un messaggio per il team..."></textarea>
+            <div class="bacheca-form-actions">
+              <label class="check-label"><input type="checkbox" id="bacheca-fixed"> Fissa in alto</label>
+              <button id="btn-save-bacheca" class="btn btn-primary">Pubblica</button>
+              <button id="btn-cancel-bacheca" class="btn btn-secondary">Annulla</button>
+            </div>
+          </div>
+        </div>
+        <p id="sync-status" class="sync-status">Mai sincronizzato · tocca per aggiornare</p>
+        <div class="quick-actions">
+          <button id="btn-go-scanner" class="btn btn-primary btn-large">Scansiona / Cerca prodotto</button>
+          <button id="btn-go-segnalare-dash" class="btn btn-secondary btn-large menu-fuschi-only hidden" style="margin-top:8px;">Prodotti da segnalare <span id="segnalare-count" class="btn-count">0</span></button>
+          <button id="btn-go-ordini-dash" class="btn btn-secondary btn-large menu-santoemma-only hidden" style="margin-top:8px;">Ordini fornitore</button>
+          <button id="btn-go-add-dash" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Aggiungi prodotto</button>
+        </div>
+      </section>
+
+      <section id="page-tasks" class="page">
+        <div class="list-header">
+          <p class="dash-kicker" style="margin:0">Task di reparto</p>
+          <button id="btn-new-task" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuovo</button>
+        </div>
+        <div class="task-filters">
+          <button class="task-filter-btn active" data-filter="miei">I miei</button>
+          <button class="task-filter-btn" data-filter="aperti">Aperti</button>
+          <button class="task-filter-btn" data-filter="tutti">Tutti</button>
+          <button class="task-filter-btn" data-filter="fatti">Completati</button>
+        </div>
+        <div id="tasks-list" class="tasks-list">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+        <div id="task-form-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="task-form-title">Nuovo task</h3>
+              <div class="detail-row">
+                <label>Titolo *</label>
+                <input type="text" id="task-titolo" placeholder="Cosa c'è da fare">
+              </div>
+              <div class="detail-row">
+                <label>Descrizione</label>
+                <textarea id="task-descrizione" rows="2" placeholder="Dettagli opzionali"></textarea>
+              </div>
+              <div class="detail-row">
+                <label>Priorità</label>
+                <select id="task-priorita">
+                  <option value="normale">Normale</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
+              <div class="detail-row">
+                <label>Da fare entro</label>
+                <input type="date" id="task-due-date">
+                <p class="field-hint">Opzionale. In home compare se è oggi o in ritardo.</p>
+              </div>
+              <div class="detail-row">
+                <label>Responsabili * (seleziona uno o più)</label>
+                <div class="operator-checks" id="task-responsabili">
+                  <label class="check-label"><input type="checkbox" value="Santoemma"> Santoemma</label>
+                  <label class="check-label"><input type="checkbox" value="Fuschi"> Fuschi</label>
+                  <label class="check-label"><input type="checkbox" value="Pizzimenti"> Pizzimenti</label>
+                  <label class="check-label"><input type="checkbox" value="Sorrentino"> Sorrentino</label>
+                </div>
+              </div>
+              <button type="button" id="btn-cancel-task" class="btn-text-back">Annulla</button>
+            </div>
+            <div class="sheet-footer">
+              <button id="btn-save-task" class="btn btn-primary btn-large">Salva task</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-missione" class="page">
+        <p class="dash-kicker">Missione di oggi</p>
+        <p class="turni-hint">Prodotti in negozio ancora senza data. Ogni operatore ha una lista diversa.</p>
+        <div id="missione-status" class="missione-status">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+        <div id="missione-operators" class="missione-operators"></div>
+        <div id="missione-list" class="product-list">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+      </section>
+
+      <section id="page-turni" class="page">
+        <div class="list-header">
+          <p class="dash-kicker" style="margin:0">Turni</p>
+          <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">Carica settimana</button>
+        </div>
+        <p class="turni-hint">Foto del foglio turni. Tocco per ingrandire. Lo storico resta sotto.</p>
+        <div id="turni-corrente" class="turni-corrente hidden"></div>
+        <h3 class="section-label">Storico settimane</h3>
+        <div id="turni-list" class="turni-list">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+        <div id="turno-form-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="turno-form-title">Carica foglio turni</h3>
+              <div class="detail-row">
+                <label>Inizio settimana (lunedì) *</label>
+                <input type="date" id="turno-inizio">
+              </div>
+              <div class="detail-row">
+                <label>Fine settimana (domenica)</label>
+                <input type="date" id="turno-fine">
+              </div>
+              <div class="detail-row">
+                <label>Foto del foglio turni *</label>
+                <input type="file" id="turno-foto" accept="image/*">
+                <div id="turno-foto-preview" class="turno-foto-preview hidden"></div>
+              </div>
+              <div class="detail-row">
+                <label>Note (opzionale)</label>
+                <input type="text" id="turno-note" placeholder="Es. settimana con inventario">
+              </div>
+              <p id="turno-upload-msg" class="msg hidden"></p>
+              <button type="button" id="btn-cancel-turno" class="btn-text-back">Annulla</button>
+            </div>
+            <div class="sheet-footer">
+              <button id="btn-save-turno" class="btn btn-primary btn-large">Salva in archivio</button>
+            </div>
+          </div>
+        </div>
+        <div id="turno-viewer" class="turno-viewer hidden">
+          <div class="turno-viewer-toolbar">
+            <button id="btn-close-viewer" class="turno-viewer-close">Chiudi</button>
+            <span id="turno-viewer-caption" class="turno-viewer-caption"></span>
+            <div class="turno-zoom-btns">
+              <button type="button" id="btn-zoom-out" class="turno-zoom-btn">−</button>
+              <button type="button" id="btn-zoom-reset" class="turno-zoom-btn">1:1</button>
+              <button type="button" id="btn-zoom-in" class="turno-zoom-btn">+</button>
+            </div>
+          </div>
+          <div id="turno-viewer-stage" class="turno-viewer-stage">
+            <img id="turno-viewer-img" src="" alt="Foglio turni">
+          </div>
+          <p class="turno-viewer-hint">Pizzica per zoom · trascina per spostare · usa + / −</p>
+        </div>
+      </section>
+
+      <section id="page-turni-prova" class="page">
+        <p class="dash-kicker">Turni 2.0</p>
+        <p class="turni-hint">Visibile a tutti. Il vecchio sistema (foto) resta in Turni. Tocca le date, poi Genera e Salva.</p>
+        <div class="prova-week-bar">
+          <button type="button" id="btn-prova-prev" class="turno-zoom-btn">‹</button>
+          <label class="prova-week-pick">
+            <span id="prova-week-label">Settimana</span>
+            <input type="date" id="prova-week-date" class="prova-week-date-vis" aria-label="Scegli la settimana">
+          </label>
+          <button type="button" id="btn-prova-next" class="turno-zoom-btn">›</button>
+        </div>
+        <button type="button" id="btn-prova-oggi" class="btn btn-secondary btn-large" style="margin-bottom:12px;">Settimana in corso</button>
+        <button type="button" id="btn-prova-generate" class="btn btn-primary btn-large" style="margin-bottom:12px;">Genera settimana</button>
+        <button type="button" id="btn-prova-swap" class="btn btn-secondary btn-large" style="margin-bottom:12px;">Scambia turni</button>
+        <button type="button" id="btn-prova-unlock" class="btn btn-secondary btn-large hidden" style="margin-bottom:12px;">Sblocca per correzione</button>
+        <div class="prova-legend">
+          <span class="leg-pv pv-malfa">La Malfa</span>
+          <span class="leg-pv pv-rizzo">Rizzo</span>
+          <span class="leg-pv pv-lorenzo">San Lorenzo</span>
+          <span class="leg-pv pv-bagheria">Bagheria</span>
+          <span class="leg-pv pv-riposo">Riposo</span>
+          <span class="leg-pv pv-ferie">Ferie</span>
+          <span class="leg-pv pv-malattia">Malattia</span>
+        </div>
+        <div id="prova-check" class="prova-check is-empty">Settimana vuota. Premi Genera settimana.</div>
+        <div class="prova-split">
+          <div class="prova-split-grid">
+            <div id="prova-grid" class="prova-grid-wrap"></div>
+            <button type="button" id="btn-prova-save" class="btn btn-primary btn-large" style="margin-top:14px;">Salva settimana</button>
+            <button type="button" id="btn-prova-draft-save" class="btn btn-secondary btn-large" style="margin-top:8px;">Salva bozza</button>
+            <button type="button" id="btn-prova-draft-load" class="btn btn-secondary btn-large" style="margin-top:8px;">Riprendi bozza</button>
+            <p id="prova-draft-hint" class="field-hint" style="margin-top:6px;"></p>
+            <button type="button" id="btn-prova-share" class="btn btn-secondary btn-large" style="margin-top:8px;">Crea immagine da inviare</button>
+            <button type="button" id="btn-prova-print" class="btn btn-secondary btn-large" style="margin-top:8px;">Stampa / PDF</button>
+            <button type="button" id="btn-copy-prova-sql" class="btn btn-secondary btn-large" style="margin-top:8px;">Copia SQL tabella</button>
+            <p id="prova-status" class="field-hint" style="margin-top:8px;"></p>
+          </div>
+          <aside class="monte-ore-panel" id="monte-ore-panel">
+            <p class="dash-kicker" style="margin:0 0 6px">Monte ore</p>
+            <p class="field-hint" style="margin-bottom:10px">Rispetto alle 40h: in più = straordinario, in meno = debito. Rettifica manuale con data e motivo.</p>
+            <div id="monte-saldi" class="monte-saldi"></div>
+            <button type="button" id="btn-monte-csv" class="btn btn-secondary btn-large" style="margin-top:8px;">Esporta CSV</button>
+            <button type="button" id="btn-monte-print" class="btn btn-secondary btn-large" style="margin-top:8px;">Stampa / PDF</button>
+            <p class="monte-form-title">Rettifica manuale</p>
+            <select id="monte-op" aria-label="Operatore"></select>
+            <input type="date" id="monte-data" aria-label="Data">
+            <div class="monte-ore-row">
+              <select id="monte-segno" aria-label="Più o meno">
+                <option value="piu">Ore in più</option>
+                <option value="meno">Ore in meno</option>
+              </select>
+              <input type="number" id="monte-ore" min="0.5" max="24" step="0.5" placeholder="Ore" inputmode="decimal">
+            </div>
+            <textarea id="monte-motivo" rows="2" placeholder="Motivo (obbligatorio)"></textarea>
+            <button type="button" id="btn-monte-add" class="btn btn-primary btn-large">Aggiungi rettifica</button>
+            <button type="button" id="btn-monte-cancel" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Annulla modifica</button>
+            <p class="monte-form-title" style="margin-top:14px">Storico</p>
+            <div id="monte-storico" class="monte-storico"></div>
+          </aside>
+        </div>
+        <div id="prova-vincoli-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3>Vincoli della settimana</h3>
+              <label class="prova-vincoli-week-lab">Settimana da generare
+                <input type="date" id="prova-vincoli-week">
+              </label>
+              <p class="field-hint">Primo orario + negozio. Opzionale: 2° orario in un altro punto vendita (es. 09-13 La Malfa e 16-20 Rizzo).</p>
+              <div id="prova-vincoli-form"></div>
+            </div>
+            <div class="sheet-footer">
+              <button type="button" id="btn-prova-vincoli-ok" class="btn btn-primary btn-large">Genera con questi vincoli</button>
+              <button type="button" id="btn-prova-vincoli-skip" class="btn btn-secondary btn-large" style="margin-top:8px;">Genera senza vincoli</button>
+              <button type="button" id="btn-prova-vincoli-cancel" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Annulla</button>
+            </div>
+          </div>
+        </div>
+        <div id="prova-share-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3>Immagine turni</h3>
+              <p class="field-hint">Tieni premuto per salvare, oppure Condividi per WhatsApp e altre chat.</p>
+              <img id="prova-share-img" class="prova-share-img" alt="Turni della settimana">
+            </div>
+            <div class="sheet-footer">
+              <button type="button" id="btn-prova-share-send" class="btn btn-primary btn-large">Condividi</button>
+              <button type="button" id="btn-prova-share-close" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Chiudi</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-consegne" class="page">
+        <div class="list-header">
+          <p class="dash-kicker" style="margin:0">Consegne</p>
+          <button id="btn-new-consegna" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuova</button>
+        </div>
+        <p class="turni-hint">Arrivi fornitori. Il giorno della consegna compare in Home.</p>
+        <div id="consegne-cal" class="consegne-cal"></div>
+        <div class="task-filters" id="consegne-filters">
+          <button class="task-filter-btn" data-cfilter="oggi">Oggi</button>
+          <button class="task-filter-btn active" data-cfilter="prossime">Prossime</button>
+          <button class="task-filter-btn" data-cfilter="storico">Storico</button>
+        </div>
+        <div id="consegne-list" class="consegne-list">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+        <div id="consegna-form-overlay" class="task-form-overlay hidden">
+          <div class="task-form-card">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+              <h3 id="consegna-form-title">Nuova consegna</h3>
+              <div class="detail-row">
+                <label>Data *</label>
+                <input type="date" id="consegna-data">
+              </div>
+              <div class="detail-row">
+                <label>Fornitore *</label>
+                <select id="consegna-fornitore">
+                  <option value="">— Seleziona fornitore —</option>
+                </select>
+              </div>
+              <div class="detail-row">
+                <label>Ora (opzionale)</label>
+                <input type="time" id="consegna-ora">
+              </div>
+              <div class="detail-row">
+                <label>Note</label>
+                <input type="text" id="consegna-note" placeholder="Es. scarico retro, 20 colli...">
+              </div>
+              <div class="detail-row">
+                <label>Stato</label>
+                <select id="consegna-stato">
+                  <option value="prevista">Prevista</option>
+                  <option value="consegnato">Consegnato</option>
+                  <option value="non_arrivata">Non arrivata</option>
+                </select>
+              </div>
+              <button type="button" id="btn-delete-consegna" class="btn-text-back btn-danger-text hidden">Elimina consegna</button>
+              <button type="button" id="btn-cancel-consegna" class="btn-text-back">Annulla</button>
+            </div>
+            <div class="sheet-footer">
+              <button id="btn-save-consegna" class="btn btn-primary btn-large">Salva</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-ordini" class="page">
+        <p class="dash-kicker">Ordini fornitore</p>
+        <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
+        <div class="ordini-setup card-block">
+          <div class="detail-row">
+            <label>Nome fornitore *</label>
+            <input type="text" id="ordine-fornitore" placeholder="Es. FARMAZOO, LIUJO, CAMON...">
+          </div>
+          <div class="detail-row">
+            <label>Periodo (testo libero)</label>
+            <input type="text" id="ordine-periodo" placeholder="Es. 18/06/2026 → 11/08/2026">
+          </div>
+          <div class="detail-row">
+            <label>File statistica (.xlsx)</label>
+            <input type="file" id="ordine-file" accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          </div>
+          <button type="button" id="btn-parse-ordine" class="btn btn-primary btn-large">Analizza file</button>
+          <p id="ordine-parse-msg" class="msg hidden"></p>
+        </div>
+        <div id="ordine-result" class="hidden">
+          <p class="dash-kicker" style="margin-top:16px" id="ordine-result-title">Proposta ordine</p>
+          <select id="ordine-filter" class="sr-only" tabindex="-1" aria-hidden="true">
+              <option value="da-ordinare">Solo da ordinare</option>
+              <option value="alta">Priorità alta</option>
+              <option value="tutti">Tutti i prodotti</option>
+          </select>
+          <div class="list-chips" role="tablist" aria-label="Filtri ordine">
+            <button type="button" class="list-chip active" data-ofilter="da-ordinare">Da ordinare</button>
+            <button type="button" class="list-chip" data-ofilter="alta">Priorità alta</button>
+            <button type="button" class="list-chip" data-ofilter="tutti">Tutti</button>
+          </div>
+          <p id="ordine-summary" class="turni-hint"></p>
+          <div id="ordine-table-wrap" class="ordine-table-wrap"></div>
+          <button type="button" id="btn-copy-ordine" class="btn btn-primary btn-large" style="margin-top:12px;">Copia ordine da inviare</button>
+          <button type="button" id="btn-share-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Condividi</button>
+          <button type="button" id="btn-clear-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Nuova analisi</button>
+        </div>
+      </section>
+
+      <section id="page-scanner" class="page">
+        <p class="dash-kicker">Scanner</p>
+        <div class="scanner-section">
+          <div id="reader" class="scanner-box"></div>
+          <p class="scanner-hint">Inquadra l’EAN nella fascia centrale, a 10–20 cm. Se è buio, accendi la torcia.</p>
+          <button id="btn-start-scanner" class="btn btn-primary btn-large">Avvia fotocamera</button>
+          <button id="btn-stop-scanner" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Ferma scanner</button>
+          <button type="button" id="btn-torch" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Torcia</button>
+          <div id="scan-result" class="scan-result hidden" style="margin-top:12px;"></div>
+        </div>
+        <div class="search-panel">
+          <p class="dash-kicker">Oppure cerca</p>
+          <input type="search" id="search-input" placeholder="EAN o nome prodotto" class="search-input" enterkeyhint="search">
+          <div id="search-results" class="product-list"></div>
+          <button id="btn-go-add" class="btn-text-back" style="display:block;width:100%;margin-top:16px;">Aggiungi prodotto manualmente</button>
+        </div>
+      </section>
+
+      <section id="page-list" class="page">
+        <p class="dash-kicker" style="margin:0 0 10px" id="list-title">Tutti i prodotti</p>
+        <select id="list-filter" class="sr-only" tabindex="-1" aria-hidden="true">
+            <option value="all">Senza data di scadenza</option>
+            <option value="with-date">Con data inserita</option>
+            <option value="expired">Scaduti (≤0)</option>
+            <option value="urgent">Urgenti (≤7)</option>
+            <option value="attention">Attenzione (≤30)</option>
+            <option value="monitor">Da monitorare (≤120)</option>
+            <option value="unsignaled">Non segnalati</option>
+            <option value="signaled">Solo segnalati</option>
+            <option value="no-expiry">Senza scadenza (esclusi)</option>
+            <option value="no-supplier">Senza fornitore</option>
+        </select>
+        <div class="list-chips" role="tablist" aria-label="Filtri lista">
+          <button type="button" class="list-chip active" data-filter="all" data-label="Senza data">Senza data</button>
+          <button type="button" class="list-chip" data-filter="expired" data-label="Scaduti">Scaduti</button>
+          <button type="button" class="list-chip" data-filter="urgent" data-label="7 gg">7 gg</button>
+          <button type="button" class="list-chip" data-filter="attention" data-label="30 gg">30 gg</button>
+          <button type="button" class="list-chip" data-filter="monitor" data-label="120 gg">120 gg</button>
+          <button type="button" class="list-chip" data-filter="unsignaled" data-label="Da segnalare">Da segnalare</button>
+          <button type="button" class="list-chip" data-filter="signaled" data-label="Segnalati">Segnalati</button>
+          <button type="button" class="list-chip" data-filter="no-expiry" data-label="Esclusi">Esclusi</button>
+          <button type="button" class="list-chip" data-filter="no-supplier" data-label="Senza fornitore">Senza fornitore</button>
+        </div>
+        <label class="list-supplier-lab" for="list-supplier">Fornitore</label>
+        <div class="list-supplier-row">
+          <select id="list-supplier" class="list-supplier" aria-label="Filtro fornitore">
+            <option value="">Tutti i fornitori</option>
+          </select>
+          <button type="button" id="btn-clear-supplier" class="btn-clear-supplier hidden" aria-label="Togli filtro fornitore">×</button>
+        </div>
+        <input type="search" id="list-search" class="list-search" placeholder="Cerca in questa lista (nome o EAN)" autocomplete="off" enterkeyhint="search">
+        <button type="button" id="btn-export-list" class="btn btn-secondary btn-large" style="margin:10px 0 8px;">Esporta questa lista</button>
+        <button type="button" id="btn-print-list" class="btn btn-secondary btn-large" style="margin:0 0 12px;">Stampa / PDF</button>
+        <div id="filtered-list" class="product-list"></div>
+      </section>
+
+      <section id="page-add" class="page">
+        <button id="btn-back-add" class="btn-back">← Indietro</button>
+        <p class="dash-kicker">Aggiungi prodotto</p>
+        <div class="detail-card">
+          <div class="detail-row">
+            <label>Codice a barre (EAN) *</label>
+            <input type="text" id="add-ean" placeholder="Inserisci EAN" inputmode="numeric">
+          </div>
+          <div class="detail-row">
+            <label>Nome prodotto *</label>
+            <input type="text" id="add-name" placeholder="Nome completo del prodotto">
+          </div>
+          <div class="detail-row">
+            <label>Fornitore *</label>
+            <select id="add-supplier">
+              <option value="">— Seleziona fornitore —</option>
+            </select>
+          </div>
+          <div class="detail-row">
+            <label>Data di scadenza (opzionale)</label>
+            <input type="date" id="add-expiry">
+          </div>
+          <button id="btn-save-new-product" class="btn btn-primary btn-large" style="margin-top:12px;">Salva prodotto</button>
+          <p id="add-product-msg" class="msg hidden"></p>
+        </div>
+      </section>
+
+      <section id="page-non-negozio" class="page">
+        <p class="dash-kicker">Non in negozio</p>
+        <p class="turni-hint">Prodotti in assortimento generale ma non presenti a scaffale. Puoi segnarli dal dettaglio prodotto.</p>
+        <div id="non-negozio-list" class="product-list">
+          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
+        </div>
+      </section>
+
+      <section id="page-detail" class="page">
+        <button id="btn-back" class="btn-back">← Indietro</button>
+        <div id="product-detail" class="detail-stack"></div>
+      </section>
+
+      <section id="page-settings" class="page">
+        <p class="dash-kicker">Impostazioni</p>
+        <div class="settings-group">
+          <label>Tu</label>
+          <p id="settings-operator-name" class="settings-op-name"></p>
+          <button id="btn-change-operator" class="btn btn-secondary btn-large">Esci / Cambia operatore</button>
+        </div>
+        <div class="settings-group">
+          <label>Aspetto</label>
+          <p class="field-hint">Modalità chiara o scura</p>
+          <div class="theme-toggle">
+            <button type="button" id="btn-theme-light" class="theme-btn">Chiara</button>
+            <button type="button" id="btn-theme-dark" class="theme-btn">Scura</button>
+          </div>
+          <p class="field-hint" style="margin-top:14px;">Liste compatte: più prodotti a schermo in corsia.</p>
+          <div class="theme-toggle">
+            <button type="button" id="btn-density-comfy" class="theme-btn">Comode</button>
+            <button type="button" id="btn-density-compact" class="theme-btn">Compatte</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label>Suono scanner</label>
+          <p class="field-hint">Beep alla lettura. Flash e vibrazione restano.</p>
+          <div class="theme-toggle">
+            <button type="button" id="btn-beep-on" class="theme-btn">Acceso</button>
+            <button type="button" id="btn-beep-off" class="theme-btn">Spento</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label>Password</label>
+          <p class="field-hint">Solo per l'operatore collegato</p>
+          <input type="password" id="new-password" placeholder="Nuova password" autocomplete="new-password">
+          <input type="password" id="confirm-password" placeholder="Conferma password" autocomplete="new-password">
+          <button id="btn-change-password" class="btn btn-primary btn-large" style="margin-top:10px;">Salva password</button>
+          <p id="password-msg" class="msg hidden"></p>
+        </div>
+        <div class="settings-group">
+          <label>Metti l’app sul telefono</label>
+          <p class="field-hint"><strong>iPhone (Safari)</strong></p>
+          <ol class="install-steps">
+            <li>Apri questa pagina con <strong>Safari</strong> (non Chrome).</li>
+            <li>Tocca il tasto <strong>Condividi</strong> (quadrato con la freccia in su).</li>
+            <li>Scorri e tocca <strong>Aggiungi a Home</strong>.</li>
+            <li>Tocca <strong>Aggiungi</strong>. In home compare <strong>Pet Store La Malfa</strong>.</li>
+          </ol>
+          <p class="field-hint" style="margin-top:10px;"><strong>Android (Chrome)</strong></p>
+          <ol class="install-steps">
+            <li>Menu ⋮ in alto a destra.</li>
+            <li>Tocca <strong>Aggiungi a schermata Home</strong> o <strong>Installa app</strong>.</li>
+          </ol>
+        </div>
+        <div class="settings-group">
+          <button id="btn-export" class="btn btn-secondary">Esporta backup</button>
+          <button id="btn-import" class="btn btn-secondary" style="margin-top:8px;">Importa backup</button>
+          <input type="file" id="import-file" accept=".json" class="hidden">
+          <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
+          <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
+        </div>
+        <p class="info" id="app-version">Versione 2.47 – Pet Store La Malfa</p>
+        <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
+      </section>
+    </main>
+  </div>
+
+  <div id="unsaved-overlay" class="task-form-overlay hidden">
+    <div class="task-form-card">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-body">
+        <h3>Modifiche non salvate</h3>
+        <p class="field-hint">Hai cambiato il prodotto e non hai premuto Salva.</p>
+      </div>
+      <div class="sheet-footer">
+        <button type="button" id="btn-unsaved-save" class="btn btn-primary btn-large">Salva</button>
+        <button type="button" id="btn-unsaved-discard" class="btn btn-secondary btn-large" style="margin-top:8px;">Scarta</button>
+        <button type="button" id="btn-unsaved-cancel" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Annulla</button>
+      </div>
+    </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.47b"></script>
-  <script src="fuschi-home.js?v=2.47b"></script>
+  <script src="app.js?v=2.47c"></script>
+  <script src="fuschi-home.js?v=2.47c"></script>
 </body>
 </html>
