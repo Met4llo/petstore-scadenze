@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.50 - Cambia operatore dal nome in alto a destra
+// VERSION 2.51 - Monte ore: solo Fuschi e Santoemma possono modificare
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3871,6 +3871,13 @@ function applyProvaLockUi() {
     grid.querySelectorAll('select').forEach(s => { s.disabled = readOnly; });
     grid.classList.toggle('is-locked', readOnly);
   }
+  // Monte ore: stessi permessi (solo Fuschi e Santoemma)
+  ['monte-op', 'monte-data', 'monte-segno', 'monte-ore', 'monte-motivo', 'btn-monte-add', 'btn-monte-cancel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !canEdit;
+  });
+  const panel = document.getElementById('monte-ore-panel');
+  if (panel) panel.classList.toggle('is-readonly', !canEdit);
 }
 
 function setProvaSwapUi() {
@@ -5409,6 +5416,10 @@ function monteClearForm() {
 }
 
 function startMonteEdit(id) {
+  if (!canEditTurniProva()) {
+    showToast('Monte ore: solo Fuschi e Santoemma possono modificare', 'warn');
+    return;
+  }
   const m = monteMovs.find(x => String(x.id) === String(id));
   if (!m) return;
   monteEditId = m.id;
@@ -5460,7 +5471,7 @@ function renderMonteOre() {
       const mid = escapeHtml(String(m.id || ''));
       items.push({
         t: m.data || m.created_at || '',
-        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(m.operatore) + '<span class="monte-val ' + (ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(ore) + '</span></div><div class="field-hint">' + (m.data ? parseDate(m.data).toLocaleDateString('it-IT') : '') + (m.created_by ? ' · ' + opChip(m.created_by) : '') + '</div><div>' + escapeHtml(m.motivo || '') + '</div>' + (m.id ? '<div class="monte-item-actions"><button type="button" class="btn-small" data-monte-edit="' + mid + '">Modifica</button><button type="button" class="btn-small btn-small-danger" data-monte-del="' + mid + '">Elimina</button></div>' : '') + '</div>'
+        html: '<div class="monte-item"><div class="monte-item-top">' + opChip(m.operatore) + '<span class="monte-val ' + (ore > 0 ? 'is-plus' : 'is-minus') + '">' + fmtOreDelta(ore) + '</span></div><div class="field-hint">' + (m.data ? parseDate(m.data).toLocaleDateString('it-IT') : '') + (m.created_by ? ' · ' + opChip(m.created_by) : '') + '</div><div>' + escapeHtml(m.motivo || '') + '</div>' + (m.id && canEditTurniProva() ? '<div class="monte-item-actions"><button type="button" class="btn-small" data-monte-edit="' + mid + '">Modifica</button><button type="button" class="btn-small btn-small-danger" data-monte-del="' + mid + '">Elimina</button></div>' : '') + '</div>'
       });
     });
     items.sort((a, b) => (b.t || '').localeCompare(a.t || ''));
@@ -5472,6 +5483,7 @@ function renderMonteOre() {
       btn.onclick = () => deleteMonteRettifica(btn.getAttribute('data-monte-del'));
     });
   }
+  if (typeof applyProvaLockUi === 'function') applyProvaLockUi();
 }
 
 async function loadMonteOre() {
@@ -5502,6 +5514,10 @@ async function loadMonteOre() {
 }
 
 async function addMonteRettifica() {
+  if (!canEditTurniProva()) {
+    showToast('Monte ore: solo Fuschi e Santoemma possono modificare', 'warn');
+    return;
+  }
   if (monteSaving) return;
   const op = (document.getElementById('monte-op') || {}).value;
   const data = (document.getElementById('monte-data') || {}).value;
@@ -5550,6 +5566,10 @@ async function addMonteRettifica() {
 
 async function deleteMonteRettifica(id) {
   if (!id) return;
+  if (!canEditTurniProva()) {
+    showToast('Monte ore: solo Fuschi e Santoemma possono modificare', 'warn');
+    return;
+  }
   if (!confirm('Eliminare questa rettifica dal monte ore?')) return;
   monteMovs = monteMovs.filter(x => String(x.id) !== String(id));
   if (String(monteEditId) === String(id)) monteClearForm();

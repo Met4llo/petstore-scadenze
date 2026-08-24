@@ -3488,3 +3488,15 @@ body {
   color: var(--danger);
   border-color: var(--danger);
 }
+
+
+.monte-ore-panel.is-readonly .monte-form-title + select,
+.monte-ore-panel.is-readonly input,
+.monte-ore-panel.is-readonly textarea,
+.monte-ore-panel.is-readonly #btn-monte-add {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.monte-ore-panel.is-readonly #btn-monte-add::after {
+  content: none;
+}
