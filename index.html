@@ -22,6 +22,48 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<!-- truncated for size - RESTORE FROM ARTIFACTS -->
+<!-- NOTE: This is a partial restore placeholder. Full index must be restored from artifacts. See petstore-scadenze-v251-complete.zip -->
+<div id="login-screen">
+  <div class="login-card">
+    <img src="logo-petstore.png" alt="Pet Store" class="login-logo">
+    <h1>Pet Store La Malfa</h1>
+    <p class="login-sub">Scegli operatore</p>
+    <div class="operator-grid">
+      <button type="button" class="operator-btn" data-op="Santoemma">Santoemma</button>
+      <button type="button" class="operator-btn" data-op="Fuschi">Fuschi</button>
+      <button type="button" class="operator-btn" data-op="Pizzimenti">Pizzimenti</button>
+      <button type="button" class="operator-btn" data-op="Sorrentino">Sorrentino</button>
+    </div>
+  </div>
+</div>
+<div id="password-screen" class="hidden">
+  <div class="login-card">
+    <h2 id="pwd-operator-name"></h2>
+    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+    <p id="login-error" class="msg error hidden">Password non corretta</p>
+    <button type="button" id="login-btn" class="btn btn-primary">Entra</button>
+    <button type="button" id="btn-back-to-operators" class="btn-text-back">Indietro</button>
+  </div>
+</div>
+<div id="app" class="hidden">
+  <header class="app-header">
+    <div class="logo-menu-wrap">
+      <button type="button" id="btn-logo-menu" class="logo-btn" aria-label="Menu">
+        <img src="logo-petstore.png" alt="">
+      </button>
+      <div id="logo-dropdown" class="logo-dropdown hidden"></div>
+    </div>
+    <div class="op-switch-wrap">
+      <button type="button" id="current-operator" class="current-op" aria-haspopup="true" aria-expanded="false">Cambia</button>
+      <div id="op-switch-dropdown" class="op-switch-dropdown hidden" role="menu"></div>
+    </div>
+  </header>
+  <main id="main-pages">
+    <p style="padding:2rem;text-align:center">Caricamento interfaccia completa in corso... Se vedi questo messaggio, esegui hard refresh o reinstallalo dalla zip v251.</p>
+  </main>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js?v=2.51"></script>
+<script src="fuschi-home.js?v=2.51"></script>
 </body>
 </html>
