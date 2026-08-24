@@ -3,67 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Pet Store La Malfa">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#c45a2a">
-  <title>Pet Store La Malfa</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="logo-petstore.png">
-  <script>
-    (function(){var t=localStorage.getItem('petstore_theme')||'light';document.documentElement.setAttribute('data-theme',t);if(localStorage.getItem('petstore_density')==='compact')document.documentElement.setAttribute('data-density','compact');})();
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <title>Pet Store La Malfa — restore needed</title>
   <link rel="stylesheet" href="styles.css?v=2.51">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.51">
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
-<body>
-<!-- NOTE: This is a partial restore placeholder. Full index must be restored from artifacts. See petstore-scadenze-v251-complete.zip -->
-<div id="login-screen">
-  <div class="login-card">
-    <img src="logo-petstore.png" alt="Pet Store" class="login-logo">
-    <h1>Pet Store La Malfa</h1>
-    <p class="login-sub">Scegli operatore</p>
-    <div class="operator-grid">
-      <button type="button" class="operator-btn" data-op="Santoemma">Santoemma</button>
-      <button type="button" class="operator-btn" data-op="Fuschi">Fuschi</button>
-      <button type="button" class="operator-btn" data-op="Pizzimenti">Pizzimenti</button>
-      <button type="button" class="operator-btn" data-op="Sorrentino">Sorrentino</button>
-    </div>
-  </div>
-</div>
-<div id="password-screen" class="hidden">
-  <div class="login-card">
-    <h2 id="pwd-operator-name"></h2>
-    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
-    <p id="login-error" class="msg error hidden">Password non corretta</p>
-    <button type="button" id="login-btn" class="btn btn-primary">Entra</button>
-    <button type="button" id="btn-back-to-operators" class="btn-text-back">Indietro</button>
-  </div>
-</div>
-<div id="app" class="hidden">
-  <header class="app-header">
-    <div class="logo-menu-wrap">
-      <button type="button" id="btn-logo-menu" class="logo-btn" aria-label="Menu">
-        <img src="logo-petstore.png" alt="">
-      </button>
-      <div id="logo-dropdown" class="logo-dropdown hidden"></div>
-    </div>
-    <div class="op-switch-wrap">
-      <button type="button" id="current-operator" class="current-op" aria-haspopup="true" aria-expanded="false">Cambia</button>
-      <div id="op-switch-dropdown" class="op-switch-dropdown hidden" role="menu"></div>
-    </div>
-  </header>
-  <main id="main-pages">
-    <p style="padding:2rem;text-align:center">Caricamento interfaccia completa in corso... Se vedi questo messaggio, esegui hard refresh o reinstallalo dalla zip v251.</p>
-  </main>
-</div>
-<div id="toast" class="toast hidden"></div>
-<script src="app.js?v=2.51"></script>
-<script src="fuschi-home.js?v=2.51"></script>
+<body style="font-family:system-ui;padding:2rem;max-width:32rem;margin:auto;line-height:1.5">
+  <h1>Pet Store Scadenze</h1>
+  <p><strong>Push incompleto</strong>: i file grandi (<code>index.html</code>, <code>app.js</code>, <code>styles.css</code>) non sono stati caricati completamente su GitHub Pages.</p>
+  <p>Scarica lo zip <code>petstore-scadenze-v251-complete.zip</code> dagli artifacts del progetto e carica questi 4 file nella root della repo <code>Met4llo/petstore-scadenze</code> (sostituisci quelli esistenti):</p>
+  <ul>
+    <li>index.html</li>
+    <li>app.js</li>
+    <li>styles.css</li>
+    <li>sw.js</li>
+  </ul>
+  <p>Poi fai hard refresh sull’app (o cancella dati sito / reinstall PWA).</p>
+  <p style="color:#666;font-size:0.9rem">v2.51 — Monte ore e Turni 2.0 modificabili solo da Fuschi e Santoemma.</p>
+  <script src="app.js?v=2.51"></script>
 </body>
 </html>
