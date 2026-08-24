@@ -1,6 +1,6 @@
 // PetStore Scadenze loader v2.47
 (async function() {
-  const n = 14;
+  const n = 19;
   const parts = [];
   for (let i = 0; i < n; i++) {
     const r = await fetch('./app-chunk-' + i + '.js?v=2.47');
@@ -12,5 +12,5 @@
   s.textContent = code;
   document.head.appendChild(s);
 })().catch(e => {
-  document.body.innerHTML = '<p style="padding:2rem;font-family:sans-serif">Errore caricamento app: ' + e + '. Prova a svuotare la cache.</p>';
+  document.body.innerHTML = '<p style="padding:2rem;font-family:sans-serif">Errore caricamento app: ' + e + '. Svuota la cache e riprova.</p>';
 });
