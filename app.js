@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.51 - Monte ore: solo Fuschi e Santoemma possono modificare
+// VERSION 2.52 - Dashboard stato negozio: card grandi scadenze + monte ore + priorità giorno
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -733,31 +733,81 @@ function updateDashboard() {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120 && !p.signaled;
   });
+  const noDate = products.filter(p => !p.expiry && !p.noExpiry && !nonInNegozio.has(p.ean));
+  const urgentTotal = expired.length + urgent.length;
 
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card urgent" data-filter="urgent">
-      <div class="label">7 giorni</div>
-      <div class="count">${urgent.length}</div>
-    </div>
-    <div class="stat-card attention" data-filter="attention">
-      <div class="label">30 giorni</div>
-      <div class="count">${attention.length}</div>
-    </div>
-    <div class="stat-card monitor" data-filter="monitor">
-      <div class="label">120 giorni</div>
-      <div class="count">${monitor.length}</div>
-    </div>
-  `;
-
-  document.querySelectorAll('.stat-card').forEach(card => {
-    card.onclick = () => {
-      setListFilter(card.dataset.filter);
-      showPage('list');
-    };
-  });
+  const grid = document.getElementById('stats-grid');
+  if (grid) {
+    grid.innerHTML = `
+      <div class="stat-card ${urgentTotal ? 'urgent' : 'ok-empty'}" data-filter="${expired.length ? 'expired' : 'urgent'}">
+        <div class="stat-card-text">
+          <div class="label">Urgenti</div>
+          <div class="stat-sub">${expired.length ? expired.length + ' scaduti' : 'entro 7 giorni'}${urgent.length && expired.length ? ' · ' + urgent.length + ' ≤7gg' : ''}</div>
+        </div>
+        <div class="count">${urgentTotal}</div>
+      </div>
+      <div class="stat-card unsignaled ${unsignaled.length ? '' : 'ok-empty'}" data-filter="unsignaled">
+        <div class="stat-card-text">
+          <div class="label">Da segnalare</div>
+          <div class="stat-sub">scadenze ≤120gg non segnalate</div>
+        </div>
+        <div class="count">${unsignaled.length}</div>
+      </div>
+      <div class="stat-card attention" data-filter="attention">
+        <div class="stat-card-text">
+          <div class="label">30 giorni</div>
+          <div class="stat-sub">da monitorare a breve</div>
+        </div>
+        <div class="count">${attention.length}</div>
+      </div>
+      <div class="stat-card monitor" data-filter="monitor">
+        <div class="stat-card-text">
+          <div class="label">120 giorni</div>
+          <div class="stat-sub">orizzonte medio</div>
+        </div>
+        <div class="count">${monitor.length}</div>
+      </div>
+      <div class="stat-card nodate" data-filter="no-date">
+        <div class="stat-card-text">
+          <div class="label">Senza data</div>
+          <div class="stat-sub">ancora da inserire</div>
+        </div>
+        <div class="count">${noDate.length}</div>
+      </div>
+    `;
+    grid.querySelectorAll('.stat-card').forEach(card => {
+      card.onclick = () => {
+        setListFilter(card.dataset.filter);
+        showPage('list');
+      };
+    });
+  }
   updateSegnalareCount();
   if (typeof updateMissioneDash === 'function') updateMissioneDash();
+  if (typeof updateMonteDash === 'function') updateMonteDash();
   renderSyncStatus();
+}
+
+function updateMonteDash() {
+  const el = document.getElementById('monte-dash');
+  if (!el) return;
+  if (typeof monteSaldo !== 'function' || !currentOperator) {
+    el.classList.add('hidden');
+    return;
+  }
+  const mine = monteSaldo(currentOperator);
+  const cls = mine > 0.05 ? 'is-plus' : mine < -0.05 ? 'is-minus' : 'is-zero';
+  const lab = mine > 0.05 ? 'in credito' : mine < -0.05 ? 'in debito' : 'in pari';
+  el.classList.remove('hidden');
+  el.innerHTML = '<div class="monte-dash-row"><div><div class="monte-dash-label">Il tuo monte ore</div><div class="monte-dash-sub">' + escapeHtml(currentOperator) + ' · ' + lab + '</div></div><span class="monte-dash-val ' + cls + '">' + fmtOreDelta(mine) + '</span></div>';
+  el.onclick = () => {
+    if (!showPage('turni-prova')) return;
+    runPageEnter('turni-prova');
+    setTimeout(() => {
+      const panel = document.getElementById('monte-ore-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+  };
 }
 
 function countUnsignaled() {
@@ -2495,6 +2545,7 @@ async function confirmSwitchOperator() {
       if (typeof fillMonteOpSelect === 'function') fillMonteOpSelect();
       if (typeof refreshMissione === 'function') refreshMissione();
       if (typeof updateDashboard === 'function') updateDashboard();
+      if (typeof updateMonteDash === 'function') updateMonteDash();
       if (typeof loadOggiTurniDash === 'function') loadOggiTurniDash();
       loadTasks().then(() => { if (typeof renderTasks === 'function') renderTasks(); });
       const active = document.querySelector('.page.active');
@@ -5511,6 +5562,7 @@ async function loadMonteOre() {
     } catch (e) {}
   }
   renderMonteOre();
+  if (typeof updateMonteDash === 'function') updateMonteDash();
 }
 
 async function addMonteRettifica() {
@@ -5560,6 +5612,7 @@ async function addMonteRettifica() {
   }
   monteClearForm();
   renderMonteOre();
+  if (typeof updateMonteDash === 'function') updateMonteDash();
   if (res.offline) showToast('Salvata su questo telefono (niente cloud)', 'warn');
   else showToast(wasEdit ? 'Rettifica aggiornata' : 'Rettifica salvata', 'success');
 }
@@ -5581,6 +5634,7 @@ async function deleteMonteRettifica(id) {
   }
   showToast('Rettifica eliminata', 'success');
   renderMonteOre();
+  if (typeof updateMonteDash === 'function') updateMonteDash();
 }
 
 // Zoom/pan state for turno viewer

@@ -591,30 +591,86 @@ body {
   margin-bottom: 18px;
 }
 .stats-grid-home {
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
-@media (min-width: 520px) {
+@media (min-width: 560px) {
   .stats-grid-home { grid-template-columns: repeat(3, 1fr); }
 }
 .stats-grid-home .stat-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 72px;
-  padding: 16px 18px;
+  gap: 10px;
+  min-height: 88px;
+  padding: 16px 16px 16px 18px;
+}
+.stats-grid-home .stat-card .stat-card-text {
+  min-width: 0;
+  flex: 1;
+  order: 1;
 }
 .stats-grid-home .stat-card .count {
-  font-size: 2.1rem;
+  font-size: 2.15rem;
   order: 2;
+  flex-shrink: 0;
+  line-height: 1;
 }
 .stats-grid-home .stat-card .label {
-  font-size: 1.05rem;
-  font-weight: 750;
+  font-size: 1rem;
+  font-weight: 800;
   color: var(--text);
   margin: 0;
   order: 1;
+  letter-spacing: -0.01em;
+}
+.stats-grid-home .stat-card .stat-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+.stats-grid-home .stat-card.ok-empty {
+  opacity: 0.78;
+  border-left-color: #94a3b8;
+  background: var(--card);
+}
+.stat-card.ok-empty .count { color: var(--muted); }
+.monte-dash {
+  cursor: pointer;
+  margin-bottom: 12px !important;
+}
+.monte-dash:active { transform: scale(0.98); }
+.monte-dash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.monte-dash-label {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.monte-dash-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.monte-dash-val {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+.monte-dash-val.is-plus { color: #15803d; }
+.monte-dash-val.is-minus { color: #b91c1c; }
+.monte-dash-val.is-zero { color: var(--muted); }
+[data-theme="dark"] .monte-dash-val.is-plus { color: #4ade80; }
+[data-theme="dark"] .monte-dash-val.is-minus { color: #f87171; }
+[data-theme="dark"] .stats-grid-home .stat-card.ok-empty {
+  opacity: 0.7;
 }
 .home-alert {
   background: var(--card) !important;

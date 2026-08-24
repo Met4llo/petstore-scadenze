@@ -15,8 +15,8 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.51">
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.51">
+  <link rel="stylesheet" href="styles.css?v=2.52">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.52">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -104,13 +104,14 @@
 
     <main class="main">
       <section id="page-dashboard" class="page active">
-        <p class="dash-kicker">Apertura turno</p>
-        <div id="turni-dash" class="turni-oggi-dash home-alert hidden"></div>
-        <div id="consegne-dash" class="consegne-dash home-alert hidden"></div>
-        <p class="dash-kicker">Scadenze da fare</p>
+        <p class="dash-kicker">Stato negozio</p>
         <div class="stats-grid stats-grid-home" id="stats-grid"></div>
+        <div id="monte-dash" class="monte-dash home-alert hidden"></div>
         <div id="missione-dash" class="missione-dash home-alert hidden"></div>
         <div id="my-tasks-alert" class="my-tasks-alert home-alert hidden"></div>
+        <p class="dash-kicker">Turni e consegne</p>
+        <div id="turni-dash" class="turni-oggi-dash home-alert hidden"></div>
+        <div id="consegne-dash" class="consegne-dash home-alert hidden"></div>
         <div class="bacheca-box">
           <div class="bacheca-header">
             <h3>Bacheca</h3>
@@ -647,7 +648,7 @@
     </div>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.51"></script>
-  <script src="fuschi-home.js?v=2.51"></script>
+  <script src="app.js?v=2.52"></script>
+  <script src="fuschi-home.js?v=2.52"></script>
 </body>
 </html>
