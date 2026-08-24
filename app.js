@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.52 - Dashboard stato negozio: card grandi scadenze + monte ore + priorità giorno
+// VERSION 2.53 - Badge stato più grandi e contrastati (leggibili da lontano + dark mode)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -218,7 +218,7 @@ function daysRemaining(expiryStr) {
 }
 
 function getStatusClass(days) {
-  if (days === null) return '';
+  if (days === null) return 'nodate';
   if (days <= 0) return 'expired';
   if (days <= 7) return 'urgent';
   if (days <= 30) return 'attention';
@@ -227,14 +227,19 @@ function getStatusClass(days) {
 }
 
 function getBadge(days, signaled, noExpiry) {
-  if (noExpiry) return '<span class="badge no-expiry">Senza scadenza</span>';
-  if (days === null) return '<span class="badge nodate">Senza data</span>';
-  if (signaled) return '<span class="badge signaled">Segnalato</span>';
-  if (days <= 0) return `<span class="badge expired">${days} gg</span>`;
-  if (days <= 7) return `<span class="badge urgent">${days} gg</span>`;
-  if (days <= 30) return `<span class="badge attention">${days} gg</span>`;
-  if (days <= 120) return `<span class="badge monitor">${days} gg</span>`;
-  return `<span class="badge ok">${days} gg</span>`;
+  const ico = (s) => '<span class="badge-ico" aria-hidden="true">' + s + '</span>';
+  if (noExpiry) return '<span class="badge no-expiry">' + ico('∞') + ' Senza scadenza</span>';
+  if (days === null) return '<span class="badge nodate">' + ico('?') + ' Senza data</span>';
+  if (signaled) return '<span class="badge signaled">' + ico('✓') + ' Segnalato</span>';
+  if (days <= 0) {
+    const n = Math.abs(days || 0);
+    const lab = n === 0 ? 'Scaduto oggi' : ('Scaduto ' + n + ' gg');
+    return '<span class="badge expired">' + ico('!') + ' ' + lab + '</span>';
+  }
+  if (days <= 7) return '<span class="badge urgent">' + ico('!') + ' ' + days + ' gg</span>';
+  if (days <= 30) return '<span class="badge attention">' + ico('·') + ' ' + days + ' gg</span>';
+  if (days <= 120) return '<span class="badge monitor">' + ico('·') + ' ' + days + ' gg</span>';
+  return '<span class="badge ok">' + ico('✓') + ' ' + days + ' gg</span>';
 }
 
 // ---------- Load catalog (static) ----------
