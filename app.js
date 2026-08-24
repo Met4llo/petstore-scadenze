@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.42 - login visivo con iniziali
+// VERSION 2.43 - liste compatte
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -5618,9 +5618,30 @@ function initScanBeep() {
   setScanBeep(isScanBeepOn());
 }
 
+function isDensityCompact() {
+  return localStorage.getItem('petstore_density') === 'compact';
+}
+
+function applyDensity(compact) {
+  if (compact) document.documentElement.setAttribute('data-density', 'compact');
+  else document.documentElement.removeAttribute('data-density');
+  localStorage.setItem('petstore_density', compact ? 'compact' : 'comfy');
+  const a = document.getElementById('btn-density-comfy');
+  const b = document.getElementById('btn-density-compact');
+  if (a) a.classList.toggle('active', !compact);
+  if (b) b.classList.toggle('active', compact);
+}
+
+function initDensity() {
+  applyDensity(isDensityCompact());
+}
+  setScanBeep(isScanBeepOn());
+}
+
 function initTheme() {
   applyTheme(getTheme());
   initScanBeep();
+  initDensity();
 }
 
 
@@ -7272,6 +7293,10 @@ async function init() {
   const btnBeepOff = document.getElementById('btn-beep-off');
   if (btnBeepOn) btnBeepOn.onclick = () => { setScanBeep(true); showToast('Suono scanner acceso', 'success'); };
   if (btnBeepOff) btnBeepOff.onclick = () => { setScanBeep(false); showToast('Suono scanner spento', 'info'); };
+  const btnDenComfy = document.getElementById('btn-density-comfy');
+  const btnDenCompact = document.getElementById('btn-density-compact');
+  if (btnDenComfy) btnDenComfy.onclick = () => { applyDensity(false); showToast('Liste comode'); };
+  if (btnDenCompact) btnDenCompact.onclick = () => { applyDensity(true); showToast('Liste compatte'); };
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentOperator) {
