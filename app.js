@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.72 - Swipe card prodotto: destra Segnala, sinistra Cambia data
+// VERSION 2.73 - Missione: nascondi già fatti (default on)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -7268,9 +7268,24 @@ function renderMissione() {
     </div>`;
   }
 
+  const hideDone = localStorage.getItem('petstore_missione_hide_done') !== '0';
+  const hideBar = document.getElementById('missione-hide-bar');
+  if (hideBar) {
+    hideBar.innerHTML = doneEans.length
+      ? '<button type="button" id="btn-missione-hide" class="theme-btn' + (hideDone ? ' active' : '') + '">' +
+        (hideDone ? 'Già fatti nascosti (' + doneEans.length + ')' : 'Mostra già fatti (' + doneEans.length + ')') +
+        '</button>'
+      : '';
+    const hb = document.getElementById('btn-missione-hide');
+    if (hb) hb.onclick = () => {
+      localStorage.setItem('petstore_missione_hide_done', hideDone ? '0' : '1');
+      renderMissione();
+    };
+  }
+
   listEl.innerHTML =
     (todo.length ? todo.map(ean => missionCard(ean, false)).join('') : (completed ? emptyStateHtml('Missione completa', 'Hai controllato tutti i prodotti della missione di oggi.', 'home', 'Torna in Home') : '')) +
-    (doneEans.length ? `<details class="mission-done-fold"><summary>Già fatti (${doneEans.length})</summary>${doneEans.map(ean => missionCard(ean, true)).join('')}</details>` : '');
+    ((!hideDone && doneEans.length) ? `<details class="mission-done-fold" open><summary>Già fatti (${doneEans.length})</summary>${doneEans.map(ean => missionCard(ean, true)).join('')}</details>` : '');
 
   wireEmptyActions(listEl);
   listEl.querySelectorAll('.product-card').forEach(card => {
