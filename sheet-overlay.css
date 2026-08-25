@@ -262,3 +262,27 @@ body.sheet-open { overflow: hidden; }
 [data-theme="dark"] .oggi-row.is-hot { background: #450a0a; }
 [data-theme="dark"] .oggi-row.is-warn { background: #431407; }
 [data-theme="dark"] .oggi-row.is-info { background: #292524; }
+
+/* v2.61 tap-to-focus */
+#reader, .scanner-box { position: relative; touch-action: manipulation; }
+.scan-focus-reticle {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  margin: -39px 0 0 -39px;
+  border: 2px solid #fbbf24;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.35);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.25);
+  z-index: 5;
+}
+.scan-focus-reticle.is-on {
+  animation: scan-focus-pop 0.7s ease-out;
+}
+@keyframes scan-focus-pop {
+  0% { opacity: 1; transform: scale(1.28); }
+  35% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.92); }
+}
