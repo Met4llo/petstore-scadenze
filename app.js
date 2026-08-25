@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.59 - Turni 2.0 sola consultazione visibile (bottoni e form nascosti)
+// VERSION 2.60 - Checklist «Cosa fare oggi» in Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -819,6 +819,151 @@ function escapeHtml(str) {
 }
 
 // ---------- Dashboard ----------
+
+function collectOggiItems() {
+  const items = [];
+  const expired = (typeof countExpiredOnShelf === 'function') ? countExpiredOnShelf() : 0;
+  const hot = (typeof urgentHotProducts === 'function') ? urgentHotProducts().length : 0;
+  if (expired || hot) {
+    const bits = [];
+    if (expired) bits.push(expired === 1 ? '1 scaduto' : (expired + ' scaduti'));
+    if (hot) bits.push(hot === 1 ? '1 da segnalare (≤7 gg)' : (hot + ' da segnalare (≤7 gg)'));
+    items.push({
+      id: 'urgent',
+      tone: expired ? 'hot' : 'warn',
+      title: 'Scadenze urgenti',
+      sub: bits.join(' · '),
+      count: expired + hot,
+      go: function() {
+        if (typeof setListFilter === 'function') setListFilter(expired ? 'expired' : 'urgent');
+        showPage('list');
+      }
+    });
+  }
+
+  if (typeof isAfterMissionHour === 'function' && isAfterMissionHour() && typeof myMissionProgress === 'function') {
+    const prog = myMissionProgress();
+    const remaining = Math.max(0, (prog.total || 0) - (prog.done || 0));
+    if (prog.total > 0 && remaining > 0) {
+      items.push({
+        id: 'missione',
+        tone: 'warn',
+        title: 'Missione di oggi',
+        sub: prog.done + ' di ' + prog.total + ' controllati',
+        count: remaining,
+        go: function() { showPage('missione'); if (typeof renderMissione === 'function') renderMissione(); }
+      });
+    }
+  }
+
+  if (typeof getMyOpenTasks === 'function') {
+    const mine = getMyOpenTasks();
+    const overdue = mine.filter(t => typeof taskDueKind === 'function' && taskDueKind(t) === 'overdue');
+    const todayDue = mine.filter(t => typeof taskDueKind === 'function' && taskDueKind(t) === 'today');
+    const hotTasks = overdue.length + todayDue.length;
+    if (hotTasks) {
+      const bits = [];
+      if (overdue.length) bits.push(overdue.length === 1 ? '1 in ritardo' : (overdue.length + ' in ritardo'));
+      if (todayDue.length) bits.push(todayDue.length === 1 ? '1 per oggi' : (todayDue.length + ' per oggi'));
+      items.push({
+        id: 'tasks',
+        tone: overdue.length ? 'hot' : 'warn',
+        title: 'I tuoi task',
+        sub: bits.join(' · '),
+        count: hotTasks,
+        go: function() {
+          taskFilter = 'miei';
+          document.querySelectorAll('.task-filter-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.filter === 'miei');
+          });
+          showPage('tasks');
+          if (typeof renderTasks === 'function') renderTasks();
+        }
+      });
+    } else if (mine.length) {
+      items.push({
+        id: 'tasks',
+        tone: 'info',
+        title: 'I tuoi task',
+        sub: mine.length === 1 ? '1 ancora aperto' : (mine.length + ' ancora aperti'),
+        count: mine.length,
+        go: function() {
+          taskFilter = 'miei';
+          document.querySelectorAll('.task-filter-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.filter === 'miei');
+          });
+          showPage('tasks');
+          if (typeof renderTasks === 'function') renderTasks();
+        }
+      });
+    }
+  }
+
+  if (typeof consegneList !== 'undefined' && Array.isArray(consegneList) && typeof todayStr === 'function') {
+    const oggi = todayStr();
+    const pending = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+    const missed = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato === 'non_arrivata');
+    if (pending.length || missed.length) {
+      const names = pending.concat(missed).map(c => c.fornitore || 'Consegna').slice(0, 3);
+      const extra = (pending.length + missed.length) > 3 ? '…' : '';
+      items.push({
+        id: 'consegne',
+        tone: missed.length ? 'hot' : 'info',
+        title: missed.length && !pending.length ? 'Consegne non arrivate' : 'Consegne di oggi',
+        sub: names.join(', ') + extra,
+        count: pending.length + missed.length,
+        go: function() { showPage('consegne'); }
+      });
+    }
+  }
+
+  if (currentOperator && typeof monteSaldo === 'function') {
+    const saldo = monteSaldo(currentOperator);
+    if (saldo < -0.05) {
+      items.push({
+        id: 'monte',
+        tone: 'info',
+        title: 'Monte ore in debito',
+        sub: (typeof fmtOreDelta === 'function' ? fmtOreDelta(saldo) : String(saldo)) + ' · ' + currentOperator,
+        count: '',
+        go: function() {
+          if (!showPage('turni-prova')) return;
+          if (typeof runPageEnter === 'function') runPageEnter('turni-prova');
+        }
+      });
+    }
+  }
+  return items;
+}
+
+function updateOggiBox() {
+  const list = document.getElementById('oggi-list');
+  const box = document.getElementById('oggi-box');
+  if (!list || !box) return;
+  const items = collectOggiItems();
+  if (!items.length) {
+    list.innerHTML = '<div class="oggi-empty">Niente in sospeso per oggi</div>';
+    box.classList.add('is-clear');
+    box.classList.remove('has-items');
+    return;
+  }
+  box.classList.remove('is-clear');
+  box.classList.add('has-items');
+  list.innerHTML = items.map(function(it, i) {
+    const cnt = it.count === '' || it.count == null ? '' : '<span class="oggi-row-count">' + it.count + '</span>';
+    return '<button type="button" class="oggi-row is-' + it.tone + '" data-oggi="' + i + '">' +
+      '<span class="oggi-row-text"><span class="oggi-row-title">' + escapeHtml(it.title) + '</span>' +
+      (it.sub ? '<span class="oggi-row-sub">' + escapeHtml(it.sub) + '</span>' : '') +
+      '</span>' + cnt + '</button>';
+  }).join('');
+  list.querySelectorAll('[data-oggi]').forEach(function(btn) {
+    btn.onclick = function() {
+      const it = items[Number(btn.dataset.oggi)];
+      if (it && typeof it.go === 'function') it.go();
+    };
+  });
+}
+
 function updateDashboard() {
   // Esclude prodotti registrati come "senza scadenza"
   const withDate = products.filter(p => p.expiry && !p.noExpiry);
@@ -884,6 +1029,7 @@ function updateDashboard() {
   if (typeof updateMissioneDash === 'function') updateMissioneDash();
   if (typeof updateMonteDash === 'function') updateMonteDash();
   renderSyncStatus();
+  if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
 
@@ -975,6 +1121,7 @@ function updateMonteDash() {
   if (!el) return;
   if (typeof monteSaldo !== 'function' || !currentOperator) {
     el.classList.add('hidden');
+    if (typeof updateOggiBox === 'function') updateOggiBox();
     return;
   }
   const mine = monteSaldo(currentOperator);
@@ -990,6 +1137,7 @@ function updateMonteDash() {
       if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
   };
+  if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
 function countUnsignaled() {
@@ -3263,6 +3411,7 @@ function updateMyTasksAlert() {
   const mine = getMyOpenTasks();
   if (mine.length === 0) {
     el.classList.add('hidden');
+    if (typeof updateOggiBox === 'function') updateOggiBox();
     return;
   }
   const alte = mine.filter(t => t.priorita === 'alta').length;
@@ -3284,6 +3433,7 @@ function updateMyTasksAlert() {
     showPage('tasks');
     renderTasks();
   };
+  if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
 function notifyTasksOnLogin() {
@@ -6768,6 +6918,7 @@ function updateMissioneDash() {
     updateMissioneMenuBadge(remaining);
   }
   el.onclick = () => { showPage('missione'); renderMissione(); };
+  if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
 async function refreshMissione() {
@@ -7170,6 +7321,7 @@ function updateConsegneDash() {
     showPage('consegne');
     renderConsegne();
   };
+  if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
 async function markConsegnaStato(id, stato) {
