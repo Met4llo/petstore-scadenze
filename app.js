@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.75 - Filtro Turni 2.0: Tutti / Solo i miei
+// VERSION 2.76 - Badge urgenti sul tasto Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1199,8 +1199,33 @@ function updateDashboard() {
   if (typeof updateMonteDash === 'function') updateMonteDash();
   renderSyncStatus();
   if (typeof updateOggiBox === 'function') updateOggiBox();
+  if (typeof updateHomeNavBadge === 'function') updateHomeNavBadge();
 }
 
+
+
+function countHomeUrgent() {
+  const expired = (typeof countExpiredOnShelf === 'function') ? countExpiredOnShelf() : 0;
+  const soon = products.filter(p => {
+    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d > 0 && d <= 7;
+  }).length;
+  return expired + soon;
+}
+
+function updateHomeNavBadge() {
+  const b = document.getElementById('home-nav-count');
+  if (!b) return;
+  const n = countHomeUrgent();
+  if (!n) {
+    b.classList.add('hidden');
+    b.textContent = '0';
+    return;
+  }
+  b.textContent = n > 99 ? '99+' : String(n);
+  b.classList.remove('hidden');
+}
 
 function urgentHotProducts() {
   return products.filter(p => {
