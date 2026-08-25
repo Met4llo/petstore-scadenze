@@ -729,3 +729,22 @@ body.sheet-open { overflow: hidden; }
   background: #5c3220 !important;
 }
 [data-theme="dark"] .prova-me-tag { background: #e07a4a; color: #1c1917; }
+
+/* v2.71 text size */
+html[data-text="large"] { font-size: 112.5%; }
+html[data-text="xl"] { font-size: 125%; }
+html[data-text="large"] .btn,
+html[data-text="xl"] .btn { min-height: 50px; }
+html[data-text="xl"] .btn-large { min-height: 56px; font-size: 1.05rem; }
+html[data-text="large"] .badge,
+html[data-text="xl"] .badge { font-size: 0.8rem; padding: 4px 8px; }
+html[data-text="large"] .product-name,
+html[data-text="xl"] .product-name { font-size: 1.08em; }
+html[data-text="large"] .prova-cell,
+html[data-text="xl"] .prova-cell { font-size: 0.88rem; min-height: 52px; }
+html[data-text="large"] .nav-btn span:last-child,
+html[data-text="xl"] .nav-btn { font-size: 0.82rem; }
+html[data-text="large"] .oggi-row-title,
+html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
+#page-settings .theme-toggle { flex-wrap: wrap; }
+#page-settings .theme-toggle .theme-btn { flex: 1 1 30%; }
