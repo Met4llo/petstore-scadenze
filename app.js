@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.62 - Scanner continuo + storico letture con Cambia data
+// VERSION 2.63 - Coda offline visibile (modifiche non ancora in cloud)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -479,10 +479,123 @@ async function loadSupplierConditions() {
 }
 
 // ---------- Save to Supabase ----------
-async function saveToCloud(product) {
+const PENDING_CLOUD_KEY = 'petstore_pending_cloud';
+let pendingCloud = [];
+try { pendingCloud = JSON.parse(localStorage.getItem(PENDING_CLOUD_KEY) || '[]') || []; }
+catch (e) { pendingCloud = []; }
+if (!Array.isArray(pendingCloud)) pendingCloud = [];
+
+function persistPendingCloud() {
+  try { localStorage.setItem(PENDING_CLOUD_KEY, JSON.stringify(pendingCloud.slice(0, 80))); } catch (e) {}
+  renderPendingCloud();
+}
+
+function summarizePendingProduct(p) {
+  if (!p) return 'Modifica prodotto';
+  const bits = [];
+  if (p.noExpiry) bits.push('senza scadenza');
+  else if (p.expiry) bits.push('scad. ' + (typeof formatExportDate === 'function' ? formatExportDate(p.expiry) : p.expiry));
+  else bits.push('senza data');
+  if (p.signaled) bits.push('segnalato');
+  return bits.join(' · ');
+}
+
+function enqueuePendingProduct(product, errMsg) {
+  if (!product || !product.ean) return;
+  pendingCloud = pendingCloud.filter(x => x.ean !== product.ean);
+  pendingCloud.unshift({
+    ean: product.ean,
+    name: product.name || product.ean,
+    summary: summarizePendingProduct(product),
+    at: Date.now(),
+    lastError: errMsg ? String(errMsg).slice(0, 120) : ''
+  });
+  persistPendingCloud();
+}
+
+function dequeuePendingProduct(ean) {
+  const n = pendingCloud.length;
+  pendingCloud = pendingCloud.filter(x => x.ean !== ean);
+  if (pendingCloud.length !== n) persistPendingCloud();
+  else renderPendingCloud();
+}
+
+function renderPendingCloud() {
+  const n = pendingCloud.length;
+  const badge = document.getElementById('pending-sync-count');
+  if (badge) {
+    badge.textContent = String(n);
+    badge.classList.toggle('hidden', n === 0);
+  }
+  const btn = document.getElementById('btn-sync');
+  if (btn) btn.classList.toggle('has-pending', n > 0);
+  const el = document.getElementById('pending-cloud');
+  if (!el) return;
+  if (!n) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  const shown = pendingCloud.slice(0, 5);
+  const extra = n - shown.length;
+  el.innerHTML = '<div class="pending-cloud-head"><div class="pending-cloud-title">' + n + (n === 1 ? ' modifica non in cloud' : ' modifiche non in cloud') + '</div><button type="button" class="btn btn-primary" id="btn-pending-retry">Riprova ora</button></div>' +
+    shown.map(item => {
+      const when = item.at ? new Date(item.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '';
+      const err = item.lastError ? '<div class="pending-cloud-err">' + escapeHtml(item.lastError) + '</div>' : '';
+      return '<button type="button" class="pending-cloud-item" data-ean="' + escapeHtml(item.ean) + '"><div class="pending-cloud-name">' + escapeHtml(item.name || item.ean) + '</div><div class="pending-cloud-sub">' + escapeHtml(item.summary || '') + (when ? ' · ' + when : '') + '</div>' + err + '</button>';
+    }).join('') +
+    (extra > 0 ? '<div class="pending-cloud-more">+' + extra + ' altre</div>' : '');
+  const retry = document.getElementById('btn-pending-retry');
+  if (retry) retry.onclick = (e) => { e.preventDefault(); e.stopPropagation(); flushPendingCloud({ silent: false }); };
+  el.querySelectorAll('.pending-cloud-item').forEach(btn => {
+    btn.onclick = () => {
+      const p = products.find(x => x.ean === btn.dataset.ean);
+      if (p) openProduct(p.ean, 'dashboard');
+    };
+  });
+}
+
+async function flushPendingCloud(opts) {
+  opts = opts || {};
+  if (!pendingCloud.length) {
+    renderPendingCloud();
+    return { ok: 0, fail: 0 };
+  }
   if (!supabase) {
-    console.error('supabase client is null');
-    showToast('Cloud non disponibile — salvato solo su questo telefono', 'warn');
+    if (!opts.silent) showToast('Niente rete: la coda resta su questo telefono', 'warn');
+    renderPendingCloud();
+    return { ok: 0, fail: pendingCloud.length };
+  }
+  let okN = 0, failN = 0;
+  const copy = pendingCloud.slice();
+  for (let i = 0; i < copy.length; i++) {
+    const item = copy[i];
+    const p = products.find(x => x.ean === item.ean);
+    if (!p) { dequeuePendingProduct(item.ean); continue; }
+    const saved = await saveToCloud(p, { fromQueue: true, silent: true });
+    if (saved) okN++;
+    else {
+      failN++;
+      const cur = pendingCloud.find(x => x.ean === item.ean);
+      if (cur) cur.lastError = 'Invio non riuscito';
+    }
+  }
+  persistPendingCloud();
+  if (!opts.silent) {
+    if (failN && okN) showToast('Inviate ' + okN + ', restano ' + failN, 'warn');
+    else if (failN) showToast('Coda non inviata — riprova', 'error');
+    else if (okN) showToast(okN === 1 ? '1 modifica inviata al cloud' : (okN + ' modifiche inviate al cloud'), 'success');
+  }
+  if (typeof updateOggiBox === 'function') updateOggiBox();
+  return { ok: okN, fail: failN };
+}
+
+async function saveToCloud(product, opts) {
+  opts = opts || {};
+  if (!supabase) {
+    enqueuePendingProduct(product, 'Niente cloud');
+    if (!opts.silent && !opts.fromQueue) showToast('Cloud non disponibile — salvato solo su questo telefono', 'warn');
     return false;
   }
   try {
@@ -495,21 +608,22 @@ async function saveToCloud(product) {
       last_modified: new Date().toISOString(),
       updated_by: currentOperator || 'Sconosciuto'
     };
-    console.log('Saving to Supabase:', payload);
     const { data, error } = await supabase
       .from('scadenze')
       .upsert(payload, { onConflict: 'ean' })
       .select();
     if (error) {
       console.error('Supabase save error:', error);
-      showToast('Errore cloud: ' + (error.message || JSON.stringify(error)), 'error');
+      enqueuePendingProduct(product, error.message || 'Errore cloud');
+      if (!opts.silent && !opts.fromQueue) showToast('Errore cloud: ' + (error.message || JSON.stringify(error)), 'error');
       return false;
     }
-    console.log('Save success:', data);
+    dequeuePendingProduct(product.ean);
     return true;
   } catch (err) {
     console.error('Save exception:', err);
-    showToast('Errore di rete: ' + err.message, 'error');
+    enqueuePendingProduct(product, err.message || 'Errore di rete');
+    if (!opts.silent && !opts.fromQueue) showToast('Errore di rete: ' + err.message, 'error');
     return false;
   }
 }
@@ -823,6 +937,20 @@ function escapeHtml(str) {
 
 function collectOggiItems() {
   const items = [];
+  if (pendingCloud && pendingCloud.length) {
+    items.push({
+      id: 'pending',
+      tone: 'hot',
+      title: 'Modifiche non in cloud',
+      sub: pendingCloud.length === 1 ? '1 salvataggio solo su questo telefono' : (pendingCloud.length + ' salvataggi solo su questo telefono'),
+      count: pendingCloud.length,
+      go: function() {
+        const box = document.getElementById('pending-cloud');
+        if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        flushPendingCloud({ silent: false });
+      }
+    });
+  }
   const expired = (typeof countExpiredOnShelf === 'function') ? countExpiredOnShelf() : 0;
   const hot = (typeof urgentHotProducts === 'function') ? urgentHotProducts().length : 0;
   if (expired || hot) {
@@ -1196,6 +1324,10 @@ function renderSyncStatus() {
     el.classList.add('is-ok');
   } else {
     el.textContent = 'Solo locale · ' + formatSyncTime(lastSyncAt) + ' · tocca per riprovare';
+    el.classList.add('is-warn');
+  }
+  if (pendingCloud.length) {
+    el.textContent = pendingCloud.length + (pendingCloud.length === 1 ? ' modifica in coda' : ' modifiche in coda') + ' · tocca per inviare';
     el.classList.add('is-warn');
   }
   el.onclick = () => { if (typeof manualSync === 'function') manualSync(); };
@@ -3010,6 +3142,7 @@ async function runSync(silent) {
   autoSyncRunning = true;
   try {
     if (!silent) showToast('Sincronizzazione in corso...', 'info');
+    await flushPendingCloud({ silent: true });
     await loadEanRinomin();
     await loadCustomProducts();
     await loadScadenzeFromCloud();
@@ -8316,6 +8449,10 @@ async function init() {
       runSync(true);
     }
   });
+  window.addEventListener('online', () => {
+    if (currentOperator) flushPendingCloud({ silent: true }).then(() => { if (pendingCloud.length) runSync(true); });
+  });
+  renderPendingCloud();
 
   const btnNewSettimana = document.getElementById('btn-new-settimana');
   if (btnNewSettimana) btnNewSettimana.onclick = openNewSettimanaForm;
