@@ -190,3 +190,22 @@ body.sheet-open { overflow: hidden; }
   color: #fafaf9;
 }
 [data-theme="dark"] .list-active-reset { color: #fdba74; }
+
+/* v2.59 consultazione turni */
+#page-turni-prova.is-consult .prova-edit-only { display: none !important; }
+#page-turni-prova.is-consult .prova-grid-wrap {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--card);
+}
+#page-turni-prova.is-consult .prova-grid-wrap select {
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none !important;
+  opacity: 1;
+  cursor: default;
+}
+.monte-ore-panel.is-readonly .monte-edit-form { display: none !important; }
+.monte-ore-panel.is-readonly .monte-form-title:first-of-type { display: none; }
