@@ -793,3 +793,22 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
   color: #fff;
   border-color: transparent;
 }
+
+/* v2.74 undo toast */
+.toast.has-undo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: normal;
+}
+.toast-msg { flex: 1; }
+.toast-undo {
+  border: 0;
+  background: transparent;
+  color: #fed7aa;
+  font-weight: 800;
+  font-size: 0.92rem;
+  padding: 8px 4px;
+  min-height: 40px;
+}
+[data-theme="dark"] .toast-undo { color: #fdba74; }
