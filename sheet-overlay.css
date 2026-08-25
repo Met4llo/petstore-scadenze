@@ -96,3 +96,53 @@ body.sheet-open { overflow: hidden; }
 [data-theme="dark"] .sheet-handle { background: #57534e; }
 
 .list-header .dash-kicker { margin-bottom: 0; }
+
+/* v2.57 urgent banner */
+.urgent-alert {
+  background: #fff7ed;
+  border: 1.5px solid #fdba74;
+  border-left: 6px solid #ea580c;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.urgent-alert.is-expired {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  border-left-color: #dc2626;
+}
+.urgent-alert-title {
+  font-weight: 800;
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+}
+.urgent-alert-sub {
+  margin-top: 4px;
+  font-size: 0.84rem;
+  color: var(--muted);
+  font-weight: 550;
+  line-height: 1.35;
+}
+.urgent-alert-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.urgent-alert-actions .btn {
+  width: 100%;
+  margin: 0;
+  min-height: 44px;
+}
+[data-theme="dark"] .urgent-alert {
+  background: #431407;
+  border-color: #c2410c;
+  color: #fed7aa;
+}
+[data-theme="dark"] .urgent-alert.is-expired {
+  background: #450a0a;
+  border-color: #b91c1c;
+  color: #fecaca;
+}
+[data-theme="dark"] .urgent-alert-sub { color: #fdba74; }
