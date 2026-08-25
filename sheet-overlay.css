@@ -748,3 +748,39 @@ html[data-text="large"] .oggi-row-title,
 html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
 #page-settings .theme-toggle { flex-wrap: wrap; }
 #page-settings .theme-toggle .theme-btn { flex: 1 1 30%; }
+
+/* v2.72 swipe card */
+.product-list { overflow-x: hidden; }
+.product-card, .scan-hist-row {
+  position: relative;
+  transition: transform 0.16s ease;
+  touch-action: pan-y;
+}
+.product-card.is-swipe-signal,
+.scan-hist-row.is-swipe-signal {
+  background: #dcfce7 !important;
+}
+.product-card.is-swipe-date,
+.scan-hist-row.is-swipe-date {
+  background: #ffedd5 !important;
+}
+.product-card.is-swipe-signal::after,
+.scan-hist-row.is-swipe-signal::after {
+  content: 'Segnala';
+  position: absolute; left: 12px; top: 12px;
+  font-weight: 800; font-size: 0.78rem; color: #166534;
+}
+.product-card.is-swipe-date::after,
+.scan-hist-row.is-swipe-date::after {
+  content: 'Cambia';
+  position: absolute; right: 12px; top: 12px;
+  font-weight: 800; font-size: 0.78rem; color: #9a3412;
+}
+[data-theme="dark"] .product-card.is-swipe-signal,
+[data-theme="dark"] .scan-hist-row.is-swipe-signal { background: #14532d !important; }
+[data-theme="dark"] .product-card.is-swipe-date,
+[data-theme="dark"] .scan-hist-row.is-swipe-date { background: #7c2d12 !important; }
+[data-theme="dark"] .product-card.is-swipe-signal::after,
+[data-theme="dark"] .scan-hist-row.is-swipe-signal::after { color: #bbf7d0; }
+[data-theme="dark"] .product-card.is-swipe-date::after,
+[data-theme="dark"] .scan-hist-row.is-swipe-date::after { color: #fed7aa; }
