@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.60 - Checklist «Cosa fare oggi» in Home
+// VERSION 2.61 - Tap-to-focus scanner + fotocamera iPhone (niente zoom/tele)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -2572,15 +2572,112 @@ function scanFormats() {
   return [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128];
 }
 
+function isAppleMobile() {
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 async function pickBackCameraId() {
+  if (isAppleMobile()) return null;
   try {
     const cams = await Html5Qrcode.getCameras();
     if (!cams || !cams.length) return null;
-    const back = cams.find(c => /back|rear|environment|dietro|indietro|trasera/i.test(c.label || ''));
-    return (back || cams[cams.length - 1] || cams[0]).id;
+    const backs = cams.filter(c => /back|rear|environment|dietro|indietro|trasera/i.test(c.label || ''));
+    const pool = backs.length ? backs : cams;
+    const wide = pool.find(c => {
+      const lab = c.label || '';
+      if (/ultra|tele|macro|truedepth|front|frontale/i.test(lab)) return false;
+      return /wide|grandangolo|posterior/i.test(lab) || /back|rear|dietro/i.test(lab);
+    });
+    return (wide || pool[0] || cams[0]).id;
   } catch (e) {
     return null;
   }
+}
+
+function showScanFocusReticle(clientX, clientY) {
+  const box = document.getElementById('reader');
+  if (!box) return;
+  const rect = box.getBoundingClientRect();
+  let el = box.querySelector('.scan-focus-reticle');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'scan-focus-reticle';
+    el.setAttribute('aria-hidden', 'true');
+    box.appendChild(el);
+  }
+  el.style.left = (clientX - rect.left) + 'px';
+  el.style.top = (clientY - rect.top) + 'px';
+  el.classList.remove('is-on');
+  void el.offsetWidth;
+  el.classList.add('is-on');
+  clearTimeout(showScanFocusReticle._t);
+  showScanFocusReticle._t = setTimeout(() => { if (el) el.classList.remove('is-on'); }, 750);
+}
+
+async function applyTapFocus(nx, ny) {
+  const track = getScanVideoTrack();
+  if (!track) return false;
+  let cap = {};
+  try {
+    if (typeof track.getCapabilities === 'function') cap = track.getCapabilities() || {};
+  } catch (e) { cap = {}; }
+  const tries = [];
+  const poi = [{ x: Math.min(1, Math.max(0, nx)), y: Math.min(1, Math.max(0, ny)) }];
+  if (cap.pointsOfInterest) {
+    tries.push({ advanced: [{ pointsOfInterest: poi }] });
+    if (cap.focusMode && cap.focusMode.indexOf('manual') >= 0) {
+      tries.push({ advanced: [{ focusMode: 'manual', pointsOfInterest: poi }] });
+    }
+  }
+  if (cap.focusMode) {
+    if (cap.focusMode.indexOf('single-shot') >= 0) tries.push({ advanced: [{ focusMode: 'single-shot' }] });
+    if (cap.focusMode.indexOf('continuous') >= 0) tries.push({ advanced: [{ focusMode: 'continuous' }] });
+  }
+  tries.push({ advanced: [{ focusMode: 'continuous' }] });
+  tries.push({ advanced: [{ pointsOfInterest: poi }] });
+  if (cap.zoom) {
+    let z = 1;
+    try { z = (track.getSettings() || {}).zoom || cap.zoom.min || 1; } catch (e) {}
+    const bumped = Math.min(cap.zoom.max || z, z * 1.04);
+    tries.push({ advanced: [{ zoom: bumped }] });
+  }
+  for (let i = 0; i < tries.length; i++) {
+    try {
+      await track.applyConstraints(tries[i]);
+      if (tries[i].advanced && tries[i].advanced[0] && tries[i].advanced[0].zoom != null && cap.zoom) {
+        const z0 = (track.getSettings() || {}).zoom;
+        setTimeout(() => {
+          try { track.applyConstraints({ advanced: [{ zoom: z0 || cap.zoom.min || 1 }] }); } catch (e) {}
+        }, 180);
+      }
+      return true;
+    } catch (e) {}
+  }
+  return false;
+}
+
+function handleScanTapFocus(ev) {
+  if (!isScanning) return;
+  if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+  const box = document.getElementById('reader');
+  const video = box && box.querySelector('video');
+  if (!video) return;
+  const rect = video.getBoundingClientRect();
+  if (ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const nx = (ev.clientX - rect.left) / Math.max(1, rect.width);
+  const ny = (ev.clientY - rect.top) / Math.max(1, rect.height);
+  showScanFocusReticle(ev.clientX, ev.clientY);
+  applyTapFocus(nx, ny);
+}
+
+function bindScanTapFocus() {
+  const box = document.getElementById('reader');
+  if (!box || box.dataset.focusBound) return;
+  box.dataset.focusBound = '1';
+  box.addEventListener('pointerdown', handleScanTapFocus, { passive: false });
 }
 
 async function boostScanTrack() {
@@ -2588,16 +2685,19 @@ async function boostScanTrack() {
   if (!track || typeof track.getCapabilities !== 'function') return;
   let cap = {};
   try { cap = track.getCapabilities() || {}; } catch (e) { return; }
+  const ios = isAppleMobile();
   const cons = {};
-  if (cap.width) cons.width = { ideal: Math.min(1920, cap.width.max || 1920) };
-  if (cap.height) cons.height = { ideal: Math.min(1080, cap.height.max || 1080) };
-  if (cap.frameRate) cons.frameRate = { ideal: Math.min(30, cap.frameRate.max || 30) };
+  if (!ios) {
+    if (cap.width) cons.width = { ideal: Math.min(1280, cap.width.max || 1280) };
+    if (cap.height) cons.height = { ideal: Math.min(720, cap.height.max || 720) };
+  }
+  if (cap.frameRate) cons.frameRate = { ideal: Math.min(24, cap.frameRate.max || 24) };
   const advanced = [];
   if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) advanced.push({ focusMode: 'continuous' });
-  if (cap.zoom) {
+  if (!ios && cap.zoom) {
     const min = cap.zoom.min || 1;
     const max = cap.zoom.max || 1;
-    advanced.push({ zoom: Math.min(max, Math.max(min, 1.5)) });
+    advanced.push({ zoom: Math.min(max, Math.max(min, 1.1)) });
   }
   if (advanced.length) cons.advanced = advanced;
   if (!Object.keys(cons).length) return;
@@ -2617,36 +2717,55 @@ async function startScanner() {
   if (formats) ctorOpts.formatsToSupport = formats;
 
   const qrbox = scanQrboxSize;
+  const ios = isAppleMobile();
   const cameraId = await pickBackCameraId();
   const attempts = [];
+  if (ios) {
+    attempts.push({
+      cam: { facingMode: { ideal: 'environment' } },
+      cfg: {
+        fps: 12,
+        qrbox: qrbox,
+        disableFlip: true,
+        videoConstraints: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      }
+    });
+    attempts.push({
+      cam: { facingMode: 'environment' },
+      cfg: { fps: 10, qrbox: qrbox, disableFlip: true }
+    });
+  }
   if (cameraId) {
     attempts.push({
       cam: cameraId,
       cfg: {
-        fps: 18,
+        fps: 16,
         qrbox: qrbox,
         disableFlip: true,
-        aspectRatio: 1.777,
         videoConstraints: {
           deviceId: { exact: cameraId },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 24 }
         }
       }
     });
-    attempts.push({ cam: cameraId, cfg: { fps: 16, qrbox: qrbox, disableFlip: true } });
+    attempts.push({ cam: cameraId, cfg: { fps: 14, qrbox: qrbox, disableFlip: true } });
   }
   attempts.push({
     cam: { facingMode: 'environment' },
     cfg: {
-      fps: 18,
+      fps: 16,
       qrbox: qrbox,
       disableFlip: true,
       videoConstraints: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       }
     }
   });
@@ -2665,11 +2784,19 @@ async function startScanner() {
       const bs = document.getElementById('btn-start-scanner');
       if (bs) bs.classList.add('hidden');
       torchOn = false;
+      bindScanTapFocus();
+      const vid = document.querySelector('#reader video');
+      if (vid) {
+        vid.setAttribute('playsinline', '');
+        vid.setAttribute('webkit-playsinline', '');
+        vid.setAttribute('autoplay', '');
+        vid.muted = true;
+      }
       setTimeout(async () => {
         await boostScanTrack();
         const hasTorch = await detectTorch();
         updateTorchButton(hasTorch);
-      }, 500);
+      }, 400);
       return;
     } catch (err) {
       lastErr = err;
