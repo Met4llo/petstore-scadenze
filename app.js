@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.69 - Pull-to-refresh in Home
+// VERSION 2.70 - Evidenzia la riga dell’operatore loggato in Turni 2.0
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4887,7 +4887,8 @@ function renderTurniProva() {
     const mal = provaMalattiaDays(op);
     const over = lav > 40.4 ? ' is-over' : '';
     const rc = provaRoleCounts(op);
-    html += `<tr><th>${opChip(op)}<small class="prova-ore${over}">${fmtOreShort(lav)}h` + (mal ? ' · ' + mal + ' mal.' : '') + ` · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
+    const isMe = currentOperator && op === currentOperator;
+    html += `<tr class="${isMe ? 'prova-row-me' : ''}"><th>${opChip(op)}${isMe ? '<span class="prova-me-tag">tu</span>' : ''}<small class="prova-ore${over}">${fmtOreShort(lav)}h` + (mal ? ' · ' + mal + ' mal.' : '') + ` · A${rc.A} S${rc.S} C${rc.C}</small></th>`;
     for (let i = 0; i < 7; i++) {
       const v = provaCell(op, i);
       const pv = provaPvClass(op, i);
