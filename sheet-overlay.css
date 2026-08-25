@@ -700,3 +700,32 @@ body.sheet-open { overflow: hidden; }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 [data-theme="dark"] .ptr-indicator { color: #a8a29e; }
 [data-theme="dark"] .ptr-indicator.is-armed { color: #fdba74; }
+
+/* v2.70 riga turni "tu" */
+#page-turni-prova tr.prova-row-me th,
+#page-turni-prova tr.prova-row-me td {
+  box-shadow: inset 0 0 0 2px var(--primary, #c45a2a);
+}
+#page-turni-prova tr.prova-row-me th {
+  background: var(--primary-soft, #f8eadc) !important;
+}
+.prova-me-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--primary, #c45a2a);
+  color: #fff;
+  vertical-align: middle;
+}
+#page-turni-prova .prova-table tbody tr.prova-row-me th {
+  z-index: 4;
+}
+[data-theme="dark"] #page-turni-prova tr.prova-row-me th {
+  background: #5c3220 !important;
+}
+[data-theme="dark"] .prova-me-tag { background: #e07a4a; color: #1c1917; }
