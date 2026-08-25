@@ -387,3 +387,14 @@ body.sheet-open { overflow: hidden; }
 [data-theme="dark"] .pending-cloud-item { background: rgba(0,0,0,.25); }
 [data-theme="dark"] .pending-cloud-err { color: #fca5a5; }
 [data-theme="dark"] #btn-sync.has-pending { color: #fca5a5; }
+
+/* v2.64 iPhone no zoom */
+#reader.ios-scan video,
+#reader.ios-scan canvas,
+.scanner-box.ios-scan video {
+  transform: none !important;
+  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+#reader.ios-scan #qr-shaded-region { display: none !important; }
