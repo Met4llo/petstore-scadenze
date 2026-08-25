@@ -784,3 +784,12 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
 [data-theme="dark"] .scan-hist-row.is-swipe-signal::after { color: #bbf7d0; }
 [data-theme="dark"] .product-card.is-swipe-date::after,
 [data-theme="dark"] .scan-hist-row.is-swipe-date::after { color: #fed7aa; }
+
+/* v2.73 missione hide done */
+.missione-hide-bar { margin: 0 0 12px; }
+.missione-hide-bar .theme-btn { width: 100%; }
+.missione-hide-bar .theme-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
