@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.58 - Filtri lista combinabili + ricerca nome/EAN/fornitore
+// VERSION 2.59 - Turni 2.0 sola consultazione visibile (bottoni e form nascosti)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4264,9 +4264,17 @@ function applyProvaLockUi() {
   const locked = provaIsLocked();
   const canEdit = canEditTurniProva();
   const readOnly = locked || !canEdit;
+  const page = document.getElementById('page-turni-prova');
+  if (page) page.classList.toggle('is-consult', !canEdit);
+  document.querySelectorAll('#page-turni-prova .prova-edit-only').forEach(b => {
+    b.classList.toggle('hidden', !canEdit);
+    b.disabled = readOnly;
+  });
   ['btn-prova-generate', 'btn-prova-swap', 'btn-prova-save', 'btn-prova-draft-save', 'btn-prova-draft-load'].forEach(id => {
     const b = document.getElementById(id);
-    if (b) b.disabled = readOnly;
+    if (!b) return;
+    b.disabled = readOnly;
+    if (!canEdit) b.classList.add('hidden');
   });
   const unlock = document.getElementById('btn-prova-unlock');
   if (unlock) {
@@ -4276,14 +4284,24 @@ function applyProvaLockUi() {
   if (grid) {
     grid.querySelectorAll('select').forEach(s => { s.disabled = readOnly; });
     grid.classList.toggle('is-locked', readOnly);
+    grid.classList.toggle('is-consult', !canEdit);
+    if (!grid.dataset.consultBound) {
+      grid.dataset.consultBound = '1';
+      grid.addEventListener('click', () => {
+        if (!canEditTurniProva()) {
+          showToast('Turni 2.0: solo Fuschi e Santoemma possono modificare', 'warn');
+        }
+      });
+    }
   }
-  // Monte ore: stessi permessi (solo Fuschi e Santoemma)
   ['monte-op', 'monte-data', 'monte-segno', 'monte-ore', 'monte-motivo', 'btn-monte-add', 'btn-monte-cancel'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !canEdit;
   });
   const panel = document.getElementById('monte-ore-panel');
   if (panel) panel.classList.toggle('is-readonly', !canEdit);
+  const form = document.getElementById('monte-edit-form');
+  if (form) form.classList.toggle('hidden', !canEdit);
 }
 
 function setProvaSwapUi() {
@@ -4518,8 +4536,21 @@ function renderProvaCheck() {
   if (!el) return;
   applyProvaLockUi();
   if (!canEditTurniProva()) {
-    el.className = 'prova-check is-warn';
-    el.innerHTML = 'Solo consultazione — possono modificare Fuschi e Santoemma.';
+    const issuesR = provaValidate();
+    const emptyR = OPERATORS.every(op => {
+      for (let i = 0; i < 7; i++) if (provaCell(op, i)) return false;
+      return true;
+    });
+    if (emptyR) {
+      el.className = 'prova-check is-empty';
+      el.innerHTML = 'Settimana non ancora compilata.';
+    } else if (issuesR.length) {
+      el.className = 'prova-check is-warn';
+      el.innerHTML = issuesR.slice(0, 4).map(x => escapeHtml(x)).join('<br>');
+    } else {
+      el.className = 'prova-check is-ok';
+      el.innerHTML = 'Turni della settimana.';
+    }
     return;
   }
   if (provaSundayPassed()) {
