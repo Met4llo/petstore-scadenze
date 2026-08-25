@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.73 - Missione: nascondi già fatti (default on)
+// VERSION 2.74 - Annulla ultima azione (segnala, data, missione)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -682,6 +682,14 @@ function inferToastType(msg) {
   if (/salvato|sincronizzat|completata|completato|pubblicato|archiviato|eliminat|aggiunto|creato|caricata|copiato|aggiornato|consegn/.test(m)) return 'success';
   return 'info';
 }
+let lastUndo = null;
+
+function hideToast() {
+  const t = document.getElementById('toast');
+  if (t) t.classList.add('hidden');
+  if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+}
+
 function showToast(msg, duration, type) {
   if (typeof duration === 'string') {
     type = duration;
@@ -691,11 +699,52 @@ function showToast(msg, duration, type) {
   type = type || inferToastType(msg);
   const t = document.getElementById('toast');
   if (!t) return;
+  lastUndo = null;
   t.textContent = msg;
   t.className = 'toast toast-' + type;
+  t.classList.remove('hidden');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.add('hidden'), duration);
   if (type === 'success' || type === 'error' || type === 'warn') appFeedback(type);
+}
+
+function showUndoToast(msg, undoFn) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  lastUndo = { fn: undoFn, at: Date.now() };
+  t.innerHTML = '<span class="toast-msg">' + escapeHtml(msg) + '</span><button type="button" class="toast-undo" id="btn-toast-undo">Annulla</button>';
+  t.className = 'toast toast-success has-undo';
+  t.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { lastUndo = null; t.classList.add('hidden'); }, 5500);
+  const btn = document.getElementById('btn-toast-undo');
+  if (btn) btn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    runLastUndo();
+  };
+  appFeedback('success');
+}
+
+async function runLastUndo() {
+  const u = lastUndo;
+  lastUndo = null;
+  hideToast();
+  if (!u || typeof u.fn !== 'function') return;
+  try { await u.fn(); }
+  catch (e) { showToast('Impossibile annullare', 'error'); }
+}
+
+function refreshProductViews() {
+  if (typeof updateDashboard === 'function') updateDashboard();
+  const listPage = document.getElementById('page-list');
+  if (listPage && listPage.classList.contains('active')) renderFilteredList();
+  const scanPage = document.getElementById('page-scanner');
+  if (scanPage && scanPage.classList.contains('active')) {
+    const q = (document.getElementById('search-input') || {}).value || '';
+    if (q.trim().length >= 2) doSearch(q);
+    if (typeof renderScanHistory === 'function') renderScanHistory();
+  }
 }
 
 function showPage(pageId) {
@@ -1928,22 +1977,22 @@ async function quickSetExpiry(ean, iso) {
       noExpiry: !!p.noExpiry,
       note: (p.note || '').trim()
     });
-    showToast('Scadenza aggiornata', 'success');
+    const prevExp = before.expiry;
+    showUndoToast('Scadenza aggiornata', async () => {
+      const cur = products.find(x => x.ean === ean);
+      if (!cur) return;
+      cur.expiry = prevExp;
+      cur.lastModified = Date.now();
+      cur.updatedBy = currentOperator || 'Sconosciuto';
+      await saveToCloud(cur);
+      try { await idbPut(STORE_PRODUCTS, cur); } catch (e) {}
+      refreshProductViews();
+      showToast('Data annullata', 'info');
+    });
   } else {
     showToast('Salvato in locale — il collega non lo vede ancora', 'warn');
   }
-  updateDashboard();
-  const listPage = document.getElementById('page-list');
-  if (listPage && listPage.classList.contains('active')) {
-    const lf = document.getElementById('list-filter');
-    renderFilteredList();
-  }
-  const scanPage = document.getElementById('page-scanner');
-  if (scanPage && scanPage.classList.contains('active')) {
-    const q = (document.getElementById('search-input') || {}).value || '';
-    if (q.trim().length >= 2) doSearch(q);
-    if (typeof renderScanHistory === 'function') renderScanHistory();
-  }
+  refreshProductViews();
 }
 
 async function quickSignalProduct(ean, opts) {
@@ -1979,21 +2028,27 @@ async function quickSignalProduct(ean, opts) {
       noExpiry: !!p.noExpiry,
       note: (p.note || '').trim()
     });
-    if (!silent) showToast('Segnalato', 'success');
+    if (!silent) {
+      showUndoToast('Segnalato', async () => {
+        const cur = products.find(x => x.ean === ean);
+        if (!cur) return;
+        cur.signaled = false;
+        cur.signaledDate = null;
+        cur.lastModified = Date.now();
+        cur.updatedBy = currentOperator || 'Sconosciuto';
+        await saveToCloud(cur);
+        try { await idbPut(STORE_PRODUCTS, cur); } catch (e) {}
+        refreshProductViews();
+        showToast('Segnalazione annullata', 'info');
+      });
+    }
   } else {
     if (!silent) showToast('Segnalato in locale — il collega non lo vede ancora', 'warn');
   }
-  if (!silent) updateDashboard();
-  const listPage = document.getElementById('page-list');
-  if (listPage && listPage.classList.contains('active')) {
-    const lf = document.getElementById('list-filter');
-    renderFilteredList();
-  }
-  const scanPage = document.getElementById('page-scanner');
-  if (scanPage && scanPage.classList.contains('active')) {
-    const q = (document.getElementById('search-input') || {}).value || '';
-    if (q.trim().length >= 2) doSearch(q);
-    if (typeof renderScanHistory === 'function') renderScanHistory();
+  if (!silent) refreshProductViews();
+  else {
+    const listPage = document.getElementById('page-list');
+    if (listPage && listPage.classList.contains('active')) renderFilteredList();
   }
 }
 
@@ -7177,12 +7232,28 @@ async function markProductChecked(ean) {
       completed_at: new Date().toISOString()
     }, { onConflict: 'data,operator' });
     await loadMissioneProgress();
-    showToast('Missione completata');
+    showUndoToast('Missione completata', () => unmarkProductChecked(ean));
   } else {
-    showToast('Prodotto controllato ✓');
+    showUndoToast('Prodotto controllato', () => unmarkProductChecked(ean));
   }
   renderMissione();
   updateMissioneDash();
+}
+
+async function unmarkProductChecked(ean) {
+  if (!supabase || !missioneOggi || !currentOperator || !ean) return;
+  await supabase.from('missioni_progress').delete()
+    .eq('data', missioneOggi.data).eq('ean', ean).eq('operator', currentOperator);
+  await loadMissioneProgress();
+  const prog = myMissionProgress();
+  if (prog.done < prog.total) {
+    await supabase.from('missioni_completate').delete()
+      .eq('data', missioneOggi.data).eq('operator', currentOperator);
+    await loadMissioneProgress();
+  }
+  renderMissione();
+  updateMissioneDash();
+  showToast('Controllo annullato', 'info');
 }
 
 function renderMissione() {
