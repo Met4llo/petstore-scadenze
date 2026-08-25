@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.56 - Overlay sheet nativi: swipe, tap fuori, animazione, tastiera
+// VERSION 2.57 - Alert proattivi scadenze in Home + avviso ad inizio turno
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -880,9 +880,94 @@ function updateDashboard() {
     });
   }
   updateSegnalareCount();
+  if (typeof updateUrgentAlert === 'function') updateUrgentAlert();
   if (typeof updateMissioneDash === 'function') updateMissioneDash();
   if (typeof updateMonteDash === 'function') updateMonteDash();
   renderSyncStatus();
+}
+
+
+function urgentHotProducts() {
+  return products.filter(p => {
+    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 7;
+  });
+}
+
+function countExpiredOnShelf() {
+  return products.filter(p => {
+    if (!p.expiry || p.noExpiry) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 0;
+  }).length;
+}
+
+function updateUrgentAlert() {
+  const el = document.getElementById('urgent-alert');
+  if (!el) return;
+  const hot = urgentHotProducts();
+  const expired = countExpiredOnShelf();
+  const unsig7 = hot.length;
+  if (!expired && !unsig7) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  el.classList.toggle('is-expired', expired > 0);
+  const bits = [];
+  if (expired) bits.push(expired === 1 ? '1 scaduto' : (expired + ' scaduti'));
+  if (unsig7) bits.push(unsig7 === 1 ? '1 entro 7 giorni da segnalare' : (unsig7 + ' entro 7 giorni da segnalare'));
+  const title = bits.join(' · ');
+  let actions = '<button type="button" class="btn btn-primary" id="btn-urgent-list">Vedi lista</button>';
+  if (unsig7) actions += '<button type="button" class="btn btn-secondary" id="btn-urgent-signal">Segnala tutti (' + unsig7 + ')</button>';
+  el.innerHTML = '<div class="urgent-alert-title">Priorità scadenze</div><div class="urgent-alert-sub">' + title + '</div><div class="urgent-alert-actions">' + actions + '</div>';
+  const listBtn = document.getElementById('btn-urgent-list');
+  if (listBtn) listBtn.onclick = () => {
+    setListFilter(expired ? 'expired' : 'urgent');
+    showPage('list');
+  };
+  const sigBtn = document.getElementById('btn-urgent-signal');
+  if (sigBtn) sigBtn.onclick = () => signalAllUrgent();
+}
+
+async function signalAllUrgent() {
+  const list = urgentHotProducts();
+  if (!list.length) {
+    showToast('Niente da segnalare', 'info');
+    return;
+  }
+  showToast('Segnalazione di ' + list.length + ' prodotti...', 'info');
+  let okN = 0, locN = 0;
+  for (const p of list) {
+    const beforeSignaled = !!p.signaled;
+    await quickSignalProduct(p.ean, { silent: true });
+    if (p.signaled && !beforeSignaled) {
+      /* count after */
+    }
+    okN++;
+  }
+  updateDashboard();
+  const left = urgentHotProducts().length;
+  if (!left) showToast('Segnalati ' + okN + ' urgenti', 'success');
+  else showToast('Segnalati. Restano ' + left + ' da rivedere', 'warn');
+}
+
+function notifyUrgentOnLogin() {
+  const n = urgentHotProducts().length + (countExpiredOnShelf() ? 1 : 0);
+  const hot = urgentHotProducts().length;
+  const exp = countExpiredOnShelf();
+  if (!hot && !exp) return;
+  const key = 'petstore_urgent_ping_' + todayStr() + '_' + (currentOperator || '');
+  try {
+    if (localStorage.getItem(key) === '1') return;
+    localStorage.setItem(key, '1');
+  } catch (e) {}
+  const parts = [];
+  if (exp) parts.push(exp === 1 ? '1 scaduto' : (exp + ' scaduti'));
+  if (hot) parts.push(hot === 1 ? '1 da segnalare (≤7 gg)' : (hot + ' da segnalare (≤7 gg)'));
+  showToast('Scadenze: ' + parts.join(' · '), 'warn');
 }
 
 function updateMonteDash() {
@@ -1431,7 +1516,7 @@ async function quickSetExpiry(ean, iso) {
   }
 }
 
-async function quickSignalProduct(ean) {
+async function quickSignalProduct(ean, opts) {
   const p = products.find(x => x.ean === ean);
   if (!p) return;
   if (!needsQuickSignal(p)) {
@@ -1451,7 +1536,8 @@ async function quickSignalProduct(ean) {
   p.signaledDate = today;
   p.lastModified = Date.now();
   p.updatedBy = currentOperator || 'Sconosciuto';
-  showToast('Segnalazione in corso...', 'info');
+  const silent = !!(opts && opts.silent);
+  if (!silent) showToast('Segnalazione in corso...', 'info');
   const ok = await saveToCloud(p);
   try { await idbPut(STORE_PRODUCTS, p); } catch (e) {}
   if (ok) {
@@ -1463,11 +1549,11 @@ async function quickSignalProduct(ean) {
       noExpiry: !!p.noExpiry,
       note: (p.note || '').trim()
     });
-    showToast('Segnalato', 'success');
+    if (!silent) showToast('Segnalato', 'success');
   } else {
-    showToast('Segnalato in locale — il collega non lo vede ancora', 'warn');
+    if (!silent) showToast('Segnalato in locale — il collega non lo vede ancora', 'warn');
   }
-  updateDashboard();
+  if (!silent) updateDashboard();
   const listPage = document.getElementById('page-list');
   if (listPage && listPage.classList.contains('active')) {
     const lf = document.getElementById('list-filter');
@@ -2506,6 +2592,7 @@ function enterApp() {
   document.getElementById('app').classList.remove('hidden');
   updateOperatorUI();
   updateDashboard();
+  notifyUrgentOnLogin();
   loadBacheca();
   loadTasks().then(() => notifyTasksOnLogin());
   loadTurni();
