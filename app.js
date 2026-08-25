@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.57 - Alert proattivi scadenze in Home + avviso ad inizio turno
+// VERSION 2.58 - Filtri lista combinabili + ricerca nome/EAN/fornitore
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -732,7 +732,7 @@ function closeUnsavedDialog() {
 function runPageEnter(page) {
   if (page === 'list') {
     const lf = document.getElementById('list-filter');
-    renderFilteredList(lf ? lf.value : 'all');
+    renderFilteredList();
   }
   if (page === 'dashboard') {
     updateDashboard();
@@ -1053,12 +1053,84 @@ function renderSyncStatus() {
 }
 
 // ---------- List / Filter ----------
-function setListFilter(filter) {
+let listBand = 'all';
+let listSignal = '';
+
+const LIST_BAND_LABELS = {
+  all: 'Senza data',
+  'no-date': 'Senza data',
+  expired: 'Scaduti',
+  urgent: '7 gg',
+  attention: '30 gg',
+  monitor: '120 gg',
+  'no-expiry': 'Esclusi',
+  'no-supplier': 'Senza fornitore',
+  'with-date': 'Con data'
+};
+const LIST_SIGNAL_LABELS = {
+  unsignaled: 'Da segnalare',
+  signaled: 'Segnalati'
+};
+
+function isSignalFilter(filter) {
+  return filter === 'unsignaled' || filter === 'signaled';
+}
+
+function syncListFilterSelect() {
   const lf = document.getElementById('list-filter');
-  if (lf) lf.value = filter;
-  renderFilteredList(filter);
+  if (lf) lf.value = listSignal || listBand || 'all';
+}
+
+function setListFilter(filter) {
+  if (isSignalFilter(filter)) {
+    listSignal = filter;
+    listBand = 'all';
+    if (filter === 'unsignaled' || filter === 'signaled') listBand = 'with-date';
+  } else {
+    listBand = filter || 'all';
+    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry' || filter === 'no-supplier') {
+      listSignal = '';
+    }
+  }
+  syncListFilterSelect();
+  renderFilteredList();
 }
 window.setListFilter = setListFilter;
+
+function onListChipClick(filter, kind) {
+  if (kind === 'signal' || isSignalFilter(filter)) {
+    listSignal = (listSignal === filter) ? '' : filter;
+    if (listSignal && (listBand === 'all' || listBand === 'no-date' || listBand === 'no-expiry' || listBand === 'no-supplier')) {
+      listBand = 'with-date';
+    }
+  } else {
+    listBand = filter || 'all';
+  }
+  syncListFilterSelect();
+  renderFilteredList();
+}
+
+function resetListFilters() {
+  listBand = 'all';
+  listSignal = '';
+  const sel = document.getElementById('list-supplier');
+  if (sel) { sel.value = ''; sel.classList.remove('is-on'); }
+  const clr = document.getElementById('btn-clear-supplier');
+  if (clr) clr.classList.add('hidden');
+  const inp = document.getElementById('list-search');
+  if (inp) inp.value = '';
+  syncListFilterSelect();
+  renderFilteredList();
+}
+
+function getActiveListQuery() {
+  return {
+    band: listBand || 'all',
+    signal: listSignal || '',
+    supplier: getSelectedListSupplier(),
+    q: getListSearchQuery()
+  };
+}
 
 function emptyStateHtml(title, text, action, actionLabel) {
   const btn = action
@@ -1115,11 +1187,11 @@ function handleEmptyAction(action) {
   } else if (action === 'list-supplier-all') {
     const sel = document.getElementById('list-supplier');
     if (sel) sel.value = '';
-    renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+    renderFilteredList();
   } else if (action === 'list-search-clear') {
     const inp = document.getElementById('list-search');
     if (inp) inp.value = '';
-    renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+    renderFilteredList();
   } else if (action === 'new-task') {
     const b = document.getElementById('btn-new-task');
     if (b) b.click();
@@ -1137,68 +1209,84 @@ function handleEmptyAction(action) {
   }
 }
 
-function getListForFilter(filter, opts) {
-  opts = opts || {};
-  let list;
-  if (filter === 'all' || filter === 'no-date') {
-    list = products.filter(p => !p.expiry && !p.noExpiry);
-  } else if (filter === 'with-date') {
-    list = products.filter(p => p.expiry && !p.noExpiry);
-  } else if (filter === 'expired') {
-    list = products.filter(p => p.expiry && !p.noExpiry && daysRemaining(p.expiry) <= 0);
-  } else if (filter === 'urgent') {
-    list = products.filter(p => {
-      if (!p.expiry || p.noExpiry) return false;
-      const d = daysRemaining(p.expiry);
-      return d > 0 && d <= 7;
-    });
-  } else if (filter === 'attention') {
-    list = products.filter(p => {
-      if (!p.expiry || p.noExpiry) return false;
-      const d = daysRemaining(p.expiry);
-      return d > 7 && d <= 30;
-    });
-  } else if (filter === 'monitor') {
-    list = products.filter(p => {
-      if (!p.expiry || p.noExpiry) return false;
-      const d = daysRemaining(p.expiry);
-      return d > 30 && d <= 120;
-    });
-  } else if (filter === 'unsignaled') {
-    list = products.filter(p => {
-      if (!p.expiry || p.noExpiry || p.signaled) return false;
-      const d = daysRemaining(p.expiry);
-      return d !== null && d <= 120;
-    });
-  } else if (filter === 'signaled') {
-    list = products.filter(p => p.signaled && !p.noExpiry);
-  } else if (filter === 'no-expiry') {
-    list = products.filter(p => p.noExpiry);
-  } else if (filter === 'no-supplier') {
-    list = products.filter(p => !(p.supplier || '').trim());
-  } else {
-    list = products.filter(p => !p.expiry && !p.noExpiry);
+function productInBand(p, band) {
+  if (!band || band === 'all' || band === 'no-date') return !p.expiry && !p.noExpiry;
+  if (band === 'with-date') return !!(p.expiry && !p.noExpiry);
+  if (band === 'expired') return !!(p.expiry && !p.noExpiry && daysRemaining(p.expiry) <= 0);
+  if (band === 'urgent') {
+    if (!p.expiry || p.noExpiry) return false;
+    const d = daysRemaining(p.expiry);
+    return d > 0 && d <= 7;
   }
+  if (band === 'attention') {
+    if (!p.expiry || p.noExpiry) return false;
+    const d = daysRemaining(p.expiry);
+    return d > 7 && d <= 30;
+  }
+  if (band === 'monitor') {
+    if (!p.expiry || p.noExpiry) return false;
+    const d = daysRemaining(p.expiry);
+    return d > 30 && d <= 120;
+  }
+  if (band === 'no-expiry') return !!p.noExpiry;
+  if (band === 'no-supplier') return !(p.supplier || '').trim();
+  return !p.expiry && !p.noExpiry;
+}
 
+function productMatchesSignal(p, sig) {
+  if (!sig) return true;
+  if (sig === 'unsignaled') {
+    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 120;
+  }
+  if (sig === 'signaled') return !!(p.signaled && !p.noExpiry);
+  return true;
+}
+
+function getListForQuery(query, opts) {
+  opts = opts || {};
+  query = query || getActiveListQuery();
+  const band = query.band || 'all';
+  const sig = query.signal || '';
+  let list = products.filter(p => productInBand(p, band) && productMatchesSignal(p, sig));
   if (!opts.countsOnly) {
-    if (filter !== 'no-supplier') {
-      const wanted = getSelectedListSupplier();
+    if (band !== 'no-supplier') {
+      const wanted = query.supplier !== undefined ? query.supplier : getSelectedListSupplier();
       if (wanted) list = list.filter(p => supplierMatches(p, wanted));
     }
-    const q = getListSearchQuery();
-    if (q.length >= 2) list = list.filter(p => productMatchesListSearch(p, q));
-    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry' || filter === 'no-supplier') {
+    const q = query.q !== undefined ? query.q : getListSearchQuery();
+    const qn = (q || '').trim();
+    if (qn.length >= 2 || /^\d+$/.test(qn)) list = list.filter(p => productMatchesListSearch(p, qn));
+    if (band === 'all' || band === 'no-date' || band === 'no-expiry' || band === 'no-supplier') {
       list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'it'));
     } else {
       list.sort((a, b) => (daysRemaining(a.expiry) || 9999) - (daysRemaining(b.expiry) || 9999));
     }
+  } else {
+    const wanted = query.supplier !== undefined ? query.supplier : getSelectedListSupplier();
+    if (wanted && band !== 'no-supplier') list = list.filter(p => supplierMatches(p, wanted));
+    const q = query.q !== undefined ? query.q : getListSearchQuery();
+    const qn = (q || '').trim();
+    if (qn.length >= 2 || /^\d+$/.test(qn)) list = list.filter(p => productMatchesListSearch(p, qn));
   }
   return list;
 }
 
+function getListForFilter(filter, opts) {
+  const query = getActiveListQuery();
+  if (isSignalFilter(filter)) query.signal = filter;
+  else if (filter) query.band = filter;
+  return getListForQuery(query, opts);
+}
+
 function updateListChipCounts() {
-  document.querySelectorAll('.list-chip').forEach(ch => {
-    const n = getListForFilter(ch.dataset.filter, { countsOnly: true }).length;
+  document.querySelectorAll('#page-list .list-chip').forEach(ch => {
+    const f = ch.dataset.filter;
+    const query = getActiveListQuery();
+    if (isSignalFilter(f)) query.signal = f;
+    else query.band = f;
+    const n = getListForQuery(query, { countsOnly: true }).length;
     const lab = ch.dataset.label || ch.textContent.replace(/\s*\(\d+\)\s*$/, '').trim();
     ch.dataset.label = lab;
     ch.textContent = lab + ' (' + n + ')';
@@ -1216,10 +1304,10 @@ function getListSearchQuery() {
 
 function productMatchesListSearch(p, q) {
   if (!q) return true;
-  const name = (p.name || '').toLowerCase();
-  const ean = String(p.ean || '').toLowerCase();
-  const note = (p.note || '').toLowerCase();
-  return name.includes(q) || ean.includes(q) || note.includes(q);
+  const hay = [(p.name || ''), String(p.ean || ''), (p.note || ''), (p.supplier || '')].join(' ').toLowerCase();
+  const tokens = String(q).toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return true;
+  return tokens.every(tok => hay.includes(tok));
 }
 
 function supplierMatches(p, wanted) {
@@ -1288,7 +1376,7 @@ function buildListCsv(list) {
 
 async function exportCurrentList() {
   const filter = (document.getElementById('list-filter') || {}).value || 'all';
-  const list = getListForFilter(filter);
+  const list = getListForQuery();
   if (!list.length) {
     showToast('Lista vuota, niente da esportare', 'warn');
     return;
@@ -1339,7 +1427,7 @@ async function exportCurrentList() {
 
 function printCurrentList() {
   const filter = (document.getElementById('list-filter') || {}).value || 'all';
-  const list = getListForFilter(filter);
+  const list = getListForQuery();
   if (!list.length) {
     showToast('Lista vuota, niente da stampare', 'warn');
     return;
@@ -1388,10 +1476,72 @@ th { text-align: left; font-size: 10px; }
   w.document.close();
 }
 
+function renderListActiveBar() {
+  const el = document.getElementById('list-active');
+  if (!el) return;
+  const query = getActiveListQuery();
+  const pills = [];
+  if (query.band) pills.push({ key: 'band', lab: LIST_BAND_LABELS[query.band] || query.band });
+  if (query.signal) pills.push({ key: 'signal', lab: LIST_SIGNAL_LABELS[query.signal] || query.signal });
+  if (query.supplier === '__none__') pills.push({ key: 'supplier', lab: 'Senza fornitore' });
+  else if (query.supplier) pills.push({ key: 'supplier', lab: query.supplier });
+  if ((query.q || '').trim().length >= 1) pills.push({ key: 'search', lab: '“' + query.q.trim() + '”' });
+  const extra = pills.length > 1 || query.signal || query.supplier || (query.q || '').trim();
+  if (!extra) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = pills.map(p => '<button type="button" class="list-active-pill" data-clear="' + p.key + '">' + escapeHtml(p.lab) + ' <span aria-hidden="true">×</span></button>').join('') +
+    '<button type="button" class="list-active-reset" id="btn-reset-list">Azzera</button>';
+  el.querySelectorAll('[data-clear]').forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.clear;
+      if (k === 'band') listBand = 'all';
+      else if (k === 'signal') listSignal = '';
+      else if (k === 'supplier') {
+        const sel = document.getElementById('list-supplier');
+        if (sel) { sel.value = ''; sel.classList.remove('is-on'); }
+        const clr = document.getElementById('btn-clear-supplier');
+        if (clr) clr.classList.add('hidden');
+      } else if (k === 'search') {
+        const inp = document.getElementById('list-search');
+        if (inp) inp.value = '';
+      }
+      syncListFilterSelect();
+      renderFilteredList();
+    };
+  });
+  const rst = document.getElementById('btn-reset-list');
+  if (rst) rst.onclick = resetListFilters;
+}
+
+function updateListCount(list) {
+  const el = document.getElementById('list-count');
+  if (!el) return;
+  const n = list.length;
+  const unsig = list.filter(p => {
+    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    const d = daysRemaining(p.expiry);
+    return d !== null && d <= 120;
+  }).length;
+  el.textContent = n + (n === 1 ? ' prodotto' : ' prodotti') + (unsig ? ' · ' + unsig + ' da segnalare' : '');
+}
+
 function renderFilteredList(filter) {
+  if (filter) {
+    if (isSignalFilter(filter)) {
+      listSignal = filter;
+      listBand = 'with-date';
+    } else {
+      listBand = filter;
+    }
+  }
   fillListSupplierSelect();
   updateListChipCounts();
-  const list = getListForFilter(filter);
+  const query = getActiveListQuery();
+  const list = getListForQuery(query);
   const titles = {
     expired: 'Prodotti scaduti',
     urgent: 'Urgenti (≤7 giorni)',
@@ -1405,20 +1555,25 @@ function renderFilteredList(filter) {
     'no-date': 'Senza data di scadenza',
     all: 'Senza data di scadenza'
   };
-  let title = titles[filter] || 'Lista prodotti';
-  const wanted = getSelectedListSupplier();
+  let title = titles[query.band] || 'Lista prodotti';
+  if (query.signal) title += ' · ' + (LIST_SIGNAL_LABELS[query.signal] || query.signal).toLowerCase();
+  const wanted = query.supplier;
   if (wanted === '__none__') title += ' · senza fornitore';
   else if (wanted) title += ' · ' + wanted;
   document.getElementById('list-title').textContent = title;
 
-  const lf = document.getElementById('list-filter');
-  if (lf && lf.value !== filter) lf.value = filter;
-  document.querySelectorAll('.list-chip').forEach(ch => {
-    ch.classList.toggle('active', ch.dataset.filter === filter);
+  syncListFilterSelect();
+  document.querySelectorAll('#page-list .list-chip').forEach(ch => {
+    const f = ch.dataset.filter;
+    const on = isSignalFilter(f) ? listSignal === f : listBand === f;
+    ch.classList.toggle('active', on);
+    ch.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+  renderListActiveBar();
+  updateListCount(list);
 
   const container = document.getElementById('filtered-list');
-  const searchQ = getListSearchQuery();
+  const searchQ = query.q || '';
   if (list.length === 0) {
     if (searchQ.length >= 2) {
       container.innerHTML = emptyStateHtml(
@@ -1451,7 +1606,8 @@ function renderFilteredList(filter) {
       'no-supplier': ['Tutti i prodotti hanno il fornitore', 'L’anagrafica è completa su questo campo.', 'home', 'Torna in Home'],
       'with-date': ['Nessun prodotto con data', 'Non risultano ancora scadenze inserite.', 'scanner', 'Vai allo scanner']
     };
-    const cfg = emptyByFilter[filter] || ['Lista vuota', 'Nessun prodotto in questa vista.', 'home', 'Torna in Home'];
+    const emptyKey = query.signal || query.band || 'all';
+    const cfg = emptyByFilter[emptyKey] || emptyByFilter[query.band] || ['Lista vuota', 'Nessun prodotto in questa vista.', 'home', 'Torna in Home'];
     container.innerHTML = emptyStateHtml(cfg[0], cfg[1], cfg[2], cfg[3]);
     wireEmptyActions(container);
     }
@@ -1507,7 +1663,7 @@ async function quickSetExpiry(ean, iso) {
   const listPage = document.getElementById('page-list');
   if (listPage && listPage.classList.contains('active')) {
     const lf = document.getElementById('list-filter');
-    renderFilteredList(lf ? lf.value : 'all');
+    renderFilteredList();
   }
   const scanPage = document.getElementById('page-scanner');
   if (scanPage && scanPage.classList.contains('active')) {
@@ -1557,7 +1713,7 @@ async function quickSignalProduct(ean, opts) {
   const listPage = document.getElementById('page-list');
   if (listPage && listPage.classList.contains('active')) {
     const lf = document.getElementById('list-filter');
-    renderFilteredList(lf ? lf.value : 'all');
+    renderFilteredList();
   }
   const scanPage = document.getElementById('page-scanner');
   if (scanPage && scanPage.classList.contains('active')) {
@@ -8001,11 +8157,11 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
   const lfEl = document.getElementById('list-filter');
   if (lfEl) {
     lfEl.addEventListener('change', (e) => {
-      renderFilteredList(e.target.value);
+      setListFilter(e.target.value);
     });
   }
-  document.querySelectorAll('.list-chip').forEach(ch => {
-    ch.onclick = () => setListFilter(ch.dataset.filter);
+  document.querySelectorAll('#page-list .list-chip').forEach(ch => {
+    ch.onclick = () => onListChipClick(ch.dataset.filter, ch.dataset.kind);
   });
   const btnExportList = document.getElementById('btn-export-list');
   if (btnExportList) btnExportList.onclick = exportCurrentList;
@@ -8017,7 +8173,7 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
       listSupplier.classList.toggle('is-on', !!listSupplier.value);
       const clr = document.getElementById('btn-clear-supplier');
       if (clr) clr.classList.toggle('hidden', !listSupplier.value);
-      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+      renderFilteredList();
     };
   }
   const btnClearSupplier = document.getElementById('btn-clear-supplier');
@@ -8027,13 +8183,13 @@ create policy monte_ore_all on monte_ore for all using (true) with check (true);
       if (sel) sel.value = '';
       if (listSupplier) listSupplier.classList.remove('is-on');
       btnClearSupplier.classList.add('hidden');
-      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+      renderFilteredList();
     };
   }
   const listSearch = document.getElementById('list-search');
   if (listSearch) {
     listSearch.addEventListener('input', () => {
-      renderFilteredList((document.getElementById('list-filter') || {}).value || 'all');
+      renderFilteredList();
     });
   }
 
