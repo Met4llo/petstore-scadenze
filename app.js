@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.64 - iPhone scanner: niente zoom, inquadratura intera
+// VERSION 2.65 - Consegne di oggi azionabili in Home (tasti grandi)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1028,24 +1028,6 @@ function collectOggiItems() {
     }
   }
 
-  if (typeof consegneList !== 'undefined' && Array.isArray(consegneList) && typeof todayStr === 'function') {
-    const oggi = todayStr();
-    const pending = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
-    const missed = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato === 'non_arrivata');
-    if (pending.length || missed.length) {
-      const names = pending.concat(missed).map(c => c.fornitore || 'Consegna').slice(0, 3);
-      const extra = (pending.length + missed.length) > 3 ? '…' : '';
-      items.push({
-        id: 'consegne',
-        tone: missed.length ? 'hot' : 'info',
-        title: missed.length && !pending.length ? 'Consegne non arrivate' : 'Consegne di oggi',
-        sub: names.join(', ') + extra,
-        count: pending.length + missed.length,
-        go: function() { showPage('consegne'); }
-      });
-    }
-  }
-
   if (currentOperator && typeof monteSaldo === 'function') {
     const saldo = monteSaldo(currentOperator);
     if (saldo < -0.05) {
@@ -1070,10 +1052,18 @@ function updateOggiBox() {
   const box = document.getElementById('oggi-box');
   if (!list || !box) return;
   const items = collectOggiItems();
-  if (!items.length) {
+  renderOggiConsegne();
+  const hasConsegne = !!(document.getElementById('oggi-consegne') && document.getElementById('oggi-consegne').innerHTML.trim());
+  if (!items.length && !hasConsegne) {
     list.innerHTML = '<div class="oggi-empty">Niente in sospeso per oggi</div>';
     box.classList.add('is-clear');
     box.classList.remove('has-items');
+    return;
+  }
+  if (!items.length) {
+    list.innerHTML = '';
+    box.classList.remove('is-clear');
+    box.classList.add('has-items');
     return;
   }
   box.classList.remove('is-clear');
@@ -1091,6 +1081,7 @@ function updateOggiBox() {
       if (it && typeof it.go === 'function') it.go();
     };
   });
+  renderOggiConsegne();
 }
 
 function updateDashboard() {
@@ -7553,6 +7544,59 @@ function formatGiornoSafe(dateStr) {
   return d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+function bindConsegnaActionButtons(root) {
+  if (!root) return;
+  root.querySelectorAll('.btn-consegna-ok').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      markConsegnaStato(btn.dataset.id, 'consegnato');
+    };
+  });
+  root.querySelectorAll('.btn-consegna-miss').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      markConsegnaStato(btn.dataset.id, 'non_arrivata');
+    };
+  });
+}
+
+function consegnaOggiCard(c) {
+  const ora = c.ora ? String(c.ora).slice(0, 5) : '';
+  const missed = c.stato === 'non_arrivata';
+  const id = escapeHtml(String(c.id || ''));
+  const actions = missed
+    ? '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>'
+    : '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>' +
+      '<button type="button" class="btn btn-secondary btn-consegna-miss" data-id="' + id + '">Non arrivata</button>';
+  return '<div class="oggi-consegna-card' + (missed ? ' is-missed' : '') + '">' +
+    '<div class="oggi-consegna-info"><div class="oggi-consegna-name">' + escapeHtml(c.fornitore || 'Consegna') + '</div>' +
+    '<div class="oggi-consegna-time">' + (missed ? 'Non arrivata' : (ora ? 'Previsto · ' + escapeHtml(ora) : 'Oggi in arrivo')) + '</div></div>' +
+    '<div class="oggi-consegna-actions">' + actions + '</div></div>';
+}
+
+function renderOggiConsegne() {
+  const el = document.getElementById('oggi-consegne');
+  if (!el) return;
+  if (typeof consegneList === 'undefined' || !Array.isArray(consegneList) || typeof todayStr !== 'function') {
+    el.innerHTML = '';
+    return;
+  }
+  const oggi = todayStr();
+  const pending = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const missed = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato === 'non_arrivata');
+  if (!pending.length && !missed.length) {
+    el.innerHTML = '';
+    return;
+  }
+  let html = '<p class="oggi-consegne-kicker">Consegne di oggi</p>';
+  if (pending.length) html += pending.map(consegnaOggiCard).join('');
+  if (missed.length) html += missed.map(consegnaOggiCard).join('');
+  el.innerHTML = html;
+  bindConsegnaActionButtons(el);
+}
+
 function updateConsegneDash() {
   const el = document.getElementById('consegne-dash');
   if (!el) return;
@@ -7562,8 +7606,13 @@ function updateConsegneDash() {
   const domani = toDateStr(d);
   const oggiList = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi);
   const domaniList = consegneList.filter(c => normalizeConsegnaDate(c.data) === domani && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
-  if (!oggiList.length && !domaniList.length) {
+  const pendingEarly = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const missedEarly = oggiList.filter(c => c.stato === 'non_arrivata');
+  const doneEarly = oggiList.filter(c => c.stato === 'consegnato');
+  if (!doneEarly.length && !domaniList.length) {
     el.classList.add('hidden');
+    if (typeof renderOggiConsegne === 'function') renderOggiConsegne();
+    if (typeof updateOggiBox === 'function') updateOggiBox();
     return;
   }
   const pending = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
@@ -7571,37 +7620,9 @@ function updateConsegneDash() {
   const done = oggiList.filter(c => c.stato === 'consegnato');
   el.classList.remove('hidden');
   let html = '';
-  if (pending.length) {
-    html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
-    html += pending.map(c => {
-      const ora = c.ora ? String(c.ora).slice(0, 5) : '';
-      return `<div class="consegne-dash-card">
-        <div class="consegne-dash-info">
-          <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
-          <div class="consegne-dash-time">${ora ? 'Previsto · ' + escapeHtml(ora) : 'Orario non indicato'}</div>
-        </div>
-        <div class="consegne-dash-actions">
-          <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
-          <button type="button" class="btn btn-secondary btn-consegna-miss" data-id="${escapeHtml(String(c.id || ''))}">Non arrivata</button>
-        </div>
-      </div>`;
-    }).join('');
-  } else if (done.length && !missed.length) {
+  if (done.length && !pending.length && !missed.length) {
     html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
     html += '<div class="consegne-dash-done-all">Tutte consegnate</div>';
-  }
-  if (missed.length) {
-    html += '<div class="consegne-dash-title">Non arrivate</div>';
-    html += missed.map(c => {
-      const ora = c.ora ? String(c.ora).slice(0, 5) : '';
-      return `<div class="consegne-dash-card is-missed">
-        <div class="consegne-dash-info">
-          <div class="consegne-dash-name">${escapeHtml(c.fornitore || '')}</div>
-          <div class="consegne-dash-time">Non arrivata${ora ? ' · ' + escapeHtml(ora) : ''}</div>
-        </div>
-        <button type="button" class="btn btn-primary btn-consegna-ok" data-id="${escapeHtml(String(c.id || ''))}">Consegnato</button>
-      </div>`;
-    }).join('');
   }
   if (done.length) {
     html += done.map(c => {
@@ -7622,26 +7643,14 @@ function updateConsegneDash() {
       }).join('<br>') + '</div>';
   }
   el.innerHTML = html;
-  el.querySelectorAll('.btn-consegna-ok').forEach(btn => {
-    btn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      markConsegnaStato(btn.dataset.id, 'consegnato');
-    };
-  });
-  el.querySelectorAll('.btn-consegna-miss').forEach(btn => {
-    btn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      markConsegnaStato(btn.dataset.id, 'non_arrivata');
-    };
-  });
+  bindConsegnaActionButtons(el);
   el.onclick = (e) => {
     if (e.target.closest('.btn-consegna-ok') || e.target.closest('.btn-consegna-miss')) return;
     setConsegneFilter(pending.length || missed.length || oggiList.length ? 'oggi' : 'prossime');
     showPage('consegne');
     renderConsegne();
   };
+  if (typeof renderOggiConsegne === 'function') renderOggiConsegne();
   if (typeof updateOggiBox === 'function') updateOggiBox();
 }
 
@@ -7656,20 +7665,25 @@ async function markConsegnaStato(id, stato) {
   }
   const c = consegneList.find(x => String(x.id) === String(id));
   if (!c) return;
+  const prev = c.stato;
+  c.stato = stato;
+  if (typeof renderOggiConsegne === 'function') renderOggiConsegne();
+  updateConsegneDash();
+  const page = document.getElementById('page-consegne');
+  if (page && page.classList.contains('active')) renderConsegne();
   const { error } = await supabase.from('consegne').update({
     stato: stato,
     updated_by: currentOperator || 'Sconosciuto',
     updated_at: new Date().toISOString()
   }).eq('id', id);
   if (error) {
+    c.stato = prev;
+    if (typeof renderOggiConsegne === 'function') renderOggiConsegne();
+    updateConsegneDash();
     showToast('Errore: ' + error.message, 'error');
     return;
   }
-  c.stato = stato;
   showToast((stato === 'consegnato' ? 'Consegnato' : 'Non arrivata') + ' · ' + (c.fornitore || ''), stato === 'consegnato' ? 'success' : 'warn');
-  updateConsegneDash();
-  const page = document.getElementById('page-consegne');
-  if (page && page.classList.contains('active')) renderConsegne();
 }
 
 function openConsegnaForm(id) {
