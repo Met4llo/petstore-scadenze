@@ -398,3 +398,52 @@ body.sheet-open { overflow: hidden; }
   height: 100% !important;
 }
 #reader.ios-scan #qr-shaded-region { display: none !important; }
+
+/* v2.65 consegne oggi in Home */
+.oggi-consegne { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.oggi-consegne-kicker {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.oggi-consegna-card {
+  background: var(--bg, #fafaf9);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: inset 4px 0 0 #a8a29e;
+}
+.oggi-consegna-card.is-missed { background: #fef2f2; box-shadow: inset 4px 0 0 #dc2626; }
+.oggi-consegna-name { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
+.oggi-consegna-time { font-size: 0.82rem; color: var(--muted); font-weight: 600; margin-top: 2px; }
+.oggi-consegna-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.oggi-consegna-actions .btn {
+  width: 100%;
+  margin: 0;
+  min-height: 48px;
+  font-size: 1rem;
+}
+.consegne-dash { cursor: default; }
+.consegne-dash:active { transform: none; }
+.consegne-dash-card {
+  flex-wrap: wrap;
+}
+.consegne-dash-actions {
+  width: 100%;
+  flex-direction: column;
+}
+.consegne-dash-actions .btn {
+  width: 100% !important;
+  min-height: 48px !important;
+  font-size: 1rem !important;
+  padding: 10px 14px !important;
+}
+[data-theme="dark"] .oggi-consegna-card { background: #292524; }
+[data-theme="dark"] .oggi-consegna-card.is-missed { background: #450a0a; }
