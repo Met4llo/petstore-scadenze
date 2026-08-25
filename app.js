@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.68 - Dark mode rifinita (scanner, turni, home, overlay)
+// VERSION 2.69 - Pull-to-refresh in Home
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3184,6 +3184,67 @@ async function runSync(silent) {
 async function manualSync() {
   await runSync(false);
 }
+
+function initPullToRefresh() {
+  const ind = document.getElementById('ptr-indicator');
+  if (!ind || ind.dataset.bound) return;
+  ind.dataset.bound = '1';
+  const label = ind.querySelector('.ptr-label');
+  let startY = 0, pulling = false, armed = false, busy = false;
+
+  function dashOn() {
+    const p = document.getElementById('page-dashboard');
+    return p && p.classList.contains('active') && currentOperator;
+  }
+  function setPtr(dy, isArmed, loading) {
+    const h = loading ? 56 : Math.max(0, Math.min(88, dy * 0.72));
+    ind.style.height = h + 'px';
+    ind.classList.toggle('is-on', h > 12);
+    ind.classList.toggle('is-armed', !!isArmed);
+    ind.classList.toggle('is-loading', !!loading);
+    if (label) label.textContent = loading ? 'Aggiorno…' : (isArmed ? 'Rilascia per aggiornare' : 'Tira per aggiornare');
+  }
+  function resetPtr() {
+    ind.classList.remove('is-on', 'is-armed', 'is-loading');
+    ind.style.height = '0px';
+    if (label) label.textContent = 'Tira per aggiornare';
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    if (!dashOn() || busy || !e.touches || !e.touches[0]) return;
+    if (window.scrollY > 4) return;
+    if (e.target.closest('input, textarea, select, button, .sheet-open')) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    armed = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling || !dashOn() || busy) return;
+    const y = e.touches[0].clientY;
+    const dy = y - startY;
+    if (window.scrollY > 4 && dy < 12) { pulling = false; resetPtr(); return; }
+    if (dy < 10) return;
+    if (window.scrollY <= 0 && dy > 0) e.preventDefault();
+    armed = dy > 70;
+    setPtr(dy, armed, false);
+  }, { passive: false });
+
+  document.addEventListener('touchend', async () => {
+    if (!pulling) return;
+    pulling = false;
+    if (armed && !busy && dashOn()) {
+      busy = true;
+      setPtr(80, true, true);
+      try { await runSync(false); } catch (err) {}
+      busy = false;
+    }
+    armed = false;
+    resetPtr();
+  });
+}
+
+
 
 function startAutoSync() {
   stopAutoSync();
@@ -8497,6 +8558,7 @@ async function init() {
     if (currentOperator) flushPendingCloud({ silent: true }).then(() => { if (pendingCloud.length) runSync(true); });
   });
   renderPendingCloud();
+  initPullToRefresh();
 
   const btnNewSettimana = document.getElementById('btn-new-settimana');
   if (btnNewSettimana) btnNewSettimana.onclick = openNewSettimanaForm;
