@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.53 - Badge stato più grandi e contrastati (leggibili da lontano + dark mode)
+// VERSION 2.55 - Feedback tattile/sonoro unificato su salvataggi, scanner, errori
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -580,6 +580,7 @@ function showToast(msg, duration, type) {
   t.className = 'toast toast-' + type;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.add('hidden'), duration);
+  if (type === 'success' || type === 'error' || type === 'warn') appFeedback(type);
 }
 
 function showPage(pageId) {
@@ -1989,6 +1990,8 @@ async function deleteProduct() {
 }
 
 // ---------- Scanner ----------
+let lastAppFeedbackAt = 0;
+
 function unlockScanFeedback() {
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1998,46 +2001,63 @@ function unlockScanFeedback() {
   } catch (e) {}
 }
 
-function playScanBeep(ok) {
+function beepTone(ctx, freq, start, dur, vol) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(vol, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+}
+
+function playAppTone(type) {
   if (!isScanBeepOn()) return;
   try {
     unlockScanFeedback();
     if (!scanAudioCtx) return;
     const ctx = scanAudioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.value = ok ? 880 : 220;
     const now = ctx.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + (ok ? 0.13 : 0.22));
-    osc.start(now);
-    osc.stop(now + (ok ? 0.15 : 0.26));
-    if (!ok) {
-      const osc2 = ctx.createOscillator();
-      const g2 = ctx.createGain();
-      osc2.connect(g2);
-      g2.connect(ctx.destination);
-      osc2.type = 'sine';
-      osc2.frequency.value = 165;
-      g2.gain.setValueAtTime(0.0001, now + 0.12);
-      g2.gain.exponentialRampToValueAtTime(0.12, now + 0.14);
-      g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.34);
+    if (type === 'success') {
+      beepTone(ctx, 880, now, 0.09, 0.13);
+      beepTone(ctx, 1175, now + 0.1, 0.11, 0.12);
+    } else if (type === 'warn') {
+      beepTone(ctx, 520, now, 0.14, 0.11);
+    } else if (type === 'error') {
+      beepTone(ctx, 220, now, 0.16, 0.14);
+      beepTone(ctx, 165, now + 0.14, 0.2, 0.12);
     }
   } catch (e) {}
 }
 
-function hapticScan(ok) {
+function playScanBeep(ok) {
+  playAppTone(ok ? 'success' : 'error');
+}
+
+function hapticApp(type) {
   try {
-    if (typeof navigator.vibrate === 'function') {
-      navigator.vibrate(ok ? [35, 40, 55] : [90, 50, 90, 50, 120]);
-    }
+    if (typeof navigator.vibrate !== 'function') return;
+    if (type === 'success') navigator.vibrate([25, 30, 40]);
+    else if (type === 'warn') navigator.vibrate(55);
+    else if (type === 'error') navigator.vibrate([90, 50, 90, 50, 120]);
   } catch (e) {}
+}
+
+function hapticScan(ok) {
+  hapticApp(ok ? 'success' : 'error');
+}
+
+function appFeedback(type) {
+  if (type !== 'success' && type !== 'error' && type !== 'warn') return;
+  const now = Date.now();
+  if (now - lastAppFeedbackAt < 160) return;
+  lastAppFeedbackAt = now;
+  hapticApp(type);
+  playAppTone(type);
 }
 
 function flashScanner(ok) {
@@ -2050,8 +2070,6 @@ function flashScanner(ok) {
 }
 
 function scanFeedback(ok, ean) {
-  hapticScan(ok);
-  playScanBeep(ok);
   flashScanner(ok);
   if (ok) {
     const tail = String(ean || '').slice(-6);
@@ -5911,6 +5929,7 @@ function setScanBeep(on) {
 
 function initScanBeep() {
   setScanBeep(isScanBeepOn());
+  document.addEventListener('pointerdown', unlockScanFeedback, { passive: true });
 }
 
 function isDensityCompact() {
@@ -7608,8 +7627,8 @@ async function init() {
   if (btnThemeDark) btnThemeDark.onclick = () => { applyTheme('dark'); showToast('Modalità scura'); };
   const btnBeepOn = document.getElementById('btn-beep-on');
   const btnBeepOff = document.getElementById('btn-beep-off');
-  if (btnBeepOn) btnBeepOn.onclick = () => { setScanBeep(true); showToast('Suono scanner acceso', 'success'); };
-  if (btnBeepOff) btnBeepOff.onclick = () => { setScanBeep(false); showToast('Suono scanner spento', 'info'); };
+  if (btnBeepOn) btnBeepOn.onclick = () => { setScanBeep(true); showToast('Suoni e vibrazione accesi', 'success'); };
+  if (btnBeepOff) btnBeepOff.onclick = () => { setScanBeep(false); showToast('Suoni e vibrazione spenti', 'info'); };
   const btnDenComfy = document.getElementById('btn-density-comfy');
   const btnDenCompact = document.getElementById('btn-density-compact');
   if (btnDenComfy) btnDenComfy.onclick = () => { applyDensity(false); showToast('Liste comode'); };
