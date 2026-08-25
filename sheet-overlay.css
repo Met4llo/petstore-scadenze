@@ -333,3 +333,57 @@ body.sheet-open { overflow: hidden; }
 .scan-hist-row.is-miss .scan-hist-name { color: #b91c1c; }
 [data-theme="dark"] .scan-hist-row { background: var(--card); }
 [data-theme="dark"] .scan-hist-row.is-miss .scan-hist-name { color: #fca5a5; }
+
+/* v2.63 pending cloud queue */
+#btn-sync { position: relative; }
+#btn-sync.has-pending { color: #dc2626; }
+.pending-sync-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+.pending-cloud {
+  margin: 0 0 12px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  background: #fff7ed;
+  border: 1.5px solid #fdba74;
+  border-left: 6px solid #ea580c;
+}
+.pending-cloud-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pending-cloud-title { flex: 1; font-weight: 800; font-size: 0.95rem; }
+.pending-cloud-head .btn { width: auto; min-height: 40px; padding: 8px 14px; margin: 0; }
+.pending-cloud-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: color-mix(in oklab, #fff 70%, transparent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  color: inherit;
+}
+.pending-cloud-name { font-weight: 750; }
+.pending-cloud-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.pending-cloud-err { font-size: 0.75rem; color: #b91c1c; margin-top: 4px; font-weight: 650; }
+.pending-cloud-more { font-size: 0.8rem; color: var(--muted); margin-top: 8px; font-weight: 650; }
+[data-theme="dark"] .pending-cloud { background: #431407; border-color: #c2410c; }
+[data-theme="dark"] .pending-cloud-item { background: rgba(0,0,0,.25); }
+[data-theme="dark"] .pending-cloud-err { color: #fca5a5; }
+[data-theme="dark"] #btn-sync.has-pending { color: #fca5a5; }
