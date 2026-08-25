@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.74 - Annulla ultima azione (segnala, data, missione)
+// VERSION 2.75 - Filtro Turni 2.0: Tutti / Solo i miei
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4986,6 +4986,28 @@ function pickProvaSwap(ref) {
   if (ok) showToast('Turni scambiati. Premi Salva settimana.', 'success');
 }
 
+
+function isProvaMineOnly() {
+  const saved = localStorage.getItem('petstore_prova_mine');
+  if (saved === '1') return true;
+  if (saved === '0') return false;
+  return typeof canEditTurniProva === 'function' ? !canEditTurniProva() : false;
+}
+
+function setProvaMineOnly(on) {
+  localStorage.setItem('petstore_prova_mine', on ? '1' : '0');
+  syncProvaMineToggle();
+  renderTurniProva();
+}
+
+function syncProvaMineToggle() {
+  const mine = isProvaMineOnly();
+  const a = document.getElementById('btn-prova-all');
+  const b = document.getElementById('btn-prova-mine');
+  if (a) a.classList.toggle('active', !mine);
+  if (b) b.classList.toggle('active', mine);
+}
+
 function renderTurniProva() {
   const label = document.getElementById('prova-week-label');
   const grid = document.getElementById('prova-grid');
@@ -4994,7 +5016,10 @@ function renderTurniProva() {
   const end = sundayOf(start);
   if (label) label.textContent = formatRange(provaWeekStart, toDateStr(end));
   syncProvaWeekInputs();
+  syncProvaMineToggle();
   if (!grid) return;
+  const mineOnly = isProvaMineOnly();
+  const ops = (mineOnly && currentOperator) ? OPERATORS.filter(op => op === currentOperator) : OPERATORS;
   let html = '<table class="prova-table"><thead><tr><th>Ore</th>';
   const todayIdx = (provaWeekStart === provaMondayStr()) ? todayProvaDayIdx() : -1;
   for (let i = 0; i < 7; i++) {
@@ -5003,7 +5028,7 @@ function renderTurniProva() {
     html += `<th${i === todayIdx ? ' class="is-today"' : ''}>${PROVA_DAYS[i]}${i === todayIdx ? '<span class="oggi-mark">Oggi</span>' : ''}<small>${d.getDate()}</small></th>`;
   }
   html += '</tr></thead><tbody>';
-  OPERATORS.forEach(op => {
+  ops.forEach(op => {
     const lav = provaHoursLavorative(op);
     const h = provaHours(op);
     const mal = provaMalattiaDays(op);
@@ -5048,6 +5073,8 @@ function renderTurniProva() {
     }
     html += '</tr>';
   });
+  const showBag = !mineOnly || currentOperator === 'Sorrentino';
+  if (showBag) {
   html += '<tr class="prova-bagheria-row"><th>Bagheria<small class="prova-ore">Sorrentino</small></th>';
   for (let i = 0; i < 7; i++) {
     const cur = provaBagheriaValue(i);
@@ -5059,6 +5086,7 @@ function renderTurniProva() {
     html += '</select></td>';
   }
   html += '</tr>';
+  }
   html += '</tbody></table>';
   grid.innerHTML = html;
   grid.querySelectorAll('select.prova-cell[data-op]').forEach(sel => {
@@ -8750,6 +8778,11 @@ async function init() {
   if (btnProvaNext) btnProvaNext.onclick = () => shiftProvaWeek(7);
   const btnProvaOggi = document.getElementById('btn-prova-oggi');
   if (btnProvaOggi) btnProvaOggi.onclick = () => { provaWeekStart = provaMondayStr(); loadTurniProva(); };
+  const btnProvaAll = document.getElementById('btn-prova-all');
+  const btnProvaMine = document.getElementById('btn-prova-mine');
+  if (btnProvaAll) btnProvaAll.onclick = () => setProvaMineOnly(false);
+  if (btnProvaMine) btnProvaMine.onclick = () => setProvaMineOnly(true);
+  syncProvaMineToggle();
   const provaWeekDate = document.getElementById('prova-week-date');
   if (provaWeekDate) provaWeekDate.onchange = () => setProvaWeekFromDate(provaWeekDate.value, true);
   const provaVincoliWeek = document.getElementById('prova-vincoli-week');
