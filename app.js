@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.55 - Feedback tattile/sonoro unificato su salvataggi, scanner, errori
+// VERSION 2.56 - Overlay sheet nativi: swipe, tap fuori, animazione, tastiera
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -628,14 +628,105 @@ function captureDetailSnapshot() {
   detailSnapshot = getDetailFormState();
 }
 
+
+function openSheet(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => {
+    el.classList.add('is-open');
+  });
+  document.body.classList.add('sheet-open');
+}
+
+function closeSheet(id) {
+  const el = typeof id === 'string' ? document.getElementById(id) : id;
+  if (!el) return;
+  el.classList.remove('is-open');
+  el.setAttribute('aria-hidden', 'true');
+  setTimeout(() => {
+    if (!el.classList.contains('is-open')) el.classList.add('hidden');
+    if (!document.querySelector('.task-form-overlay.is-open')) {
+      document.body.classList.remove('sheet-open');
+    }
+  }, 260);
+}
+
+function dismissOpenSheet(ov) {
+  if (!ov) return;
+  const id = ov.id;
+  if (id === 'task-form-overlay') closeTaskForm();
+  else if (id === 'turno-form-overlay') closeTurnoForm();
+  else if (id === 'consegna-form-overlay') closeConsegnaForm();
+  else if (id === 'prova-vincoli-overlay') closeProvaVincoli();
+  else if (id === 'prova-share-overlay') closeProvaShare();
+  else if (id === 'switch-op-overlay') closeSwitchOpOverlay();
+  else if (id === 'unsaved-overlay') {
+    closeUnsavedDialog();
+    pendingDetailLeave = null;
+  } else closeSheet(ov);
+}
+
+function syncKeyboardInset() {
+  try {
+    if (!window.visualViewport) {
+      document.documentElement.style.setProperty('--kb', '0px');
+      return;
+    }
+    const kb = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+  } catch (e) {}
+}
+
+function initSheetGestures() {
+  document.querySelectorAll('.task-form-overlay').forEach(ov => {
+    if (ov.dataset.sheetBound) return;
+    ov.dataset.sheetBound = '1';
+    ov.addEventListener('click', (e) => {
+      if (e.target === ov) dismissOpenSheet(ov);
+    });
+    const card = ov.querySelector('.task-form-card');
+    if (!card) return;
+    let startY = 0, lastY = 0, dragging = false;
+    const onStart = (y) => { startY = lastY = y; dragging = true; card.style.transition = 'none'; };
+    const onMove = (y) => {
+      if (!dragging) return;
+      lastY = y;
+      const dy = Math.max(0, y - startY);
+      card.style.transform = 'translateY(' + dy + 'px)';
+    };
+    const onEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      const dy = lastY - startY;
+      card.style.transition = '';
+      card.style.transform = '';
+      if (dy > 90) dismissOpenSheet(ov);
+    };
+    const handle = ov.querySelector('.sheet-handle') || card;
+    handle.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
+    handle.addEventListener('touchmove', (e) => onMove(e.touches[0].clientY), { passive: true });
+    handle.addEventListener('touchend', onEnd);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.task-form-overlay.is-open:not(.hidden)');
+    if (open) dismissOpenSheet(open);
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncKeyboardInset);
+    window.visualViewport.addEventListener('scroll', syncKeyboardInset);
+  }
+  syncKeyboardInset();
+}
+
 function openUnsavedDialog() {
-  const el = document.getElementById('unsaved-overlay');
-  if (el) el.classList.remove('hidden');
+  openSheet('unsaved-overlay');
 }
 
 function closeUnsavedDialog() {
-  const el = document.getElementById('unsaved-overlay');
-  if (el) el.classList.add('hidden');
+  closeSheet('unsaved-overlay');
 }
 
 function runPageEnter(page) {
@@ -2538,14 +2629,12 @@ function pickSwitchOperator(name) {
     err.textContent = 'Password non corretta';
   }
   if (inp) inp.value = '';
-  const ov = document.getElementById('switch-op-overlay');
-  if (ov) ov.classList.remove('hidden');
-  setTimeout(() => { if (inp) inp.focus(); }, 80);
+  openSheet('switch-op-overlay');
+  setTimeout(() => { if (inp) inp.focus(); }, 280);
 }
 
 function closeSwitchOpOverlay() {
-  const ov = document.getElementById('switch-op-overlay');
-  if (ov) ov.classList.add('hidden');
+  closeSheet('switch-op-overlay');
   switchPendingOp = null;
   const inp = document.getElementById('switch-op-password');
   if (inp) inp.value = '';
@@ -3088,11 +3177,11 @@ function fillTaskForm(t) {
   document.querySelectorAll('#task-responsabili input').forEach(cb => {
     cb.checked = t ? (t.responsabili || []).indexOf(cb.value) >= 0 : (cb.value === currentOperator);
   });
-  document.getElementById('task-form-overlay').classList.remove('hidden');
+  openSheet('task-form-overlay');
 }
 
 function closeTaskForm() {
-  document.getElementById('task-form-overlay').classList.add('hidden');
+  closeSheet('task-form-overlay');
   editingTaskId = null;
   const saveBtn = document.getElementById('btn-save-task');
   if (saveBtn) saveBtn.textContent = 'Salva task';
@@ -4743,13 +4832,11 @@ function openProvaVincoli() {
   if (provaGuardLocked()) return;
   renderProvaVincoliForm();
   syncProvaWeekInputs();
-  const el = document.getElementById('prova-vincoli-overlay');
-  if (el) el.classList.remove('hidden');
+  openSheet('prova-vincoli-overlay');
 }
 
 function closeProvaVincoli() {
-  const el = document.getElementById('prova-vincoli-overlay');
-  if (el) el.classList.add('hidden');
+  closeSheet('prova-vincoli-overlay');
 }
 
 function confirmProvaVincoli() {
@@ -5047,8 +5134,7 @@ function drawTurniProvaCanvas() {
 }
 
 function closeProvaShare() {
-  const el = document.getElementById('prova-share-overlay');
-  if (el) el.classList.add('hidden');
+  closeSheet('prova-share-overlay');
 }
 
 async function sendProvaShare() {
@@ -5091,8 +5177,7 @@ async function createTurniProvaImage() {
   provaShareUrl = URL.createObjectURL(provaShareBlob);
   const img = document.getElementById('prova-share-img');
   if (img) img.src = provaShareUrl;
-  const ov = document.getElementById('prova-share-overlay');
-  if (ov) ov.classList.remove('hidden');
+  openSheet('prova-share-overlay');
 }
 
 function provaDraftKey() {
@@ -5787,11 +5872,11 @@ function openNewSettimanaForm() {
   document.getElementById('turno-foto-preview').classList.add('hidden');
   document.getElementById('turno-foto-preview').innerHTML = '';
   document.getElementById('turno-upload-msg').classList.add('hidden');
-  document.getElementById('turno-form-overlay').classList.remove('hidden');
+  openSheet('turno-form-overlay');
 }
 
 function closeTurnoForm() {
-  document.getElementById('turno-form-overlay').classList.add('hidden');
+  closeSheet('turno-form-overlay');
 }
 
 // Auto-fill fine when inizio changes ( +6 days)
@@ -5953,6 +6038,7 @@ function initDensity() {
 function initTheme() {
   applyTheme(getTheme());
   initScanBeep();
+  initSheetGestures();
   initDensity();
 }
 
@@ -6863,11 +6949,11 @@ function openConsegnaForm(id) {
     document.getElementById('consegna-stato').value = 'prevista';
     if (btnDel) btnDel.classList.add('hidden');
   }
-  document.getElementById('consegna-form-overlay').classList.remove('hidden');
+  openSheet('consegna-form-overlay');
 }
 
 function closeConsegnaForm() {
-  document.getElementById('consegna-form-overlay').classList.add('hidden');
+  closeSheet('consegna-form-overlay');
   editingConsegnaId = null;
 }
 
