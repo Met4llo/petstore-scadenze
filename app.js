@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.65 - Consegne di oggi azionabili in Home (tasti grandi)
+// VERSION 2.66 - Griglia turni più leggibile, scorrevole sul telefono
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4834,14 +4834,16 @@ function renderTurniProva() {
       const work = provaIsWorkCode(v) && !isBagheriaCode(v);
       const s2 = provaSecond(op, i);
       const swapOp = (provaSwapA && provaSwapA.kind === 'op' && provaSwapA.op === op && provaSwapA.day === i) ? ' is-swap-a' : '';
-      html += `<td class="prova-td${i === todayIdx ? ' is-today' : ''}${swapOp}"><select class="prova-cell ${pv}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
+      const fascia = v ? (' fascia-' + v) : '';
+      html += `<td class="prova-td ${pv}${i === todayIdx ? ' is-today' : ''}${swapOp}"><select class="prova-cell ${pv}${fascia}" data-op="${escapeHtml(op)}" data-day="${i}" aria-label="${escapeHtml(op)} ${PROVA_DAYS[i]}">`;
       provaCellOptions(i).forEach(([val, lab]) => {
         html += `<option value="${val}"${provaOptionSelected(v, val) ? ' selected' : ''}>${lab}</option>`;
       });
       html += '</select>';
       html += `<select class="prova-neg-cell ${pv}${work ? '' : ' hidden'}" data-neg-op="${escapeHtml(op)}" data-day="${i}">`;
       PUNTI_VENDITA.forEach(n => {
-        html += `<option value="${escapeHtml(n)}"${shop === n ? ' selected' : ''}>${escapeHtml(n)}</option>`;
+        const shortN = n === 'La Malfa' ? 'Malfa' : (n === 'San Lorenzo' ? 'S.Lorenzo' : n);
+        html += `<option value="${escapeHtml(n)}"${shop === n ? ' selected' : ''}>${escapeHtml(shortN)}</option>`;
       });
       html += '</select>';
       if (work) {
@@ -4853,7 +4855,8 @@ function renderTurniProva() {
         html += '</select>';
         html += `<select class="prova-neg-cell ${pv2}${s2 && s2.code ? '' : ' hidden'}" data-s2neg-op="${escapeHtml(op)}" data-day="${i}">`;
         PUNTI_VENDITA.forEach(n => {
-          html += `<option value="${escapeHtml(n)}"${s2 && s2.shop === n ? ' selected' : ''}>${escapeHtml(n)}</option>`;
+          const shortN2 = n === 'La Malfa' ? 'Malfa' : (n === 'San Lorenzo' ? 'S.Lorenzo' : n);
+          html += `<option value="${escapeHtml(n)}"${s2 && s2.shop === n ? ' selected' : ''}>${escapeHtml(shortN2)}</option>`;
         });
         html += '</select>';
       }
@@ -4865,7 +4868,7 @@ function renderTurniProva() {
   for (let i = 0; i < 7; i++) {
     const cur = provaBagheriaValue(i);
     const swapBag = (provaSwapA && provaSwapA.kind === 'bag' && provaSwapA.day === i) ? ' is-swap-a' : '';
-    html += `<td class="${i === todayIdx ? 'is-today' : ''}${swapBag}"><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
+    html += `<td class="prova-td ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}${i === todayIdx ? ' is-today' : ''}${swapBag}"><select class="prova-cell prova-bagheria-select ${cur === 'L' ? 'pv-riposo' : 'pv-bagheria'}" data-bday="${i}" aria-label="Bagheria ${PROVA_DAYS[i]}">`;
     provaBagheriaOptions().forEach(([val, lab]) => {
       html += `<option value="${val}"${cur === val ? ' selected' : ''}>${lab}</option>`;
     });
