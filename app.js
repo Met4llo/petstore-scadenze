@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.71 - Taglia testo Normale / Grande / Extra
+// VERSION 2.72 - Swipe card prodotto: destra Segnala, sinistra Cambia data
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1891,6 +1891,7 @@ function renderFilteredList(filter) {
     card.onclick = () => openProduct(card.dataset.ean, 'list');
   });
   wireSignalButtons(container);
+  wireCardSwipe(container);
 }
 
 async function quickSetExpiry(ean, iso) {
@@ -1996,6 +1997,70 @@ async function quickSignalProduct(ean, opts) {
   }
 }
 
+
+function wireCardSwipe(container) {
+  if (!container) return;
+  container.querySelectorAll('.product-card, .scan-hist-row').forEach(card => {
+    if (card.dataset.swipeBound) return;
+    card.dataset.swipeBound = '1';
+    let x0 = 0, y0 = 0, dx = 0, axis = null, tracking = false;
+    function reset() {
+      card.style.transform = '';
+      card.classList.remove('is-swipe-signal', 'is-swipe-date');
+      x0 = 0; dx = 0; axis = null; tracking = false;
+    }
+    card.addEventListener('touchstart', (e) => {
+      if (e.target.closest('button, input, label, a, .quick-expiry, .scan-hist-actions')) return;
+      const t = e.touches[0];
+      if (!t) return;
+      x0 = t.clientX; y0 = t.clientY; dx = 0; axis = null; tracking = true;
+    }, { passive: true });
+    card.addEventListener('touchmove', (e) => {
+      if (!tracking) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const adx = t.clientX - x0, ady = t.clientY - y0;
+      if (!axis) {
+        if (Math.abs(adx) < 10 && Math.abs(ady) < 10) return;
+        axis = Math.abs(adx) > Math.abs(ady) * 1.2 ? 'x' : 'y';
+        if (axis === 'y') { tracking = false; return; }
+      }
+      if (axis !== 'x') return;
+      e.preventDefault();
+      dx = Math.max(-110, Math.min(110, adx));
+      card.style.transform = 'translateX(' + dx + 'px)';
+      card.classList.toggle('is-swipe-signal', dx > 28);
+      card.classList.toggle('is-swipe-date', dx < -28);
+    }, { passive: false });
+    card.addEventListener('touchend', () => {
+      if (!tracking) { reset(); return; }
+      const ean = card.dataset.ean;
+      const goS = dx > 72, goD = dx < -72;
+      if (goS || goD) card._swiped = true;
+      reset();
+      if (!ean) return;
+      if (goS) {
+        const p = products.find(x => x.ean === ean);
+        if (p && needsQuickSignal(p)) quickSignalProduct(ean);
+        else showToast('Non è da segnalare', 'info');
+      } else if (goD) {
+        const inp = card.querySelector('.quick-exp-input');
+        if (inp) {
+          try { if (typeof inp.showPicker === 'function') inp.showPicker(); else inp.click(); }
+          catch (err) { inp.click(); }
+        } else showToast('Niente data da cambiare', 'info');
+      }
+    });
+    card.addEventListener('touchcancel', reset);
+    card.addEventListener('click', (e) => {
+      if (!card._swiped) return;
+      e.preventDefault();
+      e.stopPropagation();
+      card._swiped = false;
+    }, true);
+  });
+}
+
 function wireSignalButtons(container) {
   if (!container) return;
   container.querySelectorAll('.btn-signal-list').forEach(btn => {
@@ -2045,6 +2110,7 @@ function doSearch(query) {
     card.onclick = () => openProduct(card.dataset.ean, 'scanner');
   });
   wireSignalButtons(container);
+  wireCardSwipe(container);
 }
 
 // ---------- Product Detail ----------
@@ -3091,6 +3157,7 @@ function renderScanHistory() {
     };
   });
   wireSignalButtons(box);
+  wireCardSwipe(box);
 }
 
 function onScanSuccess(decodedText) {
