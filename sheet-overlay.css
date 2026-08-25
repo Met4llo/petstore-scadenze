@@ -196,7 +196,6 @@ body.sheet-open { overflow: hidden; }
 #page-turni-prova.is-consult .prova-grid-wrap {
   border: 1px solid var(--border);
   border-radius: 16px;
-  overflow: hidden;
   background: var(--card);
 }
 #page-turni-prova.is-consult .prova-grid-wrap select {
@@ -448,7 +447,7 @@ body.sheet-open { overflow: hidden; }
 [data-theme="dark"] .oggi-consegna-card { background: #292524; }
 [data-theme="dark"] .oggi-consegna-card.is-missed { background: #450a0a; }
 
-/* v2.66 griglia turni telefono */
+/* v2.66-2.67 griglia turni telefono */
 .prova-phone-hint {
   margin: 0 0 10px;
   font-size: 0.82rem;
@@ -456,16 +455,32 @@ body.sheet-open { overflow: hidden; }
   font-weight: 600;
   line-height: 1.35;
 }
-#page-turni-prova .prova-grid-wrap,
-#page-turni-prova.is-consult .prova-grid-wrap {
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+#page-turni-prova,
+#page-turni-prova .prova-split,
+#page-turni-prova .prova-split-grid {
+  min-width: 0;
   max-width: 100%;
 }
+.prova-grid-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+}
+#page-turni-prova .prova-grid-wrap,
+#page-turni-prova.is-consult .prova-grid-wrap {
+  overflow: visible !important;
+  display: inline-block;
+  min-width: 720px;
+  width: max-content;
+  max-width: none;
+}
 #page-turni-prova .prova-table {
-  min-width: 780px;
-  width: max(100%, 780px);
+  min-width: 720px;
+  width: 720px;
   table-layout: fixed;
 }
 #page-turni-prova .prova-table thead th:first-child,
@@ -516,6 +531,13 @@ body.sheet-open { overflow: hidden; }
 }
 @media (min-width: 900px) {
   .prova-phone-hint { display: none; }
+  .prova-grid-scroll { overflow-x: visible; }
+  #page-turni-prova .prova-grid-wrap,
+  #page-turni-prova.is-consult .prova-grid-wrap {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
   #page-turni-prova .prova-table { min-width: 0; width: 100%; }
 }
 [data-theme="dark"] #page-turni-prova .prova-table thead th:first-child,
