@@ -812,3 +812,11 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
   min-height: 40px;
 }
 [data-theme="dark"] .toast-undo { color: #fdba74; }
+
+/* v2.75 solo i miei turni */
+.prova-mine-toggle { margin: 0 0 12px; }
+.prova-mine-toggle .theme-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
