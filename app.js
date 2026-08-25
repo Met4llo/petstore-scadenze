@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.70 - Evidenzia la riga dell’operatore loggato in Turni 2.0
+// VERSION 2.71 - Taglia testo Normale / Grande / Extra
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -6840,11 +6840,33 @@ function initDensity() {
   applyDensity(isDensityCompact());
 }
 
+function getTextSize() {
+  const s = localStorage.getItem('petstore_text') || 'normal';
+  return (s === 'large' || s === 'xl') ? s : 'normal';
+}
+
+function applyTextSize(size) {
+  const s = (size === 'large' || size === 'xl') ? size : 'normal';
+  if (s === 'normal') document.documentElement.removeAttribute('data-text');
+  else document.documentElement.setAttribute('data-text', s);
+  localStorage.setItem('petstore_text', s);
+  const ids = { normal: 'btn-text-normal', large: 'btn-text-large', xl: 'btn-text-xl' };
+  Object.keys(ids).forEach(k => {
+    const b = document.getElementById(ids[k]);
+    if (b) b.classList.toggle('active', k === s);
+  });
+}
+
+function initTextSize() {
+  applyTextSize(getTextSize());
+}
+
 function initTheme() {
   applyTheme(getTheme());
   initScanBeep();
   initSheetGestures();
   initDensity();
+  initTextSize();
 }
 
 
@@ -8549,6 +8571,12 @@ async function init() {
   const btnDenCompact = document.getElementById('btn-density-compact');
   if (btnDenComfy) btnDenComfy.onclick = () => { applyDensity(false); showToast('Liste comode'); };
   if (btnDenCompact) btnDenCompact.onclick = () => { applyDensity(true); showToast('Liste compatte'); };
+  const btnTextN = document.getElementById('btn-text-normal');
+  const btnTextL = document.getElementById('btn-text-large');
+  const btnTextX = document.getElementById('btn-text-xl');
+  if (btnTextN) btnTextN.onclick = () => { applyTextSize('normal'); showToast('Testo normale'); };
+  if (btnTextL) btnTextL.onclick = () => { applyTextSize('large'); showToast('Testo grande'); };
+  if (btnTextX) btnTextX.onclick = () => { applyTextSize('xl'); showToast('Testo extra'); };
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentOperator) {
