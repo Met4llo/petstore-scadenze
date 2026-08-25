@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.61 - Tap-to-focus scanner + fotocamera iPhone (niente zoom/tele)
+// VERSION 2.62 - Scanner continuo + storico letture con Cambia data
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -16,6 +16,7 @@ let html5QrCode = null;
 let isScanning = false;
 let lastScanAt = 0;
 let lastScanCode = '';
+let scanHistory = [];
 let scanAudioCtx = null;
 let torchOn = false;
 let supabase = null;
@@ -1817,6 +1818,7 @@ async function quickSetExpiry(ean, iso) {
   if (scanPage && scanPage.classList.contains('active')) {
     const q = (document.getElementById('search-input') || {}).value || '';
     if (q.trim().length >= 2) doSearch(q);
+    if (typeof renderScanHistory === 'function') renderScanHistory();
   }
 }
 
@@ -1867,6 +1869,7 @@ async function quickSignalProduct(ean, opts) {
   if (scanPage && scanPage.classList.contains('active')) {
     const q = (document.getElementById('search-input') || {}).value || '';
     if (q.trim().length >= 2) doSearch(q);
+    if (typeof renderScanHistory === 'function') renderScanHistory();
   }
 }
 
@@ -2897,29 +2900,64 @@ async function toggleTorch() {
   updateTorchButton(true);
 }
 
+function pushScanHistory(ean, found) {
+  scanHistory = scanHistory.filter(x => x.ean !== ean);
+  scanHistory.unshift({ ean: ean, at: Date.now(), found: !!found });
+  if (scanHistory.length > 10) scanHistory = scanHistory.slice(0, 10);
+  renderScanHistory();
+}
+
+function renderScanHistory() {
+  const box = document.getElementById('scan-history');
+  if (!box) return;
+  if (!scanHistory.length) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = '<p class="scan-history-kicker">Ultime letture</p>' + scanHistory.map(item => {
+    const p = products.find(x => x.ean === item.ean);
+    if (!p) {
+      return '<div class="scan-hist-row is-miss" data-ean="' + escapeHtml(item.ean) + '">' +
+        '<div class="scan-hist-text"><div class="scan-hist-name">Non in anagrafica</div>' +
+        '<div class="scan-hist-sub">' + escapeHtml(item.ean) + '</div></div></div>';
+    }
+    const days = p.noExpiry ? null : daysRemaining(p.expiry);
+    const cls = p.noExpiry ? 'ok' : getStatusClass(days);
+    const dateLab = p.noExpiry ? 'Senza scadenza' : (p.expiry ? formatExportDate(p.expiry) : 'Senza data');
+    const cambia = p.noExpiry ? '' :
+      '<label class="btn-quick-exp scan-hist-cambia">Cambia<input type="date" class="quick-exp-input" data-ean="' + escapeHtml(p.ean) + '" value="' + escapeHtml(p.expiry || '') + '"></label>';
+    const segnala = needsQuickSignal(p)
+      ? '<button type="button" class="btn btn-primary btn-signal-list" data-ean="' + escapeHtml(p.ean) + '">Segnala</button>'
+      : '';
+    return '<div class="scan-hist-row ' + cls + '" data-ean="' + escapeHtml(p.ean) + '">' +
+      '<div class="scan-hist-text"><div class="scan-hist-name">' + escapeHtml(p.name) + '</div>' +
+      '<div class="scan-hist-sub">' + escapeHtml(p.ean) + ' · ' + escapeHtml(dateLab) + '</div></div>' +
+      getBadge(days, p.signaled, p.noExpiry) +
+      '<div class="scan-hist-actions">' + cambia + segnala + '</div></div>';
+  }).join('');
+  box.querySelectorAll('.scan-hist-row').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.scan-hist-actions, .quick-exp-input, .btn-signal-list, .btn-quick-exp, label')) return;
+      const p = products.find(x => x.ean === row.dataset.ean);
+      if (p) openProduct(p.ean, 'scanner');
+    };
+  });
+  wireSignalButtons(box);
+}
+
 function onScanSuccess(decodedText) {
   const ean = String(decodedText || '').replace(/\D/g, '') || String(decodedText || '');
   const now = Date.now();
   if (!ean) return;
-  if (ean === lastScanCode && now - lastScanAt < 1600) return;
+  if (ean === lastScanCode && now - lastScanAt < 1400) return;
   lastScanCode = ean;
   lastScanAt = now;
 
   const product = products.find(p => p.ean === ean || p.ean === decodedText);
   scanFeedback(!!product, ean);
-  stopScanner();
-  if (product) {
-    setTimeout(() => openProduct(product.ean, 'scanner'), 280);
-  } else {
-    const box = document.getElementById('scan-result');
-    if (!box) return;
-    box.classList.remove('hidden');
-    box.innerHTML = `
-      <p><strong>Codice scansionato:</strong> ${escapeHtml(decodedText)}</p>
-      <p style="color:var(--danger);margin-top:8px;">Prodotto non trovato nel database.</p>
-      <button class="btn btn-secondary" style="margin-top:12px;" onclick="document.getElementById('scan-result').classList.add('hidden');startScanner();">Riprova</button>
-    `;
-  }
+  pushScanHistory(ean, !!product);
 }
 
 // ---------- Export / Import (backup) ----------
