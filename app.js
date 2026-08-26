@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.78 - Tasto Gestito: pratica chiusa, resta la data, esce dalle cose da fare
+// VERSION 2.79 - Versamento contanti ogni 5 chiusure, con conferma date
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -1035,6 +1035,175 @@ function escapeHtml(str) {
 
 // ---------- Dashboard ----------
 
+
+const CASSA_EVERY = 5;
+const CASSA_LS = 'petstore_cassa_chiusure';
+let cassaChiusure = [];
+let cassaTableMissing = false;
+
+function loadCassaLocal() {
+  try { return JSON.parse(localStorage.getItem(CASSA_LS) || '[]'); } catch (e) { return []; }
+}
+function saveCassaLocal() {
+  try { localStorage.setItem(CASSA_LS, JSON.stringify(cassaChiusure)); } catch (e) {}
+}
+function pendingCassaChiusure() {
+  return (cassaChiusure || []).filter(c => !c.versato).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+}
+function cassaOggiFatta() {
+  const oggi = todayStr();
+  return (cassaChiusure || []).some(c => c.data === oggi);
+}
+
+async function loadCassaChiusure() {
+  if (supabase && !cassaTableMissing) {
+    try {
+      const { data, error } = await supabase.from('cassa_chiusure').select('*').order('data', { ascending: true });
+      if (error) {
+        if (/does not exist|schema cache|relation/i.test(error.message || '')) cassaTableMissing = true;
+        else console.warn('cassa_chiusure', error.message);
+      } else {
+        cassaChiusure = (data || []).map(r => ({
+          data: String(r.data).slice(0, 10),
+          chiusa_by: r.chiusa_by || '',
+          chiusa_at: r.chiusa_at || null,
+          versato: !!r.versato,
+          versato_by: r.versato_by || '',
+          versato_at: r.versato_at || null
+        }));
+        saveCassaLocal();
+        renderOggiCassa();
+        if (typeof updateOggiBox === 'function') updateOggiBox();
+        return;
+      }
+    } catch (e) { console.warn(e); }
+  }
+  cassaChiusure = loadCassaLocal();
+  renderOggiCassa();
+  if (typeof updateOggiBox === 'function') updateOggiBox();
+}
+
+async function markChiusuraOggi() {
+  const oggi = todayStr();
+  if (cassaOggiFatta()) {
+    showToast('Chiusura di oggi già segnata', 'info');
+    return;
+  }
+  const row = {
+    data: oggi,
+    chiusa_by: currentOperator || 'Sconosciuto',
+    chiusa_at: new Date().toISOString(),
+    versato: false,
+    versato_by: '',
+    versato_at: null
+  };
+  cassaChiusure.push(row);
+  saveCassaLocal();
+  renderOggiCassa();
+  if (typeof updateOggiBox === 'function') updateOggiBox();
+  if (supabase && !cassaTableMissing) {
+    const { error } = await supabase.from('cassa_chiusure').upsert({
+      data: oggi,
+      chiusa_by: row.chiusa_by,
+      chiusa_at: row.chiusa_at,
+      versato: false
+    }, { onConflict: 'data' });
+    if (error) {
+      if (/does not exist|schema cache|relation/i.test(error.message || '')) cassaTableMissing = true;
+      showToast('Chiusura salvata su questo telefono', 'warn');
+    } else showToast('Chiusura di oggi segnata', 'success');
+  } else showToast('Chiusura di oggi segnata', 'success');
+  const n = pendingCassaChiusure().length;
+  if (n >= CASSA_EVERY) showToast('Tocca versare i contanti (' + n + ' chiusure)', 'warn');
+}
+
+function openCassaVersamento() {
+  const pending = pendingCassaChiusure();
+  if (!pending.length) {
+    showToast('Nessuna chiusura da versare', 'info');
+    return;
+  }
+  const box = document.getElementById('cassa-versamento-list');
+  if (box) {
+    box.innerHTML = pending.map(c => {
+      const lab = (typeof formatGiornoSafe === 'function') ? formatGiornoSafe(c.data) : c.data;
+      const by = c.chiusa_by ? ' · ' + c.chiusa_by : '';
+      return '<label class="cassa-check"><input type="checkbox" checked data-cassa-day="' + escapeHtml(c.data) + '"><span>' + escapeHtml(lab) + escapeHtml(by) + '</span></label>';
+    }).join('');
+  }
+  if (typeof openSheet === 'function') openSheet('cassa-versamento-overlay');
+}
+
+function closeCassaVersamento() {
+  if (typeof closeSheet === 'function') closeSheet('cassa-versamento-overlay');
+}
+
+async function confirmCassaVersamento() {
+  const box = document.getElementById('cassa-versamento-list');
+  const days = box ? [...box.querySelectorAll('input[data-cassa-day]:checked')].map(i => i.dataset.cassaDay) : [];
+  if (!days.length) {
+    showToast('Spunta almeno una chiusura', 'warn');
+    return;
+  }
+  const now = new Date().toISOString();
+  const by = currentOperator || 'Sconosciuto';
+  days.forEach(d => {
+    const row = cassaChiusure.find(c => c.data === d);
+    if (!row) return;
+    row.versato = true;
+    row.versato_by = by;
+    row.versato_at = now;
+  });
+  saveCassaLocal();
+  closeCassaVersamento();
+  renderOggiCassa();
+  if (typeof updateOggiBox === 'function') updateOggiBox();
+  if (supabase && !cassaTableMissing) {
+    for (const d of days) {
+      const { error } = await supabase.from('cassa_chiusure').update({
+        versato: true,
+        versato_by: by,
+        versato_at: now
+      }).eq('data', d);
+      if (error) {
+        showToast('Versamento salvato in locale', 'warn');
+        break;
+      }
+    }
+  }
+  showToast('Versate ' + days.length + (days.length === 1 ? ' chiusura' : ' chiusure'), 'success');
+}
+
+function renderOggiCassa() {
+  const el = document.getElementById('oggi-cassa');
+  if (!el) return;
+  const pending = pendingCassaChiusure();
+  const n = pending.length;
+  const oggiOk = cassaOggiFatta();
+  let html = '';
+  if (!oggiOk) {
+    html += '<div class="oggi-consegna-card">' +
+      '<div class="oggi-consegna-info"><div class="oggi-consegna-name">Chiusura di oggi</div>' +
+      '<div class="oggi-consegna-time">Segna la chiusura per il versamento contanti (' + n + '/' + CASSA_EVERY + ')</div></div>' +
+      '<div class="oggi-consegna-actions"><button type="button" class="btn btn-primary" id="btn-cassa-chiusura">Segna chiusura</button></div></div>';
+  }
+  if (n >= CASSA_EVERY) {
+    html += '<div class="oggi-consegna-card is-bolla">' +
+      '<div class="oggi-consegna-info"><div class="oggi-consegna-name">Versa i contanti</div>' +
+      '<div class="oggi-consegna-time">' + n + ' chiusure da versare · conferma le date</div></div>' +
+      '<div class="oggi-consegna-actions"><button type="button" class="btn btn-primary" id="btn-cassa-versa">Versato · conferma</button></div></div>';
+  } else if (n > 0 && oggiOk) {
+    html += '<div class="oggi-consegna-card">' +
+      '<div class="oggi-consegna-info"><div class="oggi-consegna-name">Contanti</div>' +
+      '<div class="oggi-consegna-time">' + n + '/' + CASSA_EVERY + ' chiusure da versare</div></div></div>';
+  }
+  el.innerHTML = html;
+  const b1 = document.getElementById('btn-cassa-chiusura');
+  if (b1) b1.onclick = (e) => { e.preventDefault(); e.stopPropagation(); markChiusuraOggi(); };
+  const b2 = document.getElementById('btn-cassa-versa');
+  if (b2) b2.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openCassaVersamento(); };
+}
+
 function collectOggiItems() {
   const items = [];
   if (pendingCloud && pendingCloud.length) {
@@ -1152,9 +1321,11 @@ function updateOggiBox() {
   const box = document.getElementById('oggi-box');
   if (!list || !box) return;
   const items = collectOggiItems();
+  renderOggiCassa();
   renderOggiConsegne();
   const hasConsegne = !!(document.getElementById('oggi-consegne') && document.getElementById('oggi-consegne').innerHTML.trim());
-  if (!items.length && !hasConsegne) {
+  const hasCassa = !!(document.getElementById('oggi-cassa') && document.getElementById('oggi-cassa').innerHTML.trim());
+  if (!items.length && !hasConsegne && !hasCassa) {
     list.innerHTML = '<div class="oggi-empty">Niente in sospeso per oggi</div>';
     box.classList.add('is-clear');
     box.classList.remove('has-items');
@@ -3437,6 +3608,7 @@ async function runSync(silent) {
     await refreshMissione();
     await loadNonInNegozio();
     await loadConsegne();
+    await loadCassaChiusure();
     updateDashboard();
     updateMyTasksAlert();
     markSync(true);
@@ -3545,6 +3717,7 @@ function enterApp() {
   refreshMissione();
   loadNonInNegozio();
   loadConsegne();
+  loadCassaChiusure();
   startAutoSync();
 }
 
@@ -8939,6 +9112,11 @@ async function init() {
   if (btnTextN) btnTextN.onclick = () => { applyTextSize('normal'); showToast('Testo normale'); };
   if (btnTextL) btnTextL.onclick = () => { applyTextSize('large'); showToast('Testo grande'); };
   if (btnTextX) btnTextX.onclick = () => { applyTextSize('xl'); showToast('Testo extra'); };
+
+  const btnCassaOk = document.getElementById('btn-cassa-versamento-ok');
+  if (btnCassaOk) btnCassaOk.onclick = confirmCassaVersamento;
+  const btnCassaCancel = document.getElementById('btn-cassa-versamento-cancel');
+  if (btnCassaCancel) btnCassaCancel.onclick = closeCassaVersamento;
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && currentOperator) {
