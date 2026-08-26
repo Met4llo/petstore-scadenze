@@ -839,3 +839,14 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
   text-align: center;
 }
 [data-theme="dark"] .nav-badge { background: #ef4444; color: #fff; }
+
+/* v2.77 bolla da confermare */
+.oggi-consegna-card.is-bolla {
+  background: #fff7ed;
+  box-shadow: inset 4px 0 0 #ea580c;
+}
+.consegna-badge.bolla { background: #ffedd5; color: #9a3412; }
+.consegna-card.bolla_da_fare { box-shadow: inset 4px 0 0 #ea580c; }
+.consegna-card .btn-consegna-bolla { width: 100%; margin-top: 10px; min-height: 44px; }
+[data-theme="dark"] .oggi-consegna-card.is-bolla { background: #7c2d12; }
+[data-theme="dark"] .consegna-badge.bolla { background: #7c2d12; color: #fed7aa; }
