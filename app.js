@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.77 - Consegne: conferma bolla dopo Consegnato
+// VERSION 2.78 - Tasto Gestito: pratica chiusa, resta la data, esce dalle cose da fare
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -227,9 +227,40 @@ function getStatusClass(days) {
   return 'ok';
 }
 
-function getBadge(days, signaled, noExpiry) {
+function isGestito(p) {
+  if (!p || p.noExpiry || !p.gestito) return false;
+  if (p.gestitoExpiry && p.expiry && String(p.gestitoExpiry).slice(0, 10) !== String(p.expiry).slice(0, 10)) return false;
+  return true;
+}
+
+const GESTITO_KEY = 'petstore_gestito';
+let gestitoColumnOk = true;
+function readGestitoMap() {
+  try { return JSON.parse(localStorage.getItem(GESTITO_KEY) || '{}'); } catch (e) { return {}; }
+}
+function persistGestitoLocal(p) {
+  if (!p || !p.ean) return;
+  const map = readGestitoMap();
+  if (isGestito(p)) map[p.ean] = { expiry: p.expiry || '', by: currentOperator || '', at: Date.now() };
+  else delete map[p.ean];
+  try { localStorage.setItem(GESTITO_KEY, JSON.stringify(map)); } catch (e) {}
+}
+function applyGestitoLocalOverlay() {
+  const map = readGestitoMap();
+  products.forEach(p => {
+    if (p.gestito) return;
+    const g = map[p.ean];
+    if (g && g.expiry && p.expiry && String(g.expiry).slice(0, 10) === String(p.expiry).slice(0, 10)) {
+      p.gestito = true;
+      p.gestitoExpiry = g.expiry;
+    }
+  });
+}
+
+function getBadge(days, signaled, noExpiry, gestito) {
   const ico = (s) => '<span class="badge-ico" aria-hidden="true">' + s + '</span>';
   if (noExpiry) return '<span class="badge no-expiry">' + ico('∞') + ' Senza scadenza</span>';
+  if (gestito) return '<span class="badge gestito">' + ico('✓') + ' Gestito</span>';
   if (days === null) return '<span class="badge nodate">' + ico('?') + ' Senza data</span>';
   if (signaled) return '<span class="badge signaled">' + ico('✓') + ' Segnalato</span>';
   if (days <= 0) {
@@ -292,6 +323,8 @@ async function loadCatalog() {
       expiry: null,
       signaled: false,
       signaledDate: null,
+      gestito: false,
+      gestitoExpiry: null,
       noExpiry: false,
       lastModified: null,
       note: ''
@@ -408,11 +441,14 @@ async function loadScadenzeFromCloud() {
         map[row.ean].signaled = !!row.signaled;
         map[row.ean].signaledDate = row.signaled_date || null;
         map[row.ean].noExpiry = !!row.no_expiry;
+        map[row.ean].gestito = !!row.gestito;
+        map[row.ean].gestitoExpiry = row.gestito_expiry || null;
         map[row.ean].lastModified = row.last_modified ? new Date(row.last_modified).getTime() : null;
         map[row.ean].updatedBy = row.updated_by || null;
       }
     });
     products = Object.values(map);
+    applyGestitoLocalOverlay();
     // Accessori (guinzagli, giochi, ecc.): senza scadenza se non hanno data
     applyAccessoriesNoExpiry();
     console.log('Merged', data.length, 'scadenze from Supabase');
@@ -605,6 +641,8 @@ async function saveToCloud(product, opts) {
       signaled: product.noExpiry ? false : !!product.signaled,
       signaled_date: product.noExpiry ? null : (product.signaledDate || null),
       no_expiry: !!product.noExpiry,
+      gestito: product.noExpiry ? false : !!product.gestito,
+      gestito_expiry: (product.noExpiry || !product.gestito) ? null : (product.expiry || null),
       last_modified: new Date().toISOString(),
       updated_by: currentOperator || 'Sconosciuto'
     };
@@ -612,12 +650,25 @@ async function saveToCloud(product, opts) {
       .from('scadenze')
       .upsert(payload, { onConflict: 'ean' })
       .select();
+    if (error && /gestito/i.test(error.message || '') && gestitoColumnOk) {
+      gestitoColumnOk = false;
+      persistGestitoLocal(product);
+      delete payload.gestito;
+      delete payload.gestito_expiry;
+      const retry = await supabase.from('scadenze').upsert(payload, { onConflict: 'ean' }).select();
+      if (!retry.error) {
+        dequeuePendingProduct(product.ean);
+        return true;
+      }
+    }
     if (error) {
       console.error('Supabase save error:', error);
+      persistGestitoLocal(product);
       enqueuePendingProduct(product, error.message || 'Errore cloud');
       if (!opts.silent && !opts.fromQueue) showToast('Errore cloud: ' + (error.message || JSON.stringify(error)), 'error');
       return false;
     }
+    persistGestitoLocal(product);
     dequeuePendingProduct(product.ean);
     return true;
   } catch (err) {
@@ -939,7 +990,7 @@ function cancelUnsavedLeave() {
 }
 
 function needsQuickSignal(p) {
-  if (!p || p.noExpiry || p.signaled || !p.expiry) return false;
+  if (!p || p.noExpiry || p.signaled || isGestito(p) || !p.expiry) return false;
   const d = daysRemaining(p.expiry);
   return d !== null && d <= 120;
 }
@@ -953,7 +1004,7 @@ function renderProductCard(p) {
     <div class="product-card ${cls}" data-ean="${p.ean}">
       <div class="product-card-top">
         <div class="product-name">${escapeHtml(p.name)}</div>
-        ${getBadge(days, p.signaled, p.noExpiry)}
+        ${getBadge(days, p.signaled, p.noExpiry, isGestito(p))}
       </div>
       <div class="product-meta">
         ${supplier ? `<span class="product-supplier">${supplier}</span>` : ''}
@@ -965,7 +1016,7 @@ function renderProductCard(p) {
         <span>${p.expiry ? escapeHtml(formatExportDate(p.expiry)) : 'Senza data'}</span>
         <label class="btn-quick-exp">Cambia<input type="date" class="quick-exp-input" data-ean="${escapeHtml(p.ean)}" value="${escapeHtml(p.expiry || '')}"></label>
       </div>`}
-      ${needsQuickSignal(p) ? `<button type="button" class="btn btn-primary btn-signal-list" data-ean="${escapeHtml(p.ean)}">Segnala</button>` : ''}
+      ${needsQuickSignal(p) ? `<button type="button" class="btn btn-primary btn-signal-list" data-ean="${escapeHtml(p.ean)}">Segnala</button>` : (p.signaled && !p.noExpiry && !isGestito(p) ? `<button type="button" class="btn btn-primary btn-gestito-list" data-ean="${escapeHtml(p.ean)}">Gestito</button>` : '')}
     </div>
   `;
 }
@@ -1136,11 +1187,12 @@ function updateOggiBox() {
 function updateDashboard() {
   // Esclude prodotti registrati come "senza scadenza"
   const withDate = products.filter(p => p.expiry && !p.noExpiry);
-  const expired = withDate.filter(p => daysRemaining(p.expiry) <= 0);
-  const urgent = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
-  const attention = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
-  const monitor = withDate.filter(p => { const d = daysRemaining(p.expiry); return d > 30 && d <= 120; });
-  const unsignaled = withDate.filter(p => {
+  const openDate = withDate.filter(p => !isGestito(p));
+  const expired = openDate.filter(p => daysRemaining(p.expiry) <= 0);
+  const urgent = openDate.filter(p => { const d = daysRemaining(p.expiry); return d > 0 && d <= 7; });
+  const attention = openDate.filter(p => { const d = daysRemaining(p.expiry); return d > 7 && d <= 30; });
+  const monitor = openDate.filter(p => { const d = daysRemaining(p.expiry); return d > 30 && d <= 120; });
+  const unsignaled = openDate.filter(p => {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120 && !p.signaled;
   });
@@ -1207,7 +1259,7 @@ function updateDashboard() {
 function countHomeUrgent() {
   const expired = (typeof countExpiredOnShelf === 'function') ? countExpiredOnShelf() : 0;
   const soon = products.filter(p => {
-    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    if (!p.expiry || p.noExpiry || p.signaled || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d !== null && d > 0 && d <= 7;
   }).length;
@@ -1229,7 +1281,7 @@ function updateHomeNavBadge() {
 
 function urgentHotProducts() {
   return products.filter(p => {
-    if (!p.expiry || p.noExpiry || p.signaled) return false;
+    if (!p.expiry || p.noExpiry || p.signaled || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 7;
   });
@@ -1237,7 +1289,7 @@ function urgentHotProducts() {
 
 function countExpiredOnShelf() {
   return products.filter(p => {
-    if (!p.expiry || p.noExpiry) return false;
+    if (!p.expiry || p.noExpiry || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 0;
   }).length;
@@ -1411,7 +1463,8 @@ const LIST_BAND_LABELS = {
   monitor: '120 gg',
   'no-expiry': 'Esclusi',
   'no-supplier': 'Senza fornitore',
-  'with-date': 'Con data'
+  'with-date': 'Con data',
+  gestito: 'Gestiti'
 };
 const LIST_SIGNAL_LABELS = {
   unsignaled: 'Da segnalare',
@@ -1434,7 +1487,7 @@ function setListFilter(filter) {
     if (filter === 'unsignaled' || filter === 'signaled') listBand = 'with-date';
   } else {
     listBand = filter || 'all';
-    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry' || filter === 'no-supplier') {
+    if (filter === 'all' || filter === 'no-date' || filter === 'no-expiry' || filter === 'no-supplier' || filter === 'gestito') {
       listSignal = '';
     }
   }
@@ -1558,19 +1611,20 @@ function handleEmptyAction(action) {
 function productInBand(p, band) {
   if (!band || band === 'all' || band === 'no-date') return !p.expiry && !p.noExpiry;
   if (band === 'with-date') return !!(p.expiry && !p.noExpiry);
-  if (band === 'expired') return !!(p.expiry && !p.noExpiry && daysRemaining(p.expiry) <= 0);
+  if (band === 'gestito') return isGestito(p);
+  if (band === 'expired') return !!(p.expiry && !p.noExpiry && !isGestito(p) && daysRemaining(p.expiry) <= 0);
   if (band === 'urgent') {
-    if (!p.expiry || p.noExpiry) return false;
+    if (!p.expiry || p.noExpiry || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d > 0 && d <= 7;
   }
   if (band === 'attention') {
-    if (!p.expiry || p.noExpiry) return false;
+    if (!p.expiry || p.noExpiry || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d > 7 && d <= 30;
   }
   if (band === 'monitor') {
-    if (!p.expiry || p.noExpiry) return false;
+    if (!p.expiry || p.noExpiry || isGestito(p)) return false;
     const d = daysRemaining(p.expiry);
     return d > 30 && d <= 120;
   }
@@ -1586,7 +1640,7 @@ function productMatchesSignal(p, sig) {
     const d = daysRemaining(p.expiry);
     return d !== null && d <= 120;
   }
-  if (sig === 'signaled') return !!(p.signaled && !p.noExpiry);
+  if (sig === 'signaled') return !!(p.signaled && !p.noExpiry && !isGestito(p));
   return true;
 }
 
@@ -1895,6 +1949,7 @@ function renderFilteredList(filter) {
     monitor: 'Da monitorare (≤120 giorni)',
     unsignaled: 'Non segnalati',
     signaled: 'Solo segnalati',
+    gestito: 'Pratiche gestite',
     'no-expiry': 'Senza scadenza (esclusi dal controllo)',
     'no-supplier': 'Senza fornitore in anagrafica',
     'with-date': 'Con data inserita',
@@ -1948,6 +2003,7 @@ function renderFilteredList(filter) {
       monitor: ['Nessun prodotto a 120 giorni', 'Nessun articolo da monitorare in questa fascia.', 'home', 'Torna in Home'],
       unsignaled: ['Tutto già segnalato', 'I prodotti in scadenza risultano già segnalati.', 'list-signaled', 'Vedi segnalati'],
       signaled: ['Nessun prodotto segnalato', 'Non ci sono ancora segnalazioni registrate.', 'list-unsignaled', 'Vedi da segnalare'],
+      gestito: ['Nessuna pratica gestita', 'Quando hai chiuso reso o nota credito, tocca Gestito. Resta la data, esce dalle cose da fare.', 'list-signaled', 'Vedi segnalati'],
       'no-expiry': ['Nessun prodotto escluso', 'Nessun articolo è stato segnato come senza scadenza.', 'scanner', 'Vai allo scanner'],
       'no-supplier': ['Tutti i prodotti hanno il fornitore', 'L’anagrafica è completa su questo campo.', 'home', 'Torna in Home'],
       'with-date': ['Nessun prodotto con data', 'Non risultano ancora scadenze inserite.', 'scanner', 'Vai allo scanner']
@@ -1989,6 +2045,10 @@ async function quickSetExpiry(ean, iso) {
     note: (p.note || '').trim()
   };
   p.expiry = iso;
+  p.gestito = false;
+  p.gestitoExpiry = null;
+  p.signaled = false;
+  p.signaledDate = null;
   p.lastModified = Date.now();
   p.updatedBy = currentOperator || 'Sconosciuto';
   const ok = await saveToCloud(p);
@@ -2078,6 +2138,45 @@ async function quickSignalProduct(ean, opts) {
 }
 
 
+
+async function quickGestitoProduct(ean) {
+  const p = products.find(x => x.ean === ean);
+  if (!p) return;
+  if (!p.signaled) {
+    showToast('Prima segnala, poi Gestito', 'info');
+    return;
+  }
+  if (isGestito(p)) {
+    showToast('Già gestito', 'info');
+    return;
+  }
+  const prevG = !!p.gestito;
+  const prevE = p.gestitoExpiry || null;
+  p.gestito = true;
+  p.gestitoExpiry = p.expiry || null;
+  p.lastModified = Date.now();
+  p.updatedBy = currentOperator || 'Sconosciuto';
+  const ok = await saveToCloud(p);
+  try { await idbPut(STORE_PRODUCTS, p); } catch (e) {}
+  persistGestitoLocal(p);
+  refreshProductViews();
+  if (ok || true) {
+    showUndoToast('Gestito · esce dalle cose da fare', async () => {
+      const cur = products.find(x => x.ean === ean);
+      if (!cur) return;
+      cur.gestito = prevG;
+      cur.gestitoExpiry = prevE;
+      cur.lastModified = Date.now();
+      cur.updatedBy = currentOperator || 'Sconosciuto';
+      await saveToCloud(cur);
+      try { await idbPut(STORE_PRODUCTS, cur); } catch (e) {}
+      persistGestitoLocal(cur);
+      refreshProductViews();
+      showToast('Gestito annullato', 'info');
+    });
+  }
+}
+
 function wireCardSwipe(container) {
   if (!container) return;
   container.querySelectorAll('.product-card, .scan-hist-row').forEach(card => {
@@ -2152,6 +2251,13 @@ function wireSignalButtons(container) {
   });
   container.querySelectorAll('.quick-expiry').forEach(row => {
     row.onclick = (e) => e.stopPropagation();
+  });
+  container.querySelectorAll('.btn-gestito-list').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      quickGestitoProduct(btn.dataset.ean);
+    };
   });
   container.querySelectorAll('.quick-exp-input').forEach(inp => {
     inp.onclick = (e) => e.stopPropagation();
@@ -2255,8 +2361,9 @@ function openProduct(ean, returnPage) {
         <div class="detail-row">
           <label>Stato</label>
           <select id="detail-signaled">
-            <option value="false" ${!currentProduct.signaled ? 'selected' : ''}>Non segnalato</option>
-            <option value="true" ${currentProduct.signaled ? 'selected' : ''}>Segnalato</option>
+            <option value="false" ${!currentProduct.signaled && !isGestito(currentProduct) ? 'selected' : ''}>Non segnalato</option>
+            <option value="true" ${currentProduct.signaled && !isGestito(currentProduct) ? 'selected' : ''}>Segnalato</option>
+            <option value="gestito" ${isGestito(currentProduct) ? 'selected' : ''}>Gestito</option>
           </select>
         </div>
         <div class="detail-row" id="signaled-date-row" style="${currentProduct.signaled ? '' : 'display:none'}">
@@ -2321,7 +2428,8 @@ function openProduct(ean, returnPage) {
     sigSel.addEventListener('change', (e) => {
       const row = document.getElementById('signaled-date-row');
       if (!row) return;
-      if (e.target.value === 'true') {
+      if (e.target.value === 'true' || e.target.value === 'gestito') {
+
         row.style.display = '';
         const dateInput = document.getElementById('detail-signaled-date');
         if (dateInput && !dateInput.value) {
@@ -2525,7 +2633,9 @@ async function saveProduct() {
   const expiryEl = document.getElementById('detail-expiry');
   const expiry = noExpiry ? null : ((expiryEl && expiryEl.value) || null);
   const sigEl = document.getElementById('detail-signaled');
-  const signaled = noExpiry ? false : (sigEl && sigEl.value === 'true');
+  const sigVal = sigEl ? sigEl.value : 'false';
+  const gestito = !noExpiry && sigVal === 'gestito';
+  const signaled = noExpiry ? false : (gestito || sigVal === 'true');
   const signaledDateInput = document.getElementById('detail-signaled-date');
   const signaledDate = noExpiry ? null : (signaledDateInput ? (signaledDateInput.value || null) : null);
   const noteEl = document.getElementById('detail-note');
@@ -2555,14 +2665,26 @@ async function saveProduct() {
     }
   }
 
+  const expiryChanged = (before.expiry || '') !== (expiry || '');
   currentProduct.noExpiry = noExpiry;
   currentProduct.expiry = expiry;
   currentProduct.signaled = signaled;
   currentProduct.signaledDate = signaled ? signaledDate : null;
+  if (gestito) {
+    currentProduct.gestito = true;
+    currentProduct.gestitoExpiry = expiry || null;
+  } else if (expiryChanged) {
+    currentProduct.gestito = false;
+    currentProduct.gestitoExpiry = null;
+  } else {
+    currentProduct.gestito = false;
+    currentProduct.gestitoExpiry = null;
+  }
   currentProduct.note = note;
   currentProduct.lastModified = Date.now();
   currentProduct.updatedBy = currentOperator || 'Sconosciuto';
   currentProduct.ean = newEan;
+  persistGestitoLocal(currentProduct);
 
   const idx = products.findIndex(p => p.ean === oldEan || p.ean === newEan);
   if (idx >= 0) products[idx] = currentProduct;
@@ -3222,16 +3344,16 @@ function renderScanHistory() {
       '<label class="btn-quick-exp scan-hist-cambia">Cambia<input type="date" class="quick-exp-input" data-ean="' + escapeHtml(p.ean) + '" value="' + escapeHtml(p.expiry || '') + '"></label>';
     const segnala = needsQuickSignal(p)
       ? '<button type="button" class="btn btn-primary btn-signal-list" data-ean="' + escapeHtml(p.ean) + '">Segnala</button>'
-      : '';
+      : (p.signaled && !p.noExpiry && !isGestito(p) ? '<button type="button" class="btn btn-primary btn-gestito-list" data-ean="' + escapeHtml(p.ean) + '">Gestito</button>' : '');
     return '<div class="scan-hist-row ' + cls + '" data-ean="' + escapeHtml(p.ean) + '">' +
       '<div class="scan-hist-text"><div class="scan-hist-name">' + escapeHtml(p.name) + '</div>' +
       '<div class="scan-hist-sub">' + escapeHtml(p.ean) + ' · ' + escapeHtml(dateLab) + '</div></div>' +
-      getBadge(days, p.signaled, p.noExpiry) +
+      getBadge(days, p.signaled, p.noExpiry, isGestito(p)) +
       '<div class="scan-hist-actions">' + cambia + segnala + '</div></div>';
   }).join('');
   box.querySelectorAll('.scan-hist-row').forEach(row => {
     row.onclick = (e) => {
-      if (e.target.closest('.scan-hist-actions, .quick-exp-input, .btn-signal-list, .btn-quick-exp, label')) return;
+      if (e.target.closest('.scan-hist-actions, .quick-exp-input, .btn-signal-list, .btn-gestito-list, .btn-quick-exp, label')) return;
       const p = products.find(x => x.ean === row.dataset.ean);
       if (p) openProduct(p.ean, 'scanner');
     };
@@ -7376,7 +7498,7 @@ function renderMissione() {
     return `<div class="product-card ${cls} ${checked ? 'mission-checked' : ''}" data-ean="${ean}">
       <div class="product-card-top">
         <div class="product-name">${escapeHtml(p.name)}</div>
-        ${getBadge(days, p.signaled, p.noExpiry)}
+        ${getBadge(days, p.signaled, p.noExpiry, isGestito(p))}
       </div>
       <div class="product-meta">
         ${supplier ? `<span class="product-supplier">${supplier}</span>` : ''}
@@ -7606,7 +7728,7 @@ function renderNonInNegozio() {
       <div class="product-name">${escapeHtml(p.name)}</div>
       <div class="product-meta">
         <span>${p.ean}</span>
-        ${getBadge(days, p.signaled, p.noExpiry)}
+        ${getBadge(days, p.signaled, p.noExpiry, isGestito(p))}
         ${p.supplier ? `<span>${escapeHtml((p.supplier||'').split(' ')[0])}</span>` : ''}
       </div>
     </div>`;
