@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.76 - Badge urgenti sul tasto Home
+// VERSION 2.77 - Consegne: conferma bolla dopo Consegnato
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -7635,7 +7635,7 @@ function normalizeConsegnaRow(row) {
     ...row,
     data: normalizeConsegnaDate(row.data),
     ora: row.ora ? String(row.ora).slice(0, 5) : null,
-    stato: row.stato === 'consegnato' ? 'consegnato' : (row.stato === 'non_arrivata' ? 'non_arrivata' : 'prevista')
+    stato: row.stato === 'consegnato' ? 'consegnato' : (row.stato === 'non_arrivata' ? 'non_arrivata' : (row.stato === 'bolla_da_fare' ? 'bolla_da_fare' : 'prevista'))
   };
 }
 
@@ -7687,6 +7687,7 @@ function renderConsegneCal() {
     const sel = ds === consegneCalDay;
     let dotCls = '';
     if (items.some(c => c.stato === 'non_arrivata')) dotCls = ' is-miss';
+    else if (items.some(c => c.stato === 'bolla_da_fare')) dotCls = ' is-wait';
     else if (items.length && items.every(c => c.stato === 'consegnato')) dotCls = ' is-done';
     else if (items.length) dotCls = ' is-wait';
     const names = items.slice(0, 2).map(c => escapeHtml((c.fornitore || '').split(/[\s-]/)[0].slice(0, 10)));
@@ -7770,12 +7771,12 @@ function renderConsegne() {
     // future + today, not yet delivered
     list = list.filter(c => {
       const d = normalizeConsegnaDate(c.data);
-      return d >= oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata';
+      return c.stato === 'bolla_da_fare' || (d >= oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
     });
   } else if (consegneFilter === 'storico') {
     list = list.filter(c => {
       const d = normalizeConsegnaDate(c.data);
-      return d < oggi || c.stato === 'consegnato' || c.stato === 'non_arrivata';
+      return c.stato !== 'bolla_da_fare' && (d < oggi || c.stato === 'consegnato' || c.stato === 'non_arrivata');
     });
   }
   // 'tutte' = no filter
@@ -7809,10 +7810,11 @@ function renderConsegne() {
   el.innerHTML = list.map(c => {
     const dNorm = normalizeConsegnaDate(c.data);
     const isOggi = dNorm === oggi;
-    const st = c.stato === 'consegnato' ? 'consegnato' : (c.stato === 'non_arrivata' ? 'non_arrivata' : 'prevista');
+    const st = c.stato === 'consegnato' ? 'consegnato' : (c.stato === 'non_arrivata' ? 'non_arrivata' : (c.stato === 'bolla_da_fare' ? 'bolla_da_fare' : 'prevista'));
     const d = dNorm ? formatGiornoSafe(dNorm) : '';
-    const statoLabel = st === 'consegnato' ? 'Consegnato' : (st === 'non_arrivata' ? 'Non arrivata' : (isOggi ? 'Oggi' : 'In arrivo'));
-    const statoClass = st === 'consegnato' ? 'consegnato' : (st === 'non_arrivata' ? 'non_arrivata' : (isOggi ? 'oggi' : 'prevista'));
+    const statoLabel = st === 'consegnato' ? 'Bolla ok' : (st === 'non_arrivata' ? 'Non arrivata' : (st === 'bolla_da_fare' ? 'Bolla da fare' : (isOggi ? 'Oggi' : 'In arrivo')));
+    const statoClass = st === 'consegnato' ? 'consegnato' : (st === 'non_arrivata' ? 'non_arrivata' : (st === 'bolla_da_fare' ? 'bolla' : (isOggi ? 'oggi' : 'prevista')));
+    const bollaBtn = st === 'bolla_da_fare' ? '<button type="button" class="btn btn-primary btn-consegna-bolla" data-id="' + escapeHtml(String(c.id || '')) + '">Bolla caricata</button>' : '';
     return `<div class="consegna-card ${isOggi ? 'oggi' : ''} ${st}" data-id="${c.id}">
       <div class="product-card-top">
         <div class="consegna-fornitore">${escapeHtml(c.fornitore || '')}</div>
@@ -7824,12 +7826,17 @@ function renderConsegne() {
         ${c.created_by ? opChip(c.created_by) : ''}
       </div>
       ${c.note ? '<div class="turno-note">' + escapeHtml(c.note) + '</div>' : ''}
+      ${bollaBtn}
     </div>`;
   }).join('');
 
   el.querySelectorAll('.consegna-card').forEach(card => {
-    card.onclick = () => openConsegnaForm(card.dataset.id);
+    card.onclick = (e) => {
+      if (e.target.closest('.btn-consegna-bolla')) return;
+      openConsegnaForm(card.dataset.id);
+    };
   });
+  bindConsegnaActionButtons(el);
 }
 
 function formatGiornoSafe(dateStr) {
@@ -7847,7 +7854,7 @@ function bindConsegnaActionButtons(root) {
     btn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      markConsegnaStato(btn.dataset.id, 'consegnato');
+      markConsegnaStato(btn.dataset.id, 'bolla_da_fare');
     };
   });
   root.querySelectorAll('.btn-consegna-miss').forEach(btn => {
@@ -7857,19 +7864,36 @@ function bindConsegnaActionButtons(root) {
       markConsegnaStato(btn.dataset.id, 'non_arrivata');
     };
   });
+  root.querySelectorAll('.btn-consegna-bolla').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      markConsegnaStato(btn.dataset.id, 'consegnato');
+    };
+  });
 }
 
 function consegnaOggiCard(c) {
   const ora = c.ora ? String(c.ora).slice(0, 5) : '';
   const missed = c.stato === 'non_arrivata';
+  const bolla = c.stato === 'bolla_da_fare';
   const id = escapeHtml(String(c.id || ''));
-  const actions = missed
-    ? '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>'
-    : '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>' +
+  const when = c.data ? formatGiornoSafe(c.data) : '';
+  let actions;
+  if (bolla) {
+    actions = '<button type="button" class="btn btn-primary btn-consegna-bolla" data-id="' + id + '">Bolla caricata</button>';
+  } else if (missed) {
+    actions = '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>';
+  } else {
+    actions = '<button type="button" class="btn btn-primary btn-consegna-ok" data-id="' + id + '">Consegnato</button>' +
       '<button type="button" class="btn btn-secondary btn-consegna-miss" data-id="' + id + '">Non arrivata</button>';
-  return '<div class="oggi-consegna-card' + (missed ? ' is-missed' : '') + '">' +
+  }
+  const sub = bolla
+    ? ('Consegnato · manca la bolla' + (when ? ' · ' + when : ''))
+    : (missed ? 'Non arrivata' : (ora ? 'Previsto · ' + escapeHtml(ora) : 'Oggi in arrivo'));
+  return '<div class="oggi-consegna-card' + (missed ? ' is-missed' : '') + (bolla ? ' is-bolla' : '') + '">' +
     '<div class="oggi-consegna-info"><div class="oggi-consegna-name">' + escapeHtml(c.fornitore || 'Consegna') + '</div>' +
-    '<div class="oggi-consegna-time">' + (missed ? 'Non arrivata' : (ora ? 'Previsto · ' + escapeHtml(ora) : 'Oggi in arrivo')) + '</div></div>' +
+    '<div class="oggi-consegna-time">' + sub + '</div></div>' +
     '<div class="oggi-consegna-actions">' + actions + '</div></div>';
 }
 
@@ -7881,15 +7905,23 @@ function renderOggiConsegne() {
     return;
   }
   const oggi = todayStr();
-  const pending = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const pending = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato !== 'consegnato' && c.stato !== 'non_arrivata' && c.stato !== 'bolla_da_fare');
   const missed = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi && c.stato === 'non_arrivata');
-  if (!pending.length && !missed.length) {
+  const bolle = consegneList.filter(c => c.stato === 'bolla_da_fare');
+  if (!pending.length && !missed.length && !bolle.length) {
     el.innerHTML = '';
     return;
   }
-  let html = '<p class="oggi-consegne-kicker">Consegne di oggi</p>';
-  if (pending.length) html += pending.map(consegnaOggiCard).join('');
-  if (missed.length) html += missed.map(consegnaOggiCard).join('');
+  let html = '';
+  if (pending.length || missed.length) {
+    html += '<p class="oggi-consegne-kicker">Consegne di oggi</p>';
+    if (pending.length) html += pending.map(consegnaOggiCard).join('');
+    if (missed.length) html += missed.map(consegnaOggiCard).join('');
+  }
+  if (bolle.length) {
+    html += '<p class="oggi-consegne-kicker">Bolle da confermare</p>';
+    html += bolle.map(consegnaOggiCard).join('');
+  }
   el.innerHTML = html;
   bindConsegnaActionButtons(el);
 }
@@ -7903,21 +7935,22 @@ function updateConsegneDash() {
   const domani = toDateStr(d);
   const oggiList = consegneList.filter(c => normalizeConsegnaDate(c.data) === oggi);
   const domaniList = consegneList.filter(c => normalizeConsegnaDate(c.data) === domani && c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
-  const pendingEarly = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const pendingEarly = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata' && c.stato !== 'bolla_da_fare');
   const missedEarly = oggiList.filter(c => c.stato === 'non_arrivata');
   const doneEarly = oggiList.filter(c => c.stato === 'consegnato');
+  const bollaAny = consegneList.some(c => c.stato === 'bolla_da_fare');
   if (!doneEarly.length && !domaniList.length) {
     el.classList.add('hidden');
     if (typeof renderOggiConsegne === 'function') renderOggiConsegne();
     if (typeof updateOggiBox === 'function') updateOggiBox();
     return;
   }
-  const pending = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata');
+  const pending = oggiList.filter(c => c.stato !== 'consegnato' && c.stato !== 'non_arrivata' && c.stato !== 'bolla_da_fare');
   const missed = oggiList.filter(c => c.stato === 'non_arrivata');
   const done = oggiList.filter(c => c.stato === 'consegnato');
   el.classList.remove('hidden');
   let html = '';
-  if (done.length && !pending.length && !missed.length) {
+  if (done.length && !pending.length && !missed.length && !bollaAny) {
     html += '<div class="consegne-dash-title">Oggi in arrivo</div>';
     html += '<div class="consegne-dash-done-all">Tutte consegnate</div>';
   }
@@ -7942,7 +7975,7 @@ function updateConsegneDash() {
   el.innerHTML = html;
   bindConsegnaActionButtons(el);
   el.onclick = (e) => {
-    if (e.target.closest('.btn-consegna-ok') || e.target.closest('.btn-consegna-miss')) return;
+    if (e.target.closest('.btn-consegna-ok') || e.target.closest('.btn-consegna-miss') || e.target.closest('.btn-consegna-bolla')) return;
     setConsegneFilter(pending.length || missed.length || oggiList.length ? 'oggi' : 'prossime');
     showPage('consegne');
     renderConsegne();
@@ -7980,7 +8013,8 @@ async function markConsegnaStato(id, stato) {
     showToast('Errore: ' + error.message, 'error');
     return;
   }
-  showToast((stato === 'consegnato' ? 'Consegnato' : 'Non arrivata') + ' · ' + (c.fornitore || ''), stato === 'consegnato' ? 'success' : 'warn');
+  const lab = stato === 'consegnato' ? 'Bolla confermata' : (stato === 'bolla_da_fare' ? 'Consegnato · manca la bolla' : 'Non arrivata');
+  showToast(lab + ' · ' + (c.fornitore || ''), stato === 'non_arrivata' ? 'warn' : 'success');
 }
 
 function openConsegnaForm(id) {
@@ -7996,7 +8030,7 @@ function openConsegnaForm(id) {
     document.getElementById('consegna-fornitore').value = c.fornitore || '';
     document.getElementById('consegna-ora').value = (c.ora || '').toString().slice(0, 5);
     document.getElementById('consegna-note').value = c.note || '';
-    document.getElementById('consegna-stato').value = (c.stato === 'consegnato' || c.stato === 'non_arrivata') ? c.stato : 'prevista';
+    document.getElementById('consegna-stato').value = (c.stato === 'consegnato' || c.stato === 'non_arrivata' || c.stato === 'bolla_da_fare') ? c.stato : 'prevista';
     if (btnDel) btnDel.classList.remove('hidden');
   } else {
     title.textContent = 'Nuova consegna';
