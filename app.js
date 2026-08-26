@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.79 - Versamento contanti ogni 5 chiusure, con conferma date
+// VERSION 2.80 - Sync scadenze oltre 1000 (paginazione Supabase)
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -344,7 +344,7 @@ async function loadCatalog() {
 async function loadEanRinomin() {
   if (!supabase) return;
   try {
-    const { data, error } = await supabase.from('ean_rinomini').select('*');
+    const { data, error } = await supabaseFetchAll('ean_rinomini', '*');
     if (error) {
       // Tabella assente: non bloccare l'app
       console.warn('ean_rinomini:', error.message);
@@ -413,19 +413,36 @@ async function loadEanRinomin() {
   }
 }
 
+
+async function supabaseFetchAll(table, columns) {
+  if (!supabase) return { data: [], error: new Error('no supabase') };
+  const page = 1000;
+  let from = 0;
+  const all = [];
+  columns = columns || '*';
+  while (true) {
+    const { data, error } = await supabase.from(table).select(columns).range(from, from + page - 1);
+    if (error) return { data: all, error };
+    if (data && data.length) all.push.apply(all, data);
+    if (!data || data.length < page) break;
+    from += page;
+    if (from >= 50000) break;
+  }
+  return { data: all, error: null };
+}
+
 // ---------- Load scadenze from Supabase ----------
-async function loadScadenzeFromCloud() {
+async function loadScadenzeFromCloud(opts) {
+  opts = opts || {};
   if (!supabase) {
     console.warn('Supabase not ready');
     return;
   }
   try {
-    const { data, error } = await supabase
-      .from('scadenze')
-      .select('*');
+    const { data, error } = await supabaseFetchAll('scadenze', '*');
     if (error) {
       console.error('Supabase load error:', error);
-      showToast('Errore caricamento cloud: ' + error.message);
+      if (!opts.silent) showToast('Errore caricamento cloud: ' + error.message);
       return;
     }
     if (!data || data.length === 0) {
@@ -452,7 +469,9 @@ async function loadScadenzeFromCloud() {
     // Accessori (guinzagli, giochi, ecc.): senza scadenza se non hanno data
     applyAccessoriesNoExpiry();
     console.log('Merged', data.length, 'scadenze from Supabase');
-    showToast(`Sincronizzate ${data.length} scadenze`);
+    const pc = document.getElementById('products-count');
+    if (pc) pc.textContent = String(products.length);
+    if (!opts.silent) showToast('Sincronizzate ' + data.length + ' scadenze · ' + products.length + ' prodotti');
   } catch (err) {
     console.error(err);
     showToast('Errore di rete verso Supabase');
@@ -462,7 +481,7 @@ async function loadScadenzeFromCloud() {
 async function loadNotesFromCloud() {
   if (!supabase || noteTableMissing) return;
   try {
-    const { data, error } = await supabase.from('prodotti_note').select('ean,note');
+    const { data, error } = await supabaseFetchAll('prodotti_note', 'ean,note');
     if (error) {
       const msg = (error.message || '') + '';
       if (/does not exist|schema cache|42P01/i.test(msg)) noteTableMissing = true;
@@ -3599,7 +3618,7 @@ async function runSync(silent) {
     await flushPendingCloud({ silent: true });
     await loadEanRinomin();
     await loadCustomProducts();
-    await loadScadenzeFromCloud();
+    await loadScadenzeFromCloud({ silent: !!silent });
     await loadNotesFromCloud();
     applyAccessoriesNoExpiry();
     await loadBacheca();
@@ -3995,7 +4014,7 @@ async function saveNewProduct() {
 async function loadCustomProducts() {
   if (!supabase) return;
   try {
-    const { data, error } = await supabase.from('prodotti_custom').select('*');
+    const { data, error } = await supabaseFetchAll('prodotti_custom', '*');
     if (error || !data) return;
     let added = 0;
     data.forEach(row => {
@@ -8023,7 +8042,8 @@ async function loadConsegne() {
     const { data, error } = await supabase
       .from('consegne')
       .select('*')
-      .order('data', { ascending: true });
+      .order('data', { ascending: true })
+      .range(0, 4999);
     if (error) {
       console.error('consegne:', error);
       showToast('Errore caricamento consegne: ' + error.message);
