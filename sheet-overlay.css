@@ -855,3 +855,19 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
 .badge.gestito { background: #e4f0e8; color: #1f6b45; border: 1px solid #86efac; }
 [data-theme="dark"] .badge.gestito { background: #14532d; color: #bbf7d0; border-color: #16a34a; }
 .btn-gestito-list { width: 100%; margin-top: 8px; }
+
+/* v2.79 versamento cassa */
+.cassa-versamento-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.cassa-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-weight: 700;
+  min-height: 48px;
+}
+.cassa-check input { width: 22px; height: 22px; accent-color: var(--primary); }
+[data-theme="dark"] .cassa-check { background: #292524; }
