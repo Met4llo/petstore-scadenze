@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.82 - Tasto Scanner in barra avvia subito la fotocamera
+// VERSION 2.83 - Spezzati 4+4 e 3+3 con orari in chiaro
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -4785,8 +4785,8 @@ const PROVA_LABEL = {
   '': '·',
   A: '9-17',
   C: '12-20',
-  S: '4+4',
-  S6: '3+3',
+  S: '09 13 - 16 20',
+  S6: '09 12 - 17 20',
   S7: '9-12/16-20',
   '7C': '11-20',
   '6A': '9-15',
@@ -4797,7 +4797,7 @@ const PROVA_LABEL = {
   '4C': '16-20',
   '3C': '17-20',
   B: 'Bagh.',
-  B44: 'Bag 4+4',
+  B44: 'BG 09 13 - 16 20',
   B4A: 'Bag 9-13',
   B4C: 'Bag 16-20',
   DM: '9-15',
@@ -4822,7 +4822,7 @@ const PROVA_TITLE = {
   '4C': '16:00–20:00 (4h)',
   '3C': '17:00–20:00 (3h)',
   B: 'Bagheria giornata (8h)',
-  B44: 'Bagheria 4+4 (09-13 e 16-20, 8h)',
+  B44: 'Bagheria 09 13 - 16 20 (8h)',
   B4A: 'Bagheria 09-13 (4h)',
   B4C: 'Bagheria 16-20 (4h)',
   DM: '09:00–15:00 (6h)',
@@ -5129,7 +5129,7 @@ function provaOpAtBagheria(day) {
 function provaBagheriaOptions() {
   return [
     ['L', 'Libero'],
-    ['B44', '4+4 (8h)'],
+    ['B44', '09 13 - 16 20 (8h)'],
     ['B4A', '09-13 (4h)'],
     ['B4C', '16-20 (4h)']
   ];
@@ -5180,8 +5180,8 @@ function provaCellOptions(day) {
     ['', '—'],
     ['A', '09-17 (8h)'],
     ['C', '12-20 (8h)'],
-    ['S', '4+4 (8h)'],
-    ['S6', '09-12 / 17-20 (6h)'],
+    ['S', '09 13 - 16 20 (8h)'],
+    ['S6', '09 12 - 17 20 (6h)'],
     ['S7', '09-12 / 16-20 (7h)'],
     ['7C', '11-20 (9h)'],
     ['6A', '09-15 (6h)'],
@@ -5191,7 +5191,7 @@ function provaCellOptions(day) {
     ['4A', '09-13 (4h)'],
     ['4C', '16-20 (4h)'],
     ['3C', '17-20 (3h)'],
-    ['B44', 'Bagheria 4+4'],
+    ['B44', 'Bagheria 09 13 - 16 20'],
     ['B4A', 'Bagheria 09-13'],
     ['B4C', 'Bagheria 16-20'],
     ['R', 'Riposo'],
@@ -5999,8 +5999,8 @@ function provaVincoloOptions(day) {
     ['M', 'Malattia (esclusa dal monte ore)'],
     ['A', '09-17 (8h)'],
     ['C', '12-20 (8h)'],
-    ['S', 'Spezzato 4+4 (8h)'],
-    ['S6', 'Spezzato 09-12 / 17-20 (6h)'],
+    ['S', 'Spezzato 09 13 - 16 20 (8h)'],
+    ['S6', 'Spezzato 09 12 - 17 20 (6h)'],
     ['S7', 'Spezzato 09-12 / 16-20 (7h)'],
     ['7C', '11-20 (9h)'],
     ['6A', '09-15 (6h)'],
