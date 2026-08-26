@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.80 - Sync scadenze oltre 1000 (paginazione Supabase)
+// VERSION 2.81 - Scanner si ferma dopo una lettura
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -3563,6 +3563,7 @@ function onScanSuccess(decodedText) {
   const product = products.find(p => p.ean === ean || p.ean === decodedText);
   scanFeedback(!!product, ean);
   pushScanHistory(ean, !!product);
+  stopScanner();
 }
 
 // ---------- Export / Import (backup) ----------
