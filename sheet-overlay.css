@@ -850,3 +850,8 @@ html[data-text="xl"] .oggi-row-title { font-size: 1.05rem; }
 .consegna-card .btn-consegna-bolla { width: 100%; margin-top: 10px; min-height: 44px; }
 [data-theme="dark"] .oggi-consegna-card.is-bolla { background: #7c2d12; }
 [data-theme="dark"] .consegna-badge.bolla { background: #7c2d12; color: #fed7aa; }
+
+/* v2.78 gestito */
+.badge.gestito { background: #e4f0e8; color: #1f6b45; border: 1px solid #86efac; }
+[data-theme="dark"] .badge.gestito { background: #14532d; color: #bbf7d0; border-color: #16a34a; }
+.btn-gestito-list { width: 100%; margin-top: 8px; }
