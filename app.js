@@ -1,5 +1,5 @@
 // ===== PetStore Scadenze App + Supabase =====
-// VERSION 2.83 - Spezzati 4+4 e 3+3 con orari in chiaro
+// VERSION 2.84 - Solo scadenze: via turni, consegne, task, missione, cassa, ordini
 const SUPABASE_URL = 'https://olfltcygpakierjzrhcr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZmx0Y3lncGFraWVyanpyaGNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTQ2NzQsImV4cCI6MjEwMTY3MDY3NH0.io1m5GR7twQXQELbJQl0pz6Ok-Fk3rKyf_u4kzNHfjQ';
 
@@ -818,10 +818,9 @@ function refreshProductViews() {
 }
 
 function showPage(pageId) {
-  if (pageId === 'ordini' && currentOperator !== 'Santoemma') {
-    showToast('Sezione riservata a Santoemma');
-    pageId = 'dashboard';
-  }
+  const removed = ['tasks', 'missione', 'turni', 'turni-prova', 'consegne', 'ordini'];
+  if (removed.indexOf(pageId) >= 0) pageId = 'dashboard';
+  if (!document.getElementById('page-' + pageId)) pageId = 'dashboard';
 
   const detailEl = document.getElementById('page-detail');
   const onDetail = detailEl && detailEl.classList.contains('active');
@@ -975,16 +974,8 @@ function runPageEnter(page) {
   if (page === 'dashboard') {
     updateDashboard();
     loadBacheca();
-    updateMyTasksAlert();
-    loadTurni();
-    loadOggiTurniDash();
   }
-  if (page === 'tasks') loadTasks();
-  if (page === 'turni') loadTurni();
-  if (page === 'turni-prova') loadTurniProva();
-  if (page === 'missione') refreshMissione();
   if (page === 'non-negozio') loadNonInNegozio().then(() => renderNonInNegozio());
-  if (page === 'consegne') loadConsegne();
 }
 
 function discardUnsavedAndLeave() {
@@ -1262,80 +1253,6 @@ function collectOggiItems() {
     });
   }
 
-  if (typeof isAfterMissionHour === 'function' && isAfterMissionHour() && typeof myMissionProgress === 'function') {
-    const prog = myMissionProgress();
-    const remaining = Math.max(0, (prog.total || 0) - (prog.done || 0));
-    if (prog.total > 0 && remaining > 0) {
-      items.push({
-        id: 'missione',
-        tone: 'warn',
-        title: 'Missione di oggi',
-        sub: prog.done + ' di ' + prog.total + ' controllati',
-        count: remaining,
-        go: function() { showPage('missione'); if (typeof renderMissione === 'function') renderMissione(); }
-      });
-    }
-  }
-
-  if (typeof getMyOpenTasks === 'function') {
-    const mine = getMyOpenTasks();
-    const overdue = mine.filter(t => typeof taskDueKind === 'function' && taskDueKind(t) === 'overdue');
-    const todayDue = mine.filter(t => typeof taskDueKind === 'function' && taskDueKind(t) === 'today');
-    const hotTasks = overdue.length + todayDue.length;
-    if (hotTasks) {
-      const bits = [];
-      if (overdue.length) bits.push(overdue.length === 1 ? '1 in ritardo' : (overdue.length + ' in ritardo'));
-      if (todayDue.length) bits.push(todayDue.length === 1 ? '1 per oggi' : (todayDue.length + ' per oggi'));
-      items.push({
-        id: 'tasks',
-        tone: overdue.length ? 'hot' : 'warn',
-        title: 'I tuoi task',
-        sub: bits.join(' · '),
-        count: hotTasks,
-        go: function() {
-          taskFilter = 'miei';
-          document.querySelectorAll('.task-filter-btn').forEach(b => {
-            b.classList.toggle('active', b.dataset.filter === 'miei');
-          });
-          showPage('tasks');
-          if (typeof renderTasks === 'function') renderTasks();
-        }
-      });
-    } else if (mine.length) {
-      items.push({
-        id: 'tasks',
-        tone: 'info',
-        title: 'I tuoi task',
-        sub: mine.length === 1 ? '1 ancora aperto' : (mine.length + ' ancora aperti'),
-        count: mine.length,
-        go: function() {
-          taskFilter = 'miei';
-          document.querySelectorAll('.task-filter-btn').forEach(b => {
-            b.classList.toggle('active', b.dataset.filter === 'miei');
-          });
-          showPage('tasks');
-          if (typeof renderTasks === 'function') renderTasks();
-        }
-      });
-    }
-  }
-
-  if (currentOperator && typeof monteSaldo === 'function') {
-    const saldo = monteSaldo(currentOperator);
-    if (saldo < -0.05) {
-      items.push({
-        id: 'monte',
-        tone: 'info',
-        title: 'Monte ore in debito',
-        sub: (typeof fmtOreDelta === 'function' ? fmtOreDelta(saldo) : String(saldo)) + ' · ' + currentOperator,
-        count: '',
-        go: function() {
-          if (!showPage('turni-prova')) return;
-          if (typeof runPageEnter === 'function') runPageEnter('turni-prova');
-        }
-      });
-    }
-  }
   return items;
 }
 
@@ -1344,20 +1261,10 @@ function updateOggiBox() {
   const box = document.getElementById('oggi-box');
   if (!list || !box) return;
   const items = collectOggiItems();
-  renderOggiCassa();
-  renderOggiConsegne();
-  const hasConsegne = !!(document.getElementById('oggi-consegne') && document.getElementById('oggi-consegne').innerHTML.trim());
-  const hasCassa = !!(document.getElementById('oggi-cassa') && document.getElementById('oggi-cassa').innerHTML.trim());
-  if (!items.length && !hasConsegne && !hasCassa) {
+  if (!items.length) {
     list.innerHTML = '<div class="oggi-empty">Niente in sospeso per oggi</div>';
     box.classList.add('is-clear');
     box.classList.remove('has-items');
-    return;
-  }
-  if (!items.length) {
-    list.innerHTML = '';
-    box.classList.remove('is-clear');
-    box.classList.add('has-items');
     return;
   }
   box.classList.remove('is-clear');
@@ -1375,7 +1282,6 @@ function updateOggiBox() {
       if (it && typeof it.go === 'function') it.go();
     };
   });
-  renderOggiConsegne();
 }
 
 function updateDashboard() {
@@ -1441,8 +1347,6 @@ function updateDashboard() {
   }
   updateSegnalareCount();
   if (typeof updateUrgentAlert === 'function') updateUrgentAlert();
-  if (typeof updateMissioneDash === 'function') updateMissioneDash();
-  if (typeof updateMonteDash === 'function') updateMonteDash();
   renderSyncStatus();
   if (typeof updateOggiBox === 'function') updateOggiBox();
   if (typeof updateHomeNavBadge === 'function') updateHomeNavBadge();
@@ -3627,14 +3531,8 @@ async function runSync(silent) {
     await loadNotesFromCloud();
     applyAccessoriesNoExpiry();
     await loadBacheca();
-    await loadTasks();
-    await loadTurni();
-    await refreshMissione();
     await loadNonInNegozio();
-    await loadConsegne();
-    await loadCassaChiusure();
     updateDashboard();
-    updateMyTasksAlert();
     markSync(true);
     if (!silent) showToast('Sincronizzazione completata', 'success');
   } catch (e) {
@@ -3736,12 +3634,7 @@ function enterApp() {
   updateDashboard();
   notifyUrgentOnLogin();
   loadBacheca();
-  loadTasks().then(() => notifyTasksOnLogin());
-  loadTurni();
-  refreshMissione();
   loadNonInNegozio();
-  loadConsegne();
-  loadCassaChiusure();
   startAutoSync();
 }
 
