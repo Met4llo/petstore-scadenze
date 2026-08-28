@@ -15,12 +15,12 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.83">
+  <link rel="stylesheet" href="styles.css?v=2.84">
   <style>
     .login-version{margin:18px 0 0;text-align:center;font-size:.8rem;font-weight:650;letter-spacing:.04em;color:#78716c;}
     [data-theme="dark"] .login-version{color:#a8a29e;}
   </style>
-  <link rel="stylesheet" href="sheet-overlay.css?v=2.83">
+  <link rel="stylesheet" href="sheet-overlay.css?v=2.84">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -37,7 +37,7 @@
         <button type="button" class="operator-card operator-btn" data-op="Pizzimenti"><span class="op-initial">P</span><span class="op-name">Pizzimenti</span></button>
         <button type="button" class="operator-card operator-btn" data-op="Sorrentino"><span class="op-initial">So</span><span class="op-name">Sorrentino</span></button>
       </div>
-      <p class="login-version" id="login-version">Versione 2.83</p>
+      <p class="login-version" id="login-version">Versione 2.84</p>
     </div>
   </div>
 
@@ -49,7 +49,7 @@
       <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
       <p id="login-error" class="error hidden">Password non corretta</p>
       <button type="button" id="btn-back-to-operators" class="btn-text-back">Cambia operatore</button>
-      <p class="login-version">Versione 2.83</p>
+      <p class="login-version">Versione 2.84</p>
     </div>
     <div class="login-footer">
       <button id="login-btn" class="btn btn-primary btn-large">Entra</button>
@@ -65,12 +65,6 @@
         </button>
         <div id="logo-dropdown" class="logo-dropdown hidden">
           <button type="button" class="logo-dropdown-item" data-page="dashboard">Home</button>
-          <button type="button" class="logo-dropdown-item" data-page="tasks">Task</button>
-          <button type="button" class="logo-dropdown-item" data-page="missione">Missione <span id="missione-menu-count" class="btn-count hidden">0</span></button>
-          <button type="button" class="logo-dropdown-item" data-page="turni">Turni (foto)</button>
-          <button type="button" class="logo-dropdown-item" data-page="turni-prova">Turni 2.0</button>
-          <button type="button" class="logo-dropdown-item" data-page="consegne">Consegne</button>
-          <button type="button" class="logo-dropdown-item menu-santoemma-only hidden" data-page="ordini">Ordini fornitore</button>
           <button type="button" class="logo-dropdown-item" data-page="scanner">Scanner / Cerca</button>
           <button type="button" class="logo-dropdown-item" data-page="list">Lista scadenze</button>
           <button type="button" class="logo-dropdown-item" data-page="non-negozio">Non in negozio</button>
@@ -96,13 +90,9 @@
         <span>Home</span>
         <span id="home-nav-count" class="nav-badge hidden">0</span>
       </button>
-      <button class="nav-btn" data-page="tasks">
-        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
-        <span>Task</span>
-      </button>
-      <button class="nav-btn" data-page="turni-prova">
-        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
-        <span>Turni</span>
+      <button class="nav-btn" data-page="list">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+        <span>Lista</span>
       </button>
       <button class="nav-btn" data-page="scanner">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -116,18 +106,10 @@
         <div id="oggi-box" class="oggi-box">
           <p class="dash-kicker" style="margin:0 0 8px">Cosa fare oggi</p>
           <div id="oggi-list" class="oggi-list"></div>
-          <div id="oggi-cassa" class="oggi-consegne"></div>
-          <div id="oggi-consegne" class="oggi-consegne"></div>
         </div>
         <p class="dash-kicker">Stato negozio</p>
         <div id="urgent-alert" class="urgent-alert hidden" role="status"></div>
         <div class="stats-grid stats-grid-home" id="stats-grid"></div>
-        <div id="monte-dash" class="monte-dash home-alert hidden"></div>
-        <div id="missione-dash" class="missione-dash home-alert hidden"></div>
-        <div id="my-tasks-alert" class="my-tasks-alert home-alert hidden"></div>
-        <p class="dash-kicker">Turni e consegne</p>
-        <div id="turni-dash" class="turni-oggi-dash home-alert hidden"></div>
-        <div id="consegne-dash" class="consegne-dash home-alert hidden"></div>
         <div class="bacheca-box">
           <div class="bacheca-header">
             <h3>Bacheca</h3>
@@ -154,335 +136,7 @@
         <div class="quick-actions">
           <button id="btn-go-scanner" class="btn btn-primary btn-large">Scansiona / Cerca prodotto</button>
           <button id="btn-go-segnalare-dash" class="btn btn-secondary btn-large menu-fuschi-only hidden" style="margin-top:8px;">Prodotti da segnalare <span id="segnalare-count" class="btn-count">0</span></button>
-          <button id="btn-go-ordini-dash" class="btn btn-secondary btn-large menu-santoemma-only hidden" style="margin-top:8px;">Ordini fornitore</button>
           <button id="btn-go-add-dash" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Aggiungi prodotto</button>
-        </div>
-      </section>
-
-      <section id="page-tasks" class="page">
-        <div class="list-header">
-          <p class="dash-kicker" style="margin:0">Task di reparto</p>
-          <button id="btn-new-task" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuovo</button>
-        </div>
-        <div class="task-filters">
-          <button class="task-filter-btn active" data-filter="miei">I miei</button>
-          <button class="task-filter-btn" data-filter="aperti">Aperti</button>
-          <button class="task-filter-btn" data-filter="tutti">Tutti</button>
-          <button class="task-filter-btn" data-filter="fatti">Completati</button>
-        </div>
-        <div id="tasks-list" class="tasks-list">
-          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
-        </div>
-        <div id="task-form-overlay" class="task-form-overlay hidden">
-          <div class="task-form-card">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-body">
-              <h3 id="task-form-title">Nuovo task</h3>
-              <div class="detail-row">
-                <label>Titolo *</label>
-                <input type="text" id="task-titolo" placeholder="Cosa c'è da fare">
-              </div>
-              <div class="detail-row">
-                <label>Descrizione</label>
-                <textarea id="task-descrizione" rows="2" placeholder="Dettagli opzionali"></textarea>
-              </div>
-              <div class="detail-row">
-                <label>Priorità</label>
-                <select id="task-priorita">
-                  <option value="normale">Normale</option>
-                  <option value="alta">Alta</option>
-                </select>
-              </div>
-              <div class="detail-row">
-                <label>Da fare entro</label>
-                <input type="date" id="task-due-date">
-                <p class="field-hint">Opzionale. In home compare se è oggi o in ritardo.</p>
-              </div>
-              <div class="detail-row">
-                <label>Responsabili * (seleziona uno o più)</label>
-                <div class="operator-checks" id="task-responsabili">
-                  <label class="check-label"><input type="checkbox" value="Santoemma"> Santoemma</label>
-                  <label class="check-label"><input type="checkbox" value="Fuschi"> Fuschi</label>
-                  <label class="check-label"><input type="checkbox" value="Pizzimenti"> Pizzimenti</label>
-                  <label class="check-label"><input type="checkbox" value="Sorrentino"> Sorrentino</label>
-                </div>
-              </div>
-              <button type="button" id="btn-cancel-task" class="btn-text-back">Annulla</button>
-            </div>
-            <div class="sheet-footer">
-              <button id="btn-save-task" class="btn btn-primary btn-large">Salva task</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="page-missione" class="page">
-        <p class="dash-kicker">Missione di oggi</p>
-        <p class="turni-hint">Prodotti in negozio ancora senza data. Ogni operatore ha una lista diversa.</p>
-        <div id="missione-status" class="missione-status">
-          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
-        </div>
-        <div id="missione-operators" class="missione-operators"></div>
-        <div id="missione-hide-bar" class="missione-hide-bar"></div>
-        <div id="missione-list" class="product-list">
-          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
-        </div>
-      </section>
-
-      <section id="page-turni" class="page">
-        <div class="list-header">
-          <p class="dash-kicker" style="margin:0">Turni</p>
-          <button id="btn-new-settimana" class="btn btn-primary" style="width:auto;padding:10px 16px;">Carica settimana</button>
-        </div>
-        <p class="turni-hint">Foto del foglio turni. Tocco per ingrandire. Lo storico resta sotto.</p>
-        <div id="turni-corrente" class="turni-corrente hidden"></div>
-        <h3 class="section-label">Storico settimane</h3>
-        <div id="turni-list" class="turni-list">
-          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
-        </div>
-        <div id="turno-form-overlay" class="task-form-overlay hidden">
-          <div class="task-form-card">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-body">
-              <h3 id="turno-form-title">Carica foglio turni</h3>
-              <div class="detail-row">
-                <label>Inizio settimana (lunedì) *</label>
-                <input type="date" id="turno-inizio">
-              </div>
-              <div class="detail-row">
-                <label>Fine settimana (domenica)</label>
-                <input type="date" id="turno-fine">
-              </div>
-              <div class="detail-row">
-                <label>Foto del foglio turni *</label>
-                <input type="file" id="turno-foto" accept="image/*">
-                <div id="turno-foto-preview" class="turno-foto-preview hidden"></div>
-              </div>
-              <div class="detail-row">
-                <label>Note (opzionale)</label>
-                <input type="text" id="turno-note" placeholder="Es. settimana con inventario">
-              </div>
-              <p id="turno-upload-msg" class="msg hidden"></p>
-              <button type="button" id="btn-cancel-turno" class="btn-text-back">Annulla</button>
-            </div>
-            <div class="sheet-footer">
-              <button id="btn-save-turno" class="btn btn-primary btn-large">Salva in archivio</button>
-            </div>
-          </div>
-        </div>
-        <div id="turno-viewer" class="turno-viewer hidden">
-          <div class="turno-viewer-toolbar">
-            <button id="btn-close-viewer" class="turno-viewer-close">Chiudi</button>
-            <span id="turno-viewer-caption" class="turno-viewer-caption"></span>
-            <div class="turno-zoom-btns">
-              <button type="button" id="btn-zoom-out" class="turno-zoom-btn">−</button>
-              <button type="button" id="btn-zoom-reset" class="turno-zoom-btn">1:1</button>
-              <button type="button" id="btn-zoom-in" class="turno-zoom-btn">+</button>
-            </div>
-          </div>
-          <div id="turno-viewer-stage" class="turno-viewer-stage">
-            <img id="turno-viewer-img" src="" alt="Foglio turni">
-          </div>
-          <p class="turno-viewer-hint">Pizzica per zoom · trascina per spostare · usa + / −</p>
-        </div>
-      </section>
-
-      <section id="page-turni-prova" class="page">
-        <p class="dash-kicker">Turni 2.0</p>
-        <p class="turni-hint">Visibile a tutti. Il vecchio sistema (foto) resta in Turni. Tocca le date, poi Genera e Salva.</p>
-        <div class="prova-week-bar">
-          <button type="button" id="btn-prova-prev" class="turno-zoom-btn">‹</button>
-          <label class="prova-week-pick">
-            <span id="prova-week-label">Settimana</span>
-            <input type="date" id="prova-week-date" class="prova-week-date-vis" aria-label="Scegli la settimana">
-          </label>
-          <button type="button" id="btn-prova-next" class="turno-zoom-btn">›</button>
-        </div>
-        <button type="button" id="btn-prova-oggi" class="btn btn-secondary btn-large" style="margin-bottom:12px;">Settimana in corso</button>
-        <button type="button" id="btn-prova-generate" class="btn btn-primary btn-large" style="margin-bottom:12px;">Genera settimana</button>
-        <button type="button" id="btn-prova-swap" class="btn btn-secondary btn-large" style="margin-bottom:12px;">Scambia turni</button>
-        <button type="button" id="btn-prova-unlock" class="btn btn-secondary btn-large hidden" style="margin-bottom:12px;">Sblocca per correzione</button>
-        <p class="prova-phone-hint">Sul telefono scorri la griglia in orizzontale. La colonna nomi resta ferma.</p>
-        <div class="theme-toggle prova-mine-toggle" id="prova-mine-toggle">
-          <button type="button" id="btn-prova-all" class="theme-btn">Tutti</button>
-          <button type="button" id="btn-prova-mine" class="theme-btn">Solo i miei</button>
-        </div>
-        <div class="prova-legend">
-          <span class="leg-pv pv-malfa">La Malfa</span>
-          <span class="leg-pv pv-rizzo">Rizzo</span>
-          <span class="leg-pv pv-lorenzo">San Lorenzo</span>
-          <span class="leg-pv pv-bagheria">Bagheria</span>
-          <span class="leg-pv pv-riposo">Riposo</span>
-          <span class="leg-pv pv-ferie">Ferie</span>
-          <span class="leg-pv pv-malattia">Malattia</span>
-        </div>
-        <div id="prova-check" class="prova-check is-empty">Settimana vuota. Premi Genera settimana.</div>
-        <div class="prova-split">
-          <div class="prova-split-grid">
-            <div class="prova-grid-scroll">
-            <div id="prova-grid" class="prova-grid-wrap"></div>
-            </div>
-            <button type="button" id="btn-prova-save" class="btn btn-primary btn-large prova-edit-only" style="margin-top:14px;">Salva settimana</button>
-            <button type="button" id="btn-prova-draft-save" class="btn btn-secondary btn-large prova-edit-only" style="margin-top:8px;">Salva bozza</button>
-            <button type="button" id="btn-prova-draft-load" class="btn btn-secondary btn-large prova-edit-only" style="margin-top:8px;">Riprendi bozza</button>
-            <p id="prova-draft-hint" class="field-hint" style="margin-top:6px;"></p>
-            <button type="button" id="btn-prova-share" class="btn btn-secondary btn-large" style="margin-top:8px;">Crea immagine da inviare</button>
-            <button type="button" id="btn-prova-print" class="btn btn-secondary btn-large" style="margin-top:8px;">Stampa / PDF</button>
-            <button type="button" id="btn-copy-prova-sql" class="btn btn-secondary btn-large prova-edit-only" style="margin-top:8px;">Copia SQL tabella</button>
-            <p id="prova-status" class="field-hint" style="margin-top:8px;"></p>
-          </div>
-          <aside class="monte-ore-panel" id="monte-ore-panel">
-            <p class="dash-kicker" style="margin:0 0 6px">Monte ore</p>
-            <p class="field-hint" style="margin-bottom:10px">Rispetto alle 40h: in più = straordinario, in meno = debito. Ferie = un giorno pieno (40÷6 = 6h40). Malattia non conta come ore e non sposta il monte. Rettifiche: solo Fuschi e Santoemma.</p>
-            <div id="monte-saldi" class="monte-saldi"></div>
-            <button type="button" id="btn-monte-csv" class="btn btn-secondary btn-large" style="margin-top:8px;">Esporta CSV</button>
-            <button type="button" id="btn-monte-print" class="btn btn-secondary btn-large" style="margin-top:8px;">Stampa / PDF</button>
-            <div id="monte-edit-form" class="monte-edit-form">
-            <p class="monte-form-title">Rettifica manuale</p>
-            <select id="monte-op" aria-label="Operatore"></select>
-            <input type="date" id="monte-data" aria-label="Data">
-            <div class="monte-ore-row">
-              <select id="monte-segno" aria-label="Più o meno">
-                <option value="piu">Ore in più</option>
-                <option value="meno">Ore in meno</option>
-              </select>
-              <input type="number" id="monte-ore" min="0.5" max="24" step="0.5" placeholder="Ore" inputmode="decimal">
-            </div>
-            <textarea id="monte-motivo" rows="2" placeholder="Motivo (obbligatorio)"></textarea>
-            <button type="button" id="btn-monte-add" class="btn btn-primary btn-large">Aggiungi rettifica</button>
-            <button type="button" id="btn-monte-cancel" class="btn btn-secondary btn-large hidden" style="margin-top:8px;">Annulla modifica</button>
-            </div>
-            <p class="monte-form-title" style="margin-top:14px">Storico</p>
-            <div id="monte-storico" class="monte-storico"></div>
-          </aside>
-        </div>
-        <div id="prova-vincoli-overlay" class="task-form-overlay hidden">
-          <div class="task-form-card">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-body">
-              <h3>Vincoli della settimana</h3>
-              <label class="prova-vincoli-week-lab">Settimana da generare
-                <input type="date" id="prova-vincoli-week">
-              </label>
-              <p class="field-hint">Primo orario + negozio. Opzionale: 2° orario in un altro punto vendita (es. 09-13 La Malfa e 16-20 Rizzo).</p>
-              <div id="prova-vincoli-form"></div>
-            </div>
-            <div class="sheet-footer">
-              <button type="button" id="btn-prova-vincoli-ok" class="btn btn-primary btn-large">Genera con questi vincoli</button>
-              <button type="button" id="btn-prova-vincoli-skip" class="btn btn-secondary btn-large" style="margin-top:8px;">Genera senza vincoli</button>
-              <button type="button" id="btn-prova-vincoli-cancel" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Annulla</button>
-            </div>
-          </div>
-        </div>
-        <div id="prova-share-overlay" class="task-form-overlay hidden">
-          <div class="task-form-card">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-body">
-              <h3>Immagine turni</h3>
-              <p class="field-hint">Tieni premuto per salvare, oppure Condividi per WhatsApp e altre chat.</p>
-              <img id="prova-share-img" class="prova-share-img" alt="Turni della settimana">
-            </div>
-            <div class="sheet-footer">
-              <button type="button" id="btn-prova-share-send" class="btn btn-primary btn-large">Condividi</button>
-              <button type="button" id="btn-prova-share-close" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Chiudi</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="page-consegne" class="page">
-        <div class="list-header">
-          <p class="dash-kicker" style="margin:0">Consegne</p>
-          <button id="btn-new-consegna" class="btn btn-primary" style="width:auto;padding:10px 16px;">Nuova</button>
-        </div>
-        <p class="turni-hint">Arrivi fornitori. Dopo Consegnato resta in Home finché non confermi la bolla.</p>
-        <div id="consegne-cal" class="consegne-cal"></div>
-        <div class="task-filters" id="consegne-filters">
-          <button class="task-filter-btn" data-cfilter="oggi">Oggi</button>
-          <button class="task-filter-btn active" data-cfilter="prossime">Prossime</button>
-          <button class="task-filter-btn" data-cfilter="storico">Storico</button>
-        </div>
-        <div id="consegne-list" class="consegne-list">
-          <div class="skel-list" aria-hidden="true"><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div><div class="skel-card"><div class="skel-line w70"></div><div class="skel-line w40"></div></div></div>
-        </div>
-        <div id="consegna-form-overlay" class="task-form-overlay hidden">
-          <div class="task-form-card">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-body">
-              <h3 id="consegna-form-title">Nuova consegna</h3>
-              <div class="detail-row">
-                <label>Data *</label>
-                <input type="date" id="consegna-data">
-              </div>
-              <div class="detail-row">
-                <label>Fornitore *</label>
-                <select id="consegna-fornitore">
-                  <option value="">— Seleziona fornitore —</option>
-                </select>
-              </div>
-              <div class="detail-row">
-                <label>Ora (opzionale)</label>
-                <input type="time" id="consegna-ora">
-              </div>
-              <div class="detail-row">
-                <label>Note</label>
-                <input type="text" id="consegna-note" placeholder="Es. scarico retro, 20 colli...">
-              </div>
-              <div class="detail-row">
-                <label>Stato</label>
-                <select id="consegna-stato">
-                  <option value="prevista">Prevista</option>
-                  <option value="bolla_da_fare">Consegnato · bolla da fare</option>
-                  <option value="consegnato">Bolla caricata</option>
-                  <option value="non_arrivata">Non arrivata</option>
-                </select>
-              </div>
-              <button type="button" id="btn-delete-consegna" class="btn-text-back btn-danger-text hidden">Elimina consegna</button>
-              <button type="button" id="btn-cancel-consegna" class="btn-text-back">Annulla</button>
-            </div>
-            <div class="sheet-footer">
-              <button id="btn-save-consegna" class="btn btn-primary btn-large">Salva</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="page-ordini" class="page">
-        <p class="dash-kicker">Ordini fornitore</p>
-        <p class="turni-hint">Importa la statistica Excel (1 file = 1 fornitore). L’app calcola l’ordine consigliato in pezzi o cartoni.</p>
-        <div class="ordini-setup card-block">
-          <div class="detail-row">
-            <label>Nome fornitore *</label>
-            <input type="text" id="ordine-fornitore" placeholder="Es. FARMAZOO, LIUJO, CAMON...">
-          </div>
-          <div class="detail-row">
-            <label>Periodo (testo libero)</label>
-            <input type="text" id="ordine-periodo" placeholder="Es. 18/06/2026 → 11/08/2026">
-          </div>
-          <div class="detail-row">
-            <label>File statistica (.xlsx)</label>
-            <input type="file" id="ordine-file" accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-          </div>
-          <button type="button" id="btn-parse-ordine" class="btn btn-primary btn-large">Analizza file</button>
-          <p id="ordine-parse-msg" class="msg hidden"></p>
-        </div>
-        <div id="ordine-result" class="hidden">
-          <p class="dash-kicker" style="margin-top:16px" id="ordine-result-title">Proposta ordine</p>
-          <select id="ordine-filter" class="sr-only" tabindex="-1" aria-hidden="true">
-              <option value="da-ordinare">Solo da ordinare</option>
-              <option value="alta">Priorità alta</option>
-              <option value="tutti">Tutti i prodotti</option>
-          </select>
-          <div class="list-chips" role="tablist" aria-label="Filtri ordine">
-            <button type="button" class="list-chip active" data-ofilter="da-ordinare">Da ordinare</button>
-            <button type="button" class="list-chip" data-ofilter="alta">Priorità alta</button>
-            <button type="button" class="list-chip" data-ofilter="tutti">Tutti</button>
-          </div>
-          <p id="ordine-summary" class="turni-hint"></p>
-          <div id="ordine-table-wrap" class="ordine-table-wrap"></div>
-          <button type="button" id="btn-copy-ordine" class="btn btn-primary btn-large" style="margin-top:12px;">Copia ordine da inviare</button>
-          <button type="button" id="btn-share-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Condividi</button>
-          <button type="button" id="btn-clear-ordine" class="btn btn-secondary btn-large" style="margin-top:8px;">Nuova analisi</button>
         </div>
       </section>
 
@@ -651,7 +305,7 @@
           <p class="field-hint" style="margin-top:12px;">Tabelle extra (storico + note): una volta, su Supabase → SQL Editor</p>
           <button type="button" id="btn-copy-log-sql" class="btn btn-secondary" style="margin-top:8px;">Copia SQL tabelle extra</button>
         </div>
-        <p class="info" id="app-version">Versione 2.83 – Pet Store La Malfa</p>
+        <p class="info" id="app-version">Versione 2.84 – Pet Store La Malfa</p>
         <p class="info">Prodotti caricati: <span id="products-count">0</span></p>
       </section>
     </main>
@@ -687,22 +341,8 @@
     </div>
   </div>
 
-  <div id="cassa-versamento-overlay" class="task-form-overlay hidden">
-    <div class="task-form-card">
-      <div class="sheet-handle" aria-hidden="true"></div>
-      <div class="sheet-body">
-        <h3>Conferma versamento</h3>
-        <p class="field-hint">Spunta le chiusure che stai versando. Le altre restano da versare.</p>
-        <div id="cassa-versamento-list" class="cassa-versamento-list"></div>
-      </div>
-      <div class="sheet-footer">
-        <button type="button" id="btn-cassa-versamento-ok" class="btn btn-primary btn-large">Conferma versamento</button>
-        <button type="button" id="btn-cassa-versamento-cancel" class="btn-text-back" style="display:block;width:100%;margin-top:12px;">Annulla</button>
-      </div>
-    </div>
-  </div>
   <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=2.83"></script>
-  <script src="fuschi-home.js?v=2.83"></script>
+  <script src="app.js?v=2.84"></script>
+  <script src="fuschi-home.js?v=2.84"></script>
 </body>
 </html>
